@@ -47,6 +47,11 @@ This crate supports `no_std` targets that support the `alloc` crate.
   - `#[foo(...), bar = ...,]`
   - All braces/brackets/parens must be paired correctly?
 
+## Other related projects
+
+- [`rsn-fmt`](https://github.com/ModProg/rsn-fmt): A formatter project for `rsn`.
+- [`rsn.vim`](https://github.com/ModProg/rsn.vim): A plugin for Vim/NeoVim.
+
 ## Why not Ron?
 
 [Ron](https://crates.io/crates/ron) is a great format. There were a few design

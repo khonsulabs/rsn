@@ -558,15 +558,15 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
         negative: bool,
     ) -> Result<Token<'a>, Error> {
         match self.chars.peek() {
-            Some('x') => {
+            Some('x') | Some('X') => {
                 self.chars.next();
                 return self.tokenize_radix_number::<4>(signed, negative);
             }
-            Some('b') => {
+            Some('b') | Some('B') => {
                 self.chars.next();
                 return self.tokenize_radix_number::<1>(signed, negative);
             }
-            Some('o') => {
+            Some('o') | Some('O') => {
                 self.chars.next();
                 return self.tokenize_radix_number::<3>(signed, negative);
             }
@@ -1099,7 +1099,7 @@ mod tests {
             &[Token::new(0..3, TokenKind::Integer(Integer::Usize(1)))],
         );
         test_tokens(
-            "0x12",
+            "0X12",
             &[Token::new(0..4, TokenKind::Integer(Integer::Usize(0x12)))],
         );
         test_tokens(
@@ -1236,7 +1236,7 @@ mod tests {
             &[Token::new(0..3, TokenKind::Integer(Integer::Usize(1)))],
         );
         test_tokens(
-            "0o12",
+            "0O12",
             &[Token::new(0..4, TokenKind::Integer(Integer::Usize(0o12)))],
         );
         test_tokens(
@@ -1371,7 +1371,7 @@ mod tests {
             &[Token::new(0..3, TokenKind::Integer(Integer::Usize(1)))],
         );
         test_tokens(
-            "0b10",
+            "0B10",
             &[Token::new(0..4, TokenKind::Integer(Integer::Usize(0b10)))],
         );
         test_tokens(
