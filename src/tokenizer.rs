@@ -734,7 +734,9 @@ impl<'a, const INCLUDE_ALL: bool> Iterator for Tokenizer<'a, INCLUDE_ALL> {
                 ch if is_rust_whitespace(ch) => {
                     loop {
                         match self.chars.peek() {
-                            Some(ch) if is_rust_whitespace(ch) => {}
+                            Some(ch) if is_rust_whitespace(ch) => {
+                                self.chars.next();
+                            }
                             _ => break,
                         }
                     }
