@@ -65,10 +65,8 @@ decisions that led to this very-similar-yet-not-the-same format being invented:
   other enum.
 - `ron`'s parsing rules are close but not the same as Rust, while `rsn` attempts
   to match implementations:
-  - Rust allows unicode identifiers
-  - Rust allows additional whitespace characters
+  - Unicode white space and idents (added in [ron-rs/ron#](https://github.com/ron-rs/ron/pull/444)
   - Rust allows `_` in float literals
   - Rust allows for raw line endings to be escaped in string literals.
-  - Rust supports multi-line comments `/* ... */`
   - Rust supports byte strings and byte literals, while Ron elected to use
     `base64` encoded strings for byte values.
