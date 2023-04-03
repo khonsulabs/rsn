@@ -20,7 +20,7 @@ This crate supports `no_std` targets that support the `alloc` crate.
 
 ## Data Types
 
-- Integers (`42`, `0xFF`, `0o77`, `ob101`)
+- Integers (`42`, `0xFF`, `0o77`, `0b101`)
 - Floats (`42.`, `3.14`, `)
 - Bool (`true`, `false`)
 - Character (`'a'`, `'\''`)
@@ -65,7 +65,8 @@ decisions that led to this very-similar-yet-not-the-same format being invented:
   other enum.
 - `ron`'s parsing rules are close but not the same as Rust, while `rsn` attempts
   to match implementations:
-  - Unicode white space and idents (added in [ron-rs/ron#](https://github.com/ron-rs/ron/pull/444)
+  - Unicode white space and idents (added in
+    [ron-rs/ron#444](https://github.com/ron-rs/ron/pull/444))
   - Rust allows `_` in float literals
   - Rust allows for raw line endings to be escaped in string literals.
   - Rust supports byte strings and byte literals, while Ron elected to use
