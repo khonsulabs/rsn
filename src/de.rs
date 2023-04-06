@@ -59,7 +59,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
 
     deserialize_int_impl!(deserialize_u128, visit_u128, into_u128);
 
-    fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+    fn deserialize_any<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
     where
         V: serde::de::Visitor<'de>,
     {
@@ -239,7 +239,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
 
                 visitor.visit_seq(self)
             }
-            Some(other) => {
+            Some(_other) => {
                 todo!("expected struct")
             }
             None => todo!("unexpected eof"),
@@ -272,7 +272,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
                     todo!("expected a tuple")
                 }
             }
-            Some(other) => {
+            Some(_other) => {
                 todo!("expected tuple struct")
             }
             None => todo!("unexpected eof"),
@@ -293,7 +293,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
 
                 visitor.visit_map(self)
             }
-            Some(other) => {
+            Some(_other) => {
                 todo!("expected struct")
             }
             None => todo!("unexpected eof"),
@@ -319,7 +319,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
                     todo!("expected a map")
                 }
             }
-            Some(other) => {
+            Some(_other) => {
                 todo!("expected struct")
             }
             None => todo!("unexpected eof"),
@@ -330,8 +330,8 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
 
     fn deserialize_enum<V>(
         self,
-        name: &'static str,
-        variants: &'static [&'static str],
+        _name: &'static str,
+        _variants: &'static [&'static str],
         visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
@@ -351,7 +351,25 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: serde::de::Visitor<'de>,
     {
-        todo!()
+        let mut depth = 0;
+        loop {
+            match self.parser.next().transpose()? {
+                Some(Event::BeginNested { .. }) => {
+                    depth += 1;
+                }
+                Some(Event::EndNested) => {
+                    depth -= 1;
+                }
+                Some(Event::Primitive(_)) => {}
+                None => todo!("unexpected eof"),
+            }
+
+            if depth == 0 {
+                break;
+            }
+        }
+
+        visitor.visit_unit()
     }
 }
 
