@@ -10,7 +10,10 @@ The syntax differs from valid Rust code for:
 - Enum Variants being used without the type name -- `Red` vs `Color::Red`
   - This is technically valid Rust syntax if `use Color::*` is present.
 - Infinity and Not-A-Number floats are represented as
-  `+Inf`/`-Inf`/`+NaN`/`-NaN`.
+  `+inf`/`-inf`/`+NaN`/`-NaN`.
+  - For compatibility with Rust syntax, support for
+    [`f64::INFINITY`](https://github.com/khonsulabs/rsn/issues/3) is being
+    considered.
 
 The rules for parsing literals should match Rust's rules as closely as possible.
 

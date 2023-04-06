@@ -106,6 +106,16 @@ impl Integer {
     fn_integer_into!(into_i128, i128);
 
     fn_integer_into!(into_isize, isize);
+
+    #[inline]
+    pub const fn is_zero(self) -> bool {
+        match self {
+            Integer::Usize(value) => value == 0,
+            Integer::Isize(value) => value == 0,
+            Integer::UnsignedLarge(value) => value == 0,
+            Integer::SignedLarge(value) => value == 0,
+        }
+    }
 }
 
 #[cfg(feature = "integer128")]

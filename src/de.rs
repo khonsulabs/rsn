@@ -1,8 +1,9 @@
 use alloc::borrow::Cow;
 use alloc::string::String;
 use core::iter::Peekable;
+use serde::Deserializer as _;
 
-use serde::de::{MapAccess, SeqAccess};
+use serde::de::{EnumAccess, MapAccess, SeqAccess, VariantAccess};
 
 use crate::parser::{Error, Event, Nested, Parser, Primitive};
 
@@ -62,35 +63,50 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: serde::de::Visitor<'de>,
     {
-        todo!()
+        todo!("implement after serialization is implemented")
     }
 
     fn deserialize_bool<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: serde::de::Visitor<'de>,
     {
-        todo!()
+        match self.parser.next().transpose()? {
+            Some(Event::Primitive(Primitive::Bool(value))) => visitor.visit_bool(value),
+            Some(Event::Primitive(Primitive::Integer(value))) => {
+                visitor.visit_bool(!value.is_zero())
+            }
+            Some(_) => todo!("expected bool"),
+            None => todo!("unexpected eof"),
+        }
     }
 
     fn deserialize_f32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: serde::de::Visitor<'de>,
     {
-        todo!()
+        self.deserialize_f64(visitor)
     }
 
     fn deserialize_f64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: serde::de::Visitor<'de>,
     {
-        todo!()
+        match self.parser.next().transpose()? {
+            Some(Event::Primitive(Primitive::Float(value))) => visitor.visit_f64(value),
+            Some(_) => todo!("expected float"),
+            None => todo!("unexpected eof"),
+        }
     }
 
     fn deserialize_char<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: serde::de::Visitor<'de>,
     {
-        todo!()
+        match self.parser.next().transpose()? {
+            Some(Event::Primitive(Primitive::Char(value))) => visitor.visit_char(value),
+            Some(_) => todo!("expected char"),
+            None => todo!("unexpected eof"),
+        }
     }
 
     fn deserialize_str<V>(self, visitor: V) -> Result<V::Value, Self::Error>
@@ -109,7 +125,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
                 }
                 Cow::Owned(bytes) => visitor.visit_string(String::from_utf8(bytes).unwrap()),
             },
-            Some(_) => todo!("expected identifier"),
+            Some(_) => todo!("expected string"),
             None => todo!("unexpected eof"),
         }
     }
@@ -125,50 +141,90 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: serde::de::Visitor<'de>,
     {
-        todo!()
+        match self.parser.next().transpose()? {
+            Some(Event::Primitive(Primitive::Identifier(str)))
+            | Some(Event::Primitive(Primitive::String(str))) => match str {
+                Cow::Borrowed(str) => visitor.visit_borrowed_bytes(str.as_bytes()),
+                Cow::Owned(str) => visitor.visit_byte_buf(str.into_bytes()),
+            },
+            Some(Event::Primitive(Primitive::Bytes(bytes))) => match bytes {
+                Cow::Borrowed(bytes) => visitor.visit_borrowed_bytes(bytes),
+                Cow::Owned(bytes) => visitor.visit_byte_buf(bytes),
+            },
+            Some(_) => todo!("expected bytes"),
+            None => todo!("unexpected eof"),
+        }
     }
 
     fn deserialize_byte_buf<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: serde::de::Visitor<'de>,
     {
-        todo!()
+        self.deserialize_bytes(visitor)
     }
 
     fn deserialize_option<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: serde::de::Visitor<'de>,
     {
-        todo!()
+        match self.parser.next().transpose()? {
+            Some(Event::Primitive(Primitive::Identifier(str))) if str == "None" => {
+                visitor.visit_none()
+            }
+            Some(Event::BeginNested {
+                name,
+                kind: Nested::Tuple,
+            }) if name.as_deref() == Some("Some") => {
+                let result = visitor.visit_some(&mut *self)?;
+                match self.parser.next().transpose()? {
+                    Some(Event::EndNested) => {}
+                    _ => todo!("expected end paren"),
+                }
+                Ok(result)
+            }
+            Some(_) => todo!("expected option"),
+            None => todo!("unexpected eof"),
+        }
     }
 
     fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: serde::de::Visitor<'de>,
     {
-        todo!()
+        match self.parser.next().transpose()? {
+            Some(Event::BeginNested {
+                kind: Nested::Tuple,
+                ..
+            }) => match self.parser.next().transpose()? {
+                Some(Event::EndNested) => visitor.visit_unit(),
+                Some(_) => todo!("expected unit, found tuple"),
+                None => todo!("unexpected eof"),
+            },
+            Some(_) => todo!("expected unit, found tuple"),
+            None => todo!("unexpected eof"),
+        }
     }
 
     fn deserialize_unit_struct<V>(
         self,
-        name: &'static str,
+        _name: &'static str,
         visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
         V: serde::de::Visitor<'de>,
     {
-        todo!()
+        self.deserialize_unit(visitor)
     }
 
     fn deserialize_newtype_struct<V>(
         self,
-        name: &'static str,
+        _name: &'static str,
         visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
         V: serde::de::Visitor<'de>,
     {
-        todo!()
+        self.deserialize_seq(visitor)
     }
 
     fn deserialize_seq<V>(self, visitor: V) -> Result<V::Value, Self::Error>
@@ -178,7 +234,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
         match self.parser.next().transpose()? {
             Some(Event::BeginNested { kind, .. }) => {
                 if !matches!(kind, Nested::Tuple | Nested::List) {
-                    todo!("expected a tuple")
+                    todo!("expected a tuple or list")
                 }
 
                 visitor.visit_seq(self)
@@ -194,19 +250,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: serde::de::Visitor<'de>,
     {
-        match self.parser.next().transpose()? {
-            Some(Event::BeginNested { kind, .. }) => {
-                if kind != Nested::Tuple {
-                    todo!("expected a tuple")
-                }
-
-                visitor.visit_seq(self)
-            }
-            Some(other) => {
-                todo!("expected struct")
-            }
-            None => todo!("unexpected eof"),
-        }
+        self.deserialize_seq(visitor)
     }
 
     fn deserialize_tuple_struct<V>(
@@ -227,14 +271,14 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
                 if kind != Nested::Tuple {
                     todo!("expected a tuple")
                 }
-
-                visitor.visit_seq(self)
             }
             Some(other) => {
-                todo!("expected struct")
+                todo!("expected tuple struct")
             }
             None => todo!("unexpected eof"),
         }
+
+        visitor.visit_seq(self)
     }
 
     fn deserialize_map<V>(self, visitor: V) -> Result<V::Value, Self::Error>
@@ -274,14 +318,14 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
                 if kind != Nested::Map {
                     todo!("expected a map")
                 }
-
-                visitor.visit_map(self)
             }
             Some(other) => {
                 todo!("expected struct")
             }
             None => todo!("unexpected eof"),
         }
+
+        visitor.visit_map(self)
     }
 
     fn deserialize_enum<V>(
@@ -293,7 +337,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: serde::de::Visitor<'de>,
     {
-        todo!()
+        visitor.visit_enum(self)
     }
 
     fn deserialize_identifier<V>(self, visitor: V) -> Result<V::Value, Self::Error>
@@ -323,7 +367,7 @@ impl<'de> MapAccess<'de> for Deserializer<'de> {
                 self.parser.next();
                 Ok(None)
             }
-            Some(_) => seed.deserialize(&mut *self).map(Some),
+            Some(_) => seed.deserialize(self).map(Some),
             None => todo!("unexpected eof"),
         }
     }
@@ -348,9 +392,67 @@ impl<'de> SeqAccess<'de> for Deserializer<'de> {
                 self.parser.next();
                 Ok(None)
             }
-            Some(_) => seed.deserialize(&mut *self).map(Some),
+            Some(_) => seed.deserialize(self).map(Some),
             None => todo!("unexpected eof"),
         }
+    }
+}
+
+impl<'a, 'de> EnumAccess<'de> for &'a mut Deserializer<'de> {
+    type Error = Error;
+
+    type Variant = Self;
+
+    fn variant_seed<V>(self, seed: V) -> Result<(V::Value, Self::Variant), Self::Error>
+    where
+        V: serde::de::DeserializeSeed<'de>,
+    {
+        let variant = seed.deserialize(&mut *self)?;
+        Ok((variant, self))
+    }
+}
+
+impl<'a, 'de> VariantAccess<'de> for &'a mut Deserializer<'de> {
+    type Error = Error;
+
+    fn unit_variant(self) -> Result<(), Self::Error> {
+        match self.parser.next().transpose()? {
+            Some(Event::BeginNested {
+                kind: Nested::Tuple,
+                ..
+            }) => match self.parser.next().transpose()? {
+                Some(Event::EndNested) => Ok(()),
+                Some(_) => todo!("expected unit, found tuple"),
+                None => todo!("unexpected eof"),
+            },
+            Some(_) => todo!("expected unit, found tuple"),
+            None => todo!("unexpected eof"),
+        }
+    }
+
+    fn newtype_variant_seed<T>(self, seed: T) -> Result<T::Value, Self::Error>
+    where
+        T: serde::de::DeserializeSeed<'de>,
+    {
+        seed.deserialize(self)
+    }
+
+    fn tuple_variant<V>(self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: serde::de::Visitor<'de>,
+    {
+        self.deserialize_tuple(len, visitor)
+    }
+
+    fn struct_variant<V>(
+        self,
+        _fields: &'static [&'static str],
+        visitor: V,
+    ) -> Result<V::Value, Self::Error>
+    where
+        V: serde::de::Visitor<'de>,
+    {
+        self.deserialize_map(visitor)
     }
 }
 
@@ -376,5 +478,23 @@ mod tests {
         }
         let parsed = crate::from_str::<BasicNamed>(r#"BasicNamed{ a: 1, b: -1 }"#).unwrap();
         assert_eq!(parsed, BasicNamed { a: 1, b: -1 });
+    }
+
+    #[test]
+    fn optional() {
+        #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+        struct BasicNamed {
+            a: u32,
+            b: i32,
+        }
+
+        assert_eq!(
+            crate::from_str::<Option<BasicNamed>>(r#"None"#).unwrap(),
+            None
+        );
+
+        let parsed =
+            crate::from_str::<Option<BasicNamed>>(r#"Some(BasicNamed{ a: 1, b: -1 })"#).unwrap();
+        assert_eq!(parsed, Some(BasicNamed { a: 1, b: -1 }));
     }
 }
