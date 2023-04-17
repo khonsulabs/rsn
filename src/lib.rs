@@ -13,7 +13,7 @@ pub mod value;
 
 #[cfg(feature = "serde")]
 pub fn from_str<'de, D: serde::Deserialize<'de>>(source: &'de str) -> Result<D, parser::Error> {
-    let mut parser = de::Deserializer::new(source);
+    let mut parser = de::Deserializer::new(source, parser::Config::default());
     // TODO verify eof
     D::deserialize(&mut parser)
 }

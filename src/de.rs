@@ -5,16 +5,16 @@ use core::iter::Peekable;
 use serde::de::{EnumAccess, MapAccess, SeqAccess, VariantAccess};
 use serde::Deserializer as _;
 
-use crate::parser::{Error, Event, Nested, Parser, Primitive};
+use crate::parser::{Config, Error, Event, Nested, Parser, Primitive};
 
 pub struct Deserializer<'de> {
     parser: Peekable<Parser<'de>>,
 }
 
 impl<'de> Deserializer<'de> {
-    pub fn new(source: &'de str) -> Self {
+    pub fn new(source: &'de str, config: Config) -> Self {
         Self {
-            parser: Parser::new(source).peekable(),
+            parser: Parser::new(source, config).peekable(),
         }
     }
 }
@@ -319,8 +319,8 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
                     todo!("expected a map")
                 }
             }
-            Some(_other) => {
-                todo!("expected struct")
+            Some(other) => {
+                todo!("expected struct, got {other:?}")
             }
             None => todo!("unexpected eof"),
         }
@@ -486,6 +486,8 @@ impl serde::de::Error for Error {
 mod tests {
     use serde::{Deserialize, Serialize};
 
+    use crate::parser::Config;
+
     #[test]
     fn basic_named() {
         #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
@@ -494,6 +496,24 @@ mod tests {
             b: i32,
         }
         let parsed = crate::from_str::<BasicNamed>(r#"BasicNamed{ a: 1, b: -1 }"#).unwrap();
+        assert_eq!(parsed, BasicNamed { a: 1, b: -1 });
+    }
+
+    #[test]
+    fn implicit_map() {
+        #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+        struct BasicNamed {
+            a: u32,
+            b: i32,
+        }
+        let parsed = BasicNamed::deserialize(&mut crate::de::Deserializer::new(
+            r#"a: 1,
+            b: -1"#,
+            Config {
+                allow_implicit_map: true,
+            },
+        ))
+        .unwrap();
         assert_eq!(parsed, BasicNamed { a: 1, b: -1 });
     }
 

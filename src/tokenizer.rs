@@ -159,7 +159,7 @@ pub enum Balanced {
     Bracket,
 }
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct Tokenizer<'a, const INCLUDE_ALL: bool> {
     chars: CharIterator<'a>,
     scratch: String,
