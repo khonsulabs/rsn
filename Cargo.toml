@@ -23,4 +23,7 @@ serde = { version = "1.0.159", features = ["derive"] }
 
 [package.metadata.docs.rs]
 rustdoc-args = ["--cfg", "docsrs"]
-features = ["heapless"]
+features = ["std,serde"]
+
+[workspace]
+members = ["xtask"]
