@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["Literal","StructContents"],"struct":["Annotated","Attribute","Identifier","List","Map","Type"],"type":["OwnedValue","Value"]};

@@ -1,0 +1,1 @@
+window.SIDEBAR_ITEMS = {"enum":["Balanced","ErrorKind","Integer","TokenKind"],"struct":["Error","Token","Tokenizer"],"trait":["Integral"]};
