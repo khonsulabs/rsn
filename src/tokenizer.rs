@@ -794,6 +794,15 @@ impl Error {
     }
 }
 
+impl Display for Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(f, "{} at {:?}", self.kind, self.location)
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for Error {}
+
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub enum ErrorKind {
     UnexpectedEof,
