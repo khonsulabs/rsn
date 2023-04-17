@@ -15,7 +15,9 @@ serde = ["dep:serde"]
 nightly = []               # Enables unstable documentation features outside of docs.rs
 
 [dependencies]
-serde = { version = "1.0.159", optional = true }
+serde = { version = "1.0.159", optional = true, default-features = false, features = [
+    "alloc",
+] }
 unicode-ident = "1.0.8"
 
 [dev-dependencies]
