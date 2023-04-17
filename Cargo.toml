@@ -2,14 +2,17 @@
 name = "rsn"
 version = "0.1.0"
 edition = "2021"
-
-# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+license = "MIT OR Apache-2.0"
+repository = "https://github.com/khonsulabs/rsn"
+readme = "./README.md"
+rust-version = "1.65"
 
 [features]
 default = ["serde", "std"]
 integer128 = []
 std = ["serde/std"]
 serde = ["dep:serde"]
+nightly = []               # Enables unstable documentation features outside of docs.rs
 
 [dependencies]
 serde = { version = "1.0.159", optional = true }
@@ -17,3 +20,7 @@ unicode-ident = "1.0.8"
 
 [dev-dependencies]
 serde = { version = "1.0.159", features = ["derive"] }
+
+[package.metadata.docs.rs]
+rustdoc-args = ["--cfg", "docsrs"]
+features = ["heapless"]

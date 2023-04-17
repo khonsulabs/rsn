@@ -1,9 +1,9 @@
 use alloc::borrow::Cow;
 use alloc::string::String;
 use core::iter::Peekable;
-use serde::Deserializer as _;
 
 use serde::de::{EnumAccess, MapAccess, SeqAccess, VariantAccess};
+use serde::Deserializer as _;
 
 use crate::parser::{Error, Event, Nested, Parser, Primitive};
 
@@ -418,7 +418,6 @@ impl<'de> SeqAccess<'de> for Deserializer<'de> {
 
 impl<'a, 'de> EnumAccess<'de> for &'a mut Deserializer<'de> {
     type Error = Error;
-
     type Variant = Self;
 
     fn variant_seed<V>(self, seed: V) -> Result<(V::Value, Self::Variant), Self::Error>
