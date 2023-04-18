@@ -542,6 +542,7 @@
 <a href="#542" id="542">542</a>
 <a href="#543" id="543">543</a>
 <a href="#544" id="544">544</a>
+<a href="#545" id="545">545</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>alloc::borrow::Cow;
 <span class="kw">use </span>alloc::string::String;
 <span class="kw">use </span>core::iter::Peekable;
@@ -1039,6 +1040,7 @@
             a: u32,
             b: i32,
         }
+
         <span class="kw">let </span>parsed = <span class="kw">crate</span>::from_str::&lt;BasicNamed&gt;(<span class="string">r#&quot;BasicNamed{ a: 1, b: -1 }&quot;#</span>).unwrap();
         <span class="macro">assert_eq!</span>(parsed, BasicNamed { a: <span class="number">1</span>, b: -<span class="number">1 </span>});
     }
