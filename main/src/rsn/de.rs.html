@@ -515,6 +515,33 @@
 <a href="#515" id="515">515</a>
 <a href="#516" id="516">516</a>
 <a href="#517" id="517">517</a>
+<a href="#518" id="518">518</a>
+<a href="#519" id="519">519</a>
+<a href="#520" id="520">520</a>
+<a href="#521" id="521">521</a>
+<a href="#522" id="522">522</a>
+<a href="#523" id="523">523</a>
+<a href="#524" id="524">524</a>
+<a href="#525" id="525">525</a>
+<a href="#526" id="526">526</a>
+<a href="#527" id="527">527</a>
+<a href="#528" id="528">528</a>
+<a href="#529" id="529">529</a>
+<a href="#530" id="530">530</a>
+<a href="#531" id="531">531</a>
+<a href="#532" id="532">532</a>
+<a href="#533" id="533">533</a>
+<a href="#534" id="534">534</a>
+<a href="#535" id="535">535</a>
+<a href="#536" id="536">536</a>
+<a href="#537" id="537">537</a>
+<a href="#538" id="538">538</a>
+<a href="#539" id="539">539</a>
+<a href="#540" id="540">540</a>
+<a href="#541" id="541">541</a>
+<a href="#542" id="542">542</a>
+<a href="#543" id="543">543</a>
+<a href="#544" id="544">544</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>alloc::borrow::Cow;
 <span class="kw">use </span>alloc::string::String;
 <span class="kw">use </span>core::iter::Peekable;
@@ -522,16 +549,16 @@
 <span class="kw">use </span>serde::de::{EnumAccess, MapAccess, SeqAccess, VariantAccess};
 <span class="kw">use </span>serde::Deserializer <span class="kw">as _</span>;
 
-<span class="kw">use </span><span class="kw">crate</span>::parser::{Error, Event, Nested, Parser, Primitive};
+<span class="kw">use </span><span class="kw">crate</span>::parser::{Config, Error, Event, Nested, Parser, Primitive};
 
 <span class="kw">pub struct </span>Deserializer&lt;<span class="lifetime">&#39;de</span>&gt; {
     parser: Peekable&lt;Parser&lt;<span class="lifetime">&#39;de</span>&gt;&gt;,
 }
 
 <span class="kw">impl</span>&lt;<span class="lifetime">&#39;de</span>&gt; Deserializer&lt;<span class="lifetime">&#39;de</span>&gt; {
-    <span class="kw">pub fn </span>new(source: <span class="kw-2">&amp;</span><span class="lifetime">&#39;de </span>str) -&gt; <span class="self">Self </span>{
+    <span class="kw">pub fn </span>new(source: <span class="kw-2">&amp;</span><span class="lifetime">&#39;de </span>str, config: Config) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{
-            parser: Parser::new(source).peekable(),
+            parser: Parser::new(source, config).peekable(),
         }
     }
 }
@@ -836,8 +863,8 @@
                     <span class="macro">todo!</span>(<span class="string">&quot;expected a map&quot;</span>)
                 }
             }
-            <span class="prelude-val">Some</span>(_other) =&gt; {
-                <span class="macro">todo!</span>(<span class="string">&quot;expected struct&quot;</span>)
+            <span class="prelude-val">Some</span>(other) =&gt; {
+                <span class="macro">todo!</span>(<span class="string">&quot;expected struct, got {other:?}&quot;</span>)
             }
             <span class="prelude-val">None </span>=&gt; <span class="macro">todo!</span>(<span class="string">&quot;unexpected eof&quot;</span>),
         }
@@ -1003,6 +1030,8 @@
 </span><span class="kw">mod </span>tests {
     <span class="kw">use </span>serde::{Deserialize, Serialize};
 
+    <span class="kw">use </span><span class="kw">crate</span>::parser::Config;
+
     <span class="attr">#[test]
     </span><span class="kw">fn </span>basic_named() {
         <span class="attr">#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
@@ -1011,6 +1040,31 @@
             b: i32,
         }
         <span class="kw">let </span>parsed = <span class="kw">crate</span>::from_str::&lt;BasicNamed&gt;(<span class="string">r#&quot;BasicNamed{ a: 1, b: -1 }&quot;#</span>).unwrap();
+        <span class="macro">assert_eq!</span>(parsed, BasicNamed { a: <span class="number">1</span>, b: -<span class="number">1 </span>});
+    }
+
+    <span class="attr">#[test]
+    </span><span class="kw">fn </span>implicit_map() {
+        <span class="attr">#[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
+        </span><span class="kw">struct </span>BasicNamed {
+            a: u32,
+            b: i32,
+        }
+        <span class="kw">let </span>parsed = BasicNamed::deserialize(<span class="kw-2">&amp;mut </span><span class="kw">crate</span>::de::Deserializer::new(
+            <span class="string">r#&quot;a: 1 b: -1&quot;#</span>,
+            Config {
+                allow_implicit_map: <span class="bool-val">true</span>,
+            },
+        ))
+        .unwrap();
+        <span class="macro">assert_eq!</span>(parsed, BasicNamed { a: <span class="number">1</span>, b: -<span class="number">1 </span>});
+        <span class="kw">let </span>parsed = BasicNamed::deserialize(<span class="kw-2">&amp;mut </span><span class="kw">crate</span>::de::Deserializer::new(
+            <span class="string">r#&quot;a: 1, b: -1,&quot;#</span>,
+            Config {
+                allow_implicit_map: <span class="bool-val">true</span>,
+            },
+        ))
+        .unwrap();
         <span class="macro">assert_eq!</span>(parsed, BasicNamed { a: <span class="number">1</span>, b: -<span class="number">1 </span>});
     }
 
