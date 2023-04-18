@@ -114,8 +114,8 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
         V: serde::de::Visitor<'de>,
     {
         match self.parser.next().transpose()? {
-            Some(Event::Primitive(Primitive::Identifier(str)))
-            | Some(Event::Primitive(Primitive::String(str))) => match str {
+            Some(Event::Primitive(Primitive::Identifier(str))) => visitor.visit_borrowed_str(str),
+            Some(Event::Primitive(Primitive::String(str))) => match str {
                 Cow::Borrowed(str) => visitor.visit_borrowed_str(str),
                 Cow::Owned(str) => visitor.visit_string(str),
             },
@@ -142,8 +142,10 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
         V: serde::de::Visitor<'de>,
     {
         match self.parser.next().transpose()? {
-            Some(Event::Primitive(Primitive::Identifier(str)))
-            | Some(Event::Primitive(Primitive::String(str))) => match str {
+            Some(Event::Primitive(Primitive::Identifier(str))) => {
+                visitor.visit_borrowed_bytes(str.as_bytes())
+            }
+            Some(Event::Primitive(Primitive::String(str))) => match str {
                 Cow::Borrowed(str) => visitor.visit_borrowed_bytes(str.as_bytes()),
                 Cow::Owned(str) => visitor.visit_byte_buf(str.into_bytes()),
             },
@@ -174,7 +176,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
             Some(Event::BeginNested {
                 name,
                 kind: Nested::Tuple,
-            }) if name.as_deref() == Some("Some") => {
+            }) if name == Some("Some") => {
                 let result = visitor.visit_some(&mut *self)?;
                 match self.parser.next().transpose()? {
                     Some(Event::EndNested) => {}

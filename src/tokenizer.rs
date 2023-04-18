@@ -33,11 +33,11 @@ pub enum TokenKind<'a> {
     Byte(u8),
     String(Cow<'a, str>),
     Bytes(Cow<'a, [u8]>),
-    Identifier(Cow<'a, str>),
+    Identifier(&'a str),
     Open(Balanced),
     Close(Balanced),
-    Comment(Cow<'a, str>), // TODO needs comment kind -- block vs line
-    Whitespace,
+    Comment(&'a str), // TODO needs comment kind -- block vs line
+    Whitespace(&'a str),
 }
 
 impl<'a> Eq for TokenKind<'a> {}
@@ -1028,7 +1028,7 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
                 match source {
                     "true" if !is_raw => TokenKind::Bool(true),
                     "false" if !is_raw => TokenKind::Bool(false),
-                    _ => TokenKind::Identifier(Cow::Borrowed(source)),
+                    _ => TokenKind::Identifier(source),
                 },
             ))
         } else {
@@ -1037,6 +1037,69 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
                 kind: ErrorKind::Unexpected(initial_char),
             })
         }
+    }
+
+    fn tokenize_comment(&mut self) -> Result<Token<'a>, Error> {
+        match self.next_or_eof()? {
+            '*' => self.tokenize_block_comment(),
+            '/' => self.tokenize_single_line_comment(),
+            other => Err(Error::new(
+                self.chars.last_char_range(),
+                ErrorKind::Unexpected(other),
+            )),
+        }
+    }
+
+    fn tokenize_block_comment(&mut self) -> Result<Token<'a>, Error> {
+        let mut nests = 1;
+        while nests > 0 {
+            match self.next_or_eof()? {
+                '*' => {
+                    if self.chars.peek() == Some('/') {
+                        self.chars.next();
+                        nests -= 1;
+                        if nests == 0 {
+                            break;
+                        }
+                    }
+                }
+                '/' => {
+                    if self.chars.peek() == Some('*') {
+                        self.chars.next();
+                        nests += 1;
+                    }
+                }
+                '\r' => {
+                    self.forbid_isolated_cr()?;
+                }
+                _ => {}
+            }
+        }
+
+        Ok(Token::new(
+            self.chars.marked_range(),
+            TokenKind::Comment(&self.chars.source[self.chars.marked_range()]),
+        ))
+    }
+
+    fn tokenize_single_line_comment(&mut self) -> Result<Token<'a>, Error> {
+        loop {
+            match self.chars.peek() {
+                Some('\r') => {
+                    self.forbid_isolated_cr()?;
+                    break;
+                }
+                Some('\n') | None => break,
+                _ => {
+                    self.chars.next();
+                }
+            }
+        }
+        let range = self.chars.marked_range();
+        Ok(Token::new(
+            range.clone(),
+            TokenKind::Comment(&self.chars.source[range]),
+        ))
     }
 }
 
@@ -1112,12 +1175,24 @@ impl<'a, const INCLUDE_ALL: bool> Iterator for Tokenizer<'a, INCLUDE_ALL> {
                         }
                     }
                     if INCLUDE_ALL {
-                        Ok(Token::new(self.chars.marked_range(), TokenKind::Whitespace))
+                        Ok(Token::new(
+                            self.chars.marked_range(),
+                            TokenKind::Whitespace(self.chars.marked_str()),
+                        ))
                     } else {
                         continue;
                     }
                 }
-                '/' => todo!("comments"),
+                '/' => {
+                    let comment = self.tokenize_comment();
+                    if INCLUDE_ALL {
+                        comment
+                    } else if let Err(err) = comment {
+                        Err(err)
+                    } else {
+                        continue;
+                    }
+                }
                 ch => self.tokenize_identifier(Some(ch)),
             };
             break Some(result);
@@ -1279,6 +1354,7 @@ mod tests {
     use alloc::vec::Vec;
 
     use super::*;
+
     #[track_caller]
     fn test_tokens(source: &str, tokens: &[Token<'_>]) {
         assert_eq!(
@@ -1288,6 +1364,17 @@ mod tests {
             tokens
         );
     }
+
+    #[track_caller]
+    fn test_tokens_full(source: &str, tokens: &[Token<'_>]) {
+        assert_eq!(
+            &Tokenizer::full(source)
+                .collect::<Result<Vec<_>, _>>()
+                .unwrap(),
+            tokens
+        );
+    }
+
     #[track_caller]
     fn test_tokens_err(source: &str, location: Range<usize>, kind: ErrorKind) {
         let err = Tokenizer::minified(source)
@@ -1302,30 +1389,15 @@ mod tests {
         test_tokens("true", &[Token::new(0..4, TokenKind::Bool(true))]);
         test_tokens("false", &[Token::new(0..5, TokenKind::Bool(false))]);
 
-        test_tokens(
-            "r#true",
-            &[Token::new(
-                0..6,
-                TokenKind::Identifier(Cow::Borrowed("true")),
-            )],
-        );
+        test_tokens("r#true", &[Token::new(0..6, TokenKind::Identifier("true"))]);
         test_tokens(
             "r#false",
-            &[Token::new(
-                0..7,
-                TokenKind::Identifier(Cow::Borrowed("false")),
-            )],
+            &[Token::new(0..7, TokenKind::Identifier("false"))],
         );
 
-        test_tokens(
-            "_",
-            &[Token::new(0..1, TokenKind::Identifier(Cow::Borrowed("_")))],
-        );
+        test_tokens("_", &[Token::new(0..1, TokenKind::Identifier("_"))]);
 
-        test_tokens(
-            "_0",
-            &[Token::new(0..2, TokenKind::Identifier(Cow::Borrowed("_0")))],
-        );
+        test_tokens("_0", &[Token::new(0..2, TokenKind::Identifier("_0"))]);
 
         test_tokens_err("=", 0..1, ErrorKind::Unexpected('='));
     }
@@ -1916,11 +1988,11 @@ mod tests {
             "{a:1,b:2}",
             &[
                 Token::new(0..1, TokenKind::Open(Balanced::Brace)),
-                Token::new(1..2, TokenKind::Identifier(Cow::Borrowed("a"))),
+                Token::new(1..2, TokenKind::Identifier("a")),
                 Token::new(2..3, TokenKind::Colon),
                 Token::new(3..4, TokenKind::Integer(Integer::Usize(1))),
                 Token::new(4..5, TokenKind::Comma),
-                Token::new(5..6, TokenKind::Identifier(Cow::Borrowed("b"))),
+                Token::new(5..6, TokenKind::Identifier("b")),
                 Token::new(6..7, TokenKind::Colon),
                 Token::new(7..8, TokenKind::Integer(Integer::Usize(2))),
                 Token::new(8..9, TokenKind::Close(Balanced::Brace)),
@@ -2056,5 +2128,34 @@ mod tests {
         test_string!(br###""##"###);
         test_string!(br#"abc"#);
         test_string!(br#""\r\t\n\0\x41\u{1_F980}\\\"""#);
+    }
+
+    #[test]
+    fn block_comments() {
+        macro_rules! test_comment {
+            ($comment:tt) => {
+                test_tokens_full(
+                    $comment,
+                    &[Token::new(0..$comment.len(), TokenKind::Comment($comment))],
+                );
+            };
+        }
+        test_comment!("/* hello */");
+        test_comment!("/*** /* hello */ **/");
+    }
+
+    #[test]
+    fn single_line_comments() {
+        test_tokens_full(
+            "// test",
+            &[Token::new(0..7, TokenKind::Comment("// test"))],
+        );
+        test_tokens_full(
+            "// test\n",
+            &[
+                Token::new(0..7, TokenKind::Comment("// test")),
+                Token::new(7..8, TokenKind::Whitespace("\n")),
+            ],
+        );
     }
 }

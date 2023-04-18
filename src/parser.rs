@@ -131,7 +131,7 @@ impl<'s> Parser<'s> {
             TokenKind::Colon | TokenKind::Comma | TokenKind::Close(_) => {
                 todo!("expected value, got something else.")
             }
-            TokenKind::Comment(_) | TokenKind::Whitespace => unreachable!("disabled"),
+            TokenKind::Comment(_) | TokenKind::Whitespace(_) => unreachable!("disabled"),
         }
     }
 
@@ -351,7 +351,7 @@ pub struct Config {
 #[derive(Debug, Clone, Eq, PartialEq)]
 enum State<'s> {
     AtStart,
-    StartingImplicitMap(Cow<'s, str>),
+    StartingImplicitMap(&'s str),
     ImplicitMap(MapState),
     Finished,
 }
@@ -397,10 +397,7 @@ pub enum ErrorKind {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Event<'s> {
-    BeginNested {
-        name: Option<Cow<'s, str>>,
-        kind: Nested,
-    },
+    BeginNested { name: Option<&'s str>, kind: Nested },
     EndNested,
     Primitive(Primitive<'s>),
 }
@@ -450,7 +447,7 @@ pub enum Primitive<'s> {
     Float(f64),
     Char(char),
     String(Cow<'s, str>),
-    Identifier(Cow<'s, str>),
+    Identifier(&'s str),
     Bytes(Cow<'s, [u8]>),
 }
 
@@ -541,9 +538,9 @@ mod tests {
                     name: None,
                     kind: Nested::Map
                 },
-                Event::Primitive(Primitive::Identifier(Cow::Borrowed("a"))),
+                Event::Primitive(Primitive::Identifier("a")),
                 Event::Primitive(Primitive::Integer(Integer::Usize(1))),
-                Event::Primitive(Primitive::Identifier(Cow::Borrowed("b"))),
+                Event::Primitive(Primitive::Identifier("b")),
                 Event::Primitive(Primitive::Integer(Integer::Usize(2))),
                 Event::EndNested,
             ]
@@ -558,9 +555,9 @@ mod tests {
                     name: None,
                     kind: Nested::Map
                 },
-                Event::Primitive(Primitive::Identifier(Cow::Borrowed("a"))),
+                Event::Primitive(Primitive::Identifier("a")),
                 Event::Primitive(Primitive::Integer(Integer::Usize(1))),
-                Event::Primitive(Primitive::Identifier(Cow::Borrowed("b"))),
+                Event::Primitive(Primitive::Identifier("b")),
                 Event::Primitive(Primitive::Integer(Integer::Usize(2))),
                 Event::EndNested,
             ]
