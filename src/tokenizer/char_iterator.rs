@@ -2,7 +2,7 @@ use core::iter::Peekable;
 use core::ops::Range;
 use core::str::CharIndices;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct CharIterator<'a> {
     pub source: &'a str,
     chars: Peekable<CharIndices<'a>>,

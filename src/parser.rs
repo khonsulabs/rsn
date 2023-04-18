@@ -1,24 +1,28 @@
 use alloc::borrow::Cow;
 use alloc::vec::Vec;
 use core::fmt::{Display, Formatter};
+use core::mem;
 use core::ops::Range;
 
 use crate::tokenizer::{self, Balanced, Integer, Token, TokenKind, Tokenizer};
 
+#[derive(Debug)]
 pub struct Parser<'s> {
     tokens: Tokenizer<'s, false>,
     peeked: Option<Result<Token<'s>, tokenizer::Error>>,
     nested: Vec<NestedState>,
-    finished: bool,
+    root_state: State<'s>,
+    config: Config,
 }
 
 impl<'s> Parser<'s> {
-    pub fn new(source: &'s str) -> Self {
+    pub fn new(source: &'s str, config: Config) -> Self {
         Self {
             tokens: Tokenizer::minified(source),
             peeked: None,
             nested: Vec::new(),
-            finished: false,
+            root_state: State::AtStart,
+            config,
         }
     }
 
@@ -154,11 +158,20 @@ impl<'s> Parser<'s> {
         }
     }
 
+    fn map_state_mut(&mut self) -> &mut MapState {
+        if let Some(nested) = self.nested.last_mut() {
+            let NestedState::Map(map_state) = nested else { unreachable!("not a map state") };
+            map_state
+        } else {
+            let State::ImplicitMap(map_state) = &mut self.root_state else { unreachable!("not a map state") };
+            map_state
+        }
+    }
+
     fn parse_map(&mut self, state: MapState) -> Result<Event<'s>, Error> {
         match state {
             MapState::ExpectingKey => {
-                *self.nested.last_mut().expect("required for this fn") =
-                    NestedState::Map(MapState::ExpectingColon);
+                *self.map_state_mut() = MapState::ExpectingColon;
 
                 let token = self.next_or_eof()?;
                 self.parse_token(token, Some(Balanced::Brace))
@@ -166,31 +179,84 @@ impl<'s> Parser<'s> {
             MapState::ExpectingColon => {
                 let token = self.next_or_eof()?;
                 if matches!(token.kind, TokenKind::Colon) {
-                    *self.nested.last_mut().expect("required for this fn") =
-                        NestedState::Map(MapState::ExpectingValue);
+                    *self.map_state_mut() = MapState::ExpectingValue;
                     self.parse_map(MapState::ExpectingValue)
                 } else {
                     todo!("expected colon, got {token:?}")
                 }
             }
             MapState::ExpectingValue => {
-                *self.nested.last_mut().expect("required for this fn") =
-                    NestedState::Map(MapState::ExpectingComma);
+                *self.map_state_mut() = MapState::ExpectingComma;
 
                 let token = self.next_or_eof()?;
-                self.parse_token(token, Some(Balanced::Brace))
+                self.parse_token(token, None)
             }
             MapState::ExpectingComma => {
-                let token = self.next_or_eof()?;
-                match token.kind {
-                    TokenKind::Close(closed) if closed == Balanced::Brace => {
+                let token = self.next_token().transpose()?.map(|token| token.kind);
+                match token {
+                    Some(TokenKind::Close(closed)) if closed == Balanced::Brace => {
                         self.nested.pop();
                         Ok(Event::EndNested)
                     }
-                    TokenKind::Comma => {
-                        *self.nested.last_mut().expect("required for this fn") =
-                            NestedState::Map(MapState::ExpectingKey);
+                    Some(TokenKind::Comma) => {
+                        *self.map_state_mut() = MapState::ExpectingKey;
                         self.parse_map(MapState::ExpectingKey)
+                    }
+                    _ => todo!("expected comma or end"),
+                }
+            }
+        }
+    }
+
+    fn parse_implicit_map(&mut self, state: MapState) -> Result<Event<'s>, Error> {
+        match state {
+            MapState::ExpectingKey => {
+                let token = self.next_token().transpose()?;
+                match token.map(|token| token.kind) {
+                    Some(TokenKind::Identifier(key)) => {
+                        self.root_state = State::ImplicitMap(MapState::ExpectingColon);
+                        Ok(Event::Primitive(Primitive::Identifier(key)))
+                    }
+                    None => {
+                        self.root_state = State::Finished;
+                        Ok(Event::EndNested)
+                    }
+                    _ => todo!("expected map key"),
+                }
+            }
+            MapState::ExpectingColon => {
+                let token = self.next_or_eof()?;
+                if matches!(token.kind, TokenKind::Colon) {
+                    self.root_state = State::ImplicitMap(MapState::ExpectingValue);
+                    self.parse_implicit_map(MapState::ExpectingValue)
+                } else {
+                    todo!("expected colon, got {token:?}")
+                }
+            }
+            MapState::ExpectingValue => {
+                self.root_state = State::ImplicitMap(MapState::ExpectingComma);
+
+                let token = self.next_or_eof()?;
+                self.parse_token(token, None)
+            }
+            MapState::ExpectingComma => {
+                let token = self.next_token().transpose()?.map(|token| token.kind);
+                match token {
+                    Some(TokenKind::Close(closed)) if closed == Balanced::Brace => {
+                        self.root_state = State::Finished;
+                        Ok(Event::EndNested)
+                    }
+                    Some(TokenKind::Comma) => {
+                        self.root_state = State::ImplicitMap(MapState::ExpectingKey);
+                        self.parse_implicit_map(MapState::ExpectingKey)
+                    }
+                    Some(TokenKind::Identifier(key)) => {
+                        self.root_state = State::ImplicitMap(MapState::ExpectingColon);
+                        Ok(Event::Primitive(Primitive::Identifier(key)))
+                    }
+                    None => {
+                        self.root_state = State::Finished;
+                        Ok(Event::EndNested)
                     }
                     _ => todo!("expected comma or end"),
                 }
@@ -204,22 +270,86 @@ impl<'s> Iterator for Parser<'s> {
 
     fn next(&mut self) -> Option<Self::Item> {
         Some(match self.nested.last() {
-            None => match self.next_token()? {
-                Ok(token) => {
-                    if self.finished {
-                        todo!("error: trailing junk")
+            None => match &self.root_state {
+                State::AtStart => {
+                    let token = match self.next_token()? {
+                        Ok(token) => token,
+                        Err(err) => return Some(Err(err.into())),
+                    };
+                    if self.config.allow_implicit_map
+                        && matches!(token.kind, TokenKind::Identifier(_))
+                    {
+                        let TokenKind::Identifier(identifier) = token.kind
+                            else { unreachable!("just matched")};
+                        match self.peek() {
+                            Some(token) if matches!(token.kind, TokenKind::Colon) => {
+                                // Switch to parsing an implicit map
+                                self.root_state = State::StartingImplicitMap(identifier);
+                                Ok(Event::BeginNested {
+                                    name: None,
+                                    kind: Nested::Map,
+                                })
+                            }
+                            Some(token)
+                                if matches!(
+                                    token.kind,
+                                    TokenKind::Open(Balanced::Brace | Balanced::Paren,)
+                                ) =>
+                            {
+                                let Some(Ok(Token{ kind: TokenKind::Open(kind), ..})) = self.next_token()
+                                    else { unreachable!("just peeked") };
+                                self.root_state = State::Finished;
+                                Ok(Event::BeginNested {
+                                    name: Some(identifier),
+                                    kind: match kind {
+                                        Balanced::Paren => Nested::Tuple,
+                                        Balanced::Brace => Nested::Map,
+                                        Balanced::Bracket => {
+                                            unreachable!("not matched in peek")
+                                        }
+                                    },
+                                })
+                            }
+                            _ => {
+                                self.root_state = State::Finished;
+                                Ok(Event::Primitive(Primitive::Identifier(identifier)))
+                            }
+                        }
+                    } else {
+                        self.root_state = State::Finished;
+                        self.parse_token(token, None)
                     }
-
-                    self.finished = true;
-                    self.parse_token(token, None)
                 }
-                Err(err) => Err(err.into()),
+                State::StartingImplicitMap(_) => {
+                    let State::StartingImplicitMap(first_key) = mem::replace(&mut self.root_state, State::ImplicitMap(MapState::ExpectingColon))
+                        else { unreachable!("just matched") };
+                    Ok(Event::Primitive(Primitive::Identifier(first_key)))
+                }
+                State::ImplicitMap(state) => self.parse_implicit_map(*state),
+                State::Finished => match self.next_token()? {
+                    Ok(token) => todo!("expected eof, found {token:?}"),
+                    Err(err) => return Some(Err(err.into())),
+                },
             },
+
             Some(NestedState::Tuple(list)) => self.parse_sequence(*list, Balanced::Paren),
             Some(NestedState::List(list)) => self.parse_sequence(*list, Balanced::Bracket),
             Some(NestedState::Map(map)) => self.parse_map(*map),
         })
     }
+}
+
+#[derive(Default, Debug)]
+pub struct Config {
+    pub allow_implicit_map: bool,
+}
+
+#[derive(Debug, Clone, Eq, PartialEq)]
+enum State<'s> {
+    AtStart,
+    StartingImplicitMap(Cow<'s, str>),
+    ImplicitMap(MapState),
+    Finished,
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
@@ -325,7 +455,7 @@ mod tests {
     use super::*;
     #[test]
     fn number_array() {
-        let events = Parser::new("[1,2,3]")
+        let events = Parser::new("[1,2,3]", Config::default())
             .collect::<Result<Vec<_>, _>>()
             .unwrap();
         assert_eq!(
@@ -341,7 +471,7 @@ mod tests {
                 Event::EndNested,
             ]
         );
-        let events = Parser::new("[1,2,3,]")
+        let events = Parser::new("[1,2,3,]", Config::default())
             .collect::<Result<Vec<_>, _>>()
             .unwrap();
         assert_eq!(
@@ -358,9 +488,10 @@ mod tests {
             ]
         );
     }
+
     #[test]
     fn number_tuple() {
-        let events = Parser::new("(1,2,3)")
+        let events = Parser::new("(1,2,3)", Config::default())
             .collect::<Result<Vec<_>, _>>()
             .unwrap();
         assert_eq!(
@@ -376,7 +507,7 @@ mod tests {
                 Event::EndNested,
             ]
         );
-        let events = Parser::new("(1,2,3,)")
+        let events = Parser::new("(1,2,3,)", Config::default())
             .collect::<Result<Vec<_>, _>>()
             .unwrap();
         assert_eq!(
@@ -393,9 +524,10 @@ mod tests {
             ]
         );
     }
+
     #[test]
     fn number_map() {
-        let events = Parser::new("{a:1,b:2}")
+        let events = Parser::new("{a:1,b:2}", Config::default())
             .collect::<Result<Vec<_>, _>>()
             .unwrap();
         assert_eq!(
@@ -412,7 +544,7 @@ mod tests {
                 Event::EndNested,
             ]
         );
-        let events = Parser::new("{a:1,b:2,}")
+        let events = Parser::new("{a:1,b:2,}", Config::default())
             .collect::<Result<Vec<_>, _>>()
             .unwrap();
         assert_eq!(
