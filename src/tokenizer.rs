@@ -1,6 +1,7 @@
 use alloc::borrow::Cow;
 use alloc::string::String;
 use core::fmt::Display;
+use core::mem;
 use core::ops::Range;
 
 use unicode_ident::{is_xid_continue, is_xid_start};
@@ -705,8 +706,22 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
             't' => Ok(Some('\t')),
             '0' => Ok(Some('\0')),
             'u' if ALLOW_UNICODE => self.tokenize_unicode_escape().map(Some),
-            'x' => self.tokenize_ascii_escape().map(Some),
-            '\r' | '\n' if ALLOW_CONTINUE => {
+            'x' => {
+                let escape_start = self.chars.last_offset();
+                match self.tokenize_ascii_escape()? {
+                    byte if byte.is_ascii() => Ok(Some(byte as char)),
+                    _ => Err(Error::new(
+                        escape_start..self.chars.last_offset(),
+                        ErrorKind::InvalidAscii,
+                    )),
+                }
+            }
+            '\r' if ALLOW_CONTINUE => {
+                self.forbid_isolated_cr()?;
+                self.eat_whitespace_for_string_continue();
+                Ok(None)
+            }
+            '\n' if ALLOW_CONTINUE => {
                 self.eat_whitespace_for_string_continue();
                 Ok(None)
             }
@@ -759,11 +774,10 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
             .ok_or_else(|| Error::new(start..self.chars.last_offset(), ErrorKind::InvalidUnicode))
     }
 
-    fn tokenize_ascii_escape(&mut self) -> Result<char, Error> {
-        // The first digit can only be octal
+    fn tokenize_ascii_escape(&mut self) -> Result<u8, Error> {
         let first_digit = self
             .next_or_eof()?
-            .to_digit(8)
+            .to_digit(16)
             .ok_or_else(|| Error::new(self.chars.last_char_range(), ErrorKind::InvalidAscii))?
             as u8;
 
@@ -772,14 +786,98 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
             .to_digit(16)
             .ok_or_else(|| Error::new(self.chars.last_char_range(), ErrorKind::InvalidAscii))?
             as u8;
-        Ok(char::from((first_digit << 4) | second_digit))
+        Ok((first_digit << 4) | second_digit)
     }
 
     fn tokenize_byte_string(&mut self) -> Result<Token<'a>, Error> {
-        todo!()
+        loop {
+            match self.next_or_eof()? {
+                '"' => {
+                    let range = self.chars.marked_range();
+                    let contents = &self.chars.source[range.start + 1..range.end - 1];
+                    return Ok(Token::new(
+                        range,
+                        TokenKind::Bytes(Cow::Borrowed(contents.as_bytes())),
+                    ));
+                }
+                '\\' => break,
+                ch if ch.is_ascii() => {}
+                _ => {
+                    return Err(Error::new(
+                        self.chars.last_char_range(),
+                        ErrorKind::InvalidAscii,
+                    ))
+                }
+            }
+        }
+
+        // We need a scratch buffer to handle escape sequences
+        let mut scratch = mem::take(&mut self.scratch).into_bytes();
+        scratch.clear();
+        let start_range = self.chars.marked_range();
+        scratch.extend_from_slice(
+            self.chars.source[start_range.start + 2..start_range.end - 1].as_bytes(),
+        );
+
+        loop {
+            let byte = match self.next_or_eof()? {
+                ch @ ('"' | '\'' | '\\') => Some(ch as u8),
+                'r' => Some(b'\r'),
+                'n' => Some(b'\n'),
+                't' => Some(b'\t'),
+                '0' => Some(b'\0'),
+                'x' => Some(self.tokenize_ascii_escape()?),
+                '\r' => {
+                    self.forbid_isolated_cr()?;
+                    self.eat_whitespace_for_string_continue();
+                    None
+                }
+                '\n' => {
+                    self.eat_whitespace_for_string_continue();
+                    None
+                }
+                ch => {
+                    return Err(Error::new(
+                        self.chars.last_char_range(),
+                        ErrorKind::Unexpected(ch),
+                    ))
+                }
+            };
+
+            if let Some(byte) = byte {
+                scratch.push(byte);
+            }
+
+            loop {
+                match self.next_or_eof()? {
+                    '"' => {
+                        // We want to keep the scratch buffer around to keep
+                        // from needing to constantly grow it while parsing.
+                        let contents = scratch.clone();
+                        scratch.clear();
+                        self.scratch = String::from_utf8(scratch).expect("empty vec");
+                        return Ok(Token::new(
+                            self.chars.marked_range(),
+                            TokenKind::Bytes(Cow::Owned(contents)),
+                        ));
+                    }
+                    '\\' => break,
+                    ch if ch.is_ascii() => {
+                        scratch.push(ch as u8);
+                    }
+                    _ => {
+                        return Err(Error::new(
+                            self.chars.last_char_range(),
+                            ErrorKind::InvalidAscii,
+                        ))
+                    }
+                }
+            }
+        }
     }
 
     fn tokenize_raw_string(&mut self, mut pound_count: usize) -> Result<Token<'a>, Error> {
+        // Count the number of leading pound signs
         loop {
             match self.next_or_eof()? {
                 '#' => pound_count += 1,
@@ -1850,5 +1948,35 @@ mod tests {
         test_byte!(b'\'');
         test_byte!(b'\"');
         test_byte!(b'\x42');
+    }
+
+    #[test]
+    fn byte_strings() {
+        macro_rules! test_byte_string {
+            ($char:tt) => {
+                let ch = core::stringify!($char);
+                test_tokens(
+                    ch,
+                    &[Token::new(
+                        0..ch.len(),
+                        TokenKind::Bytes(Cow::Borrowed($char)),
+                    )],
+                );
+            };
+        }
+
+        test_byte_string!(b"\0");
+        test_byte_string!(b"\r");
+        test_byte_string!(b"\t");
+        test_byte_string!(b"\\");
+        test_byte_string!(b"\'");
+        test_byte_string!(b"\"");
+        test_byte_string!(b"\x42");
+        // string-continue, better tested with an escaped literal than trust the
+        // line endings being preserved in git.
+        test_tokens(
+            "b\"a\\\n \t \r \n  b\"",
+            &[Token::new(0..15, TokenKind::Bytes(Cow::Borrowed(b"ab")))],
+        );
     }
 }
