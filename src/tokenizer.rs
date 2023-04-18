@@ -205,6 +205,7 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
         let mut had_underscores = false;
         let mut overflowing = false;
         while let Some(ch) = self.chars.peek() {
+            // TODO get rid of the as u8
             let digit_value = (ch as u8).wrapping_sub(b'0');
             if digit_value < 10 {
                 if let Some(new_value) = value
@@ -237,6 +238,7 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
         if overflowing {
             let mut value: I::Larger = value.into_larger();
             while let Some(ch) = self.chars.peek() {
+                // TODO get rid of the as u8
                 let digit_value = (ch as u8).wrapping_sub(b'0');
                 if digit_value < 10 {
                     if let Some(new_value) = value
@@ -293,6 +295,7 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
         let mut overflowing = false;
         let mut had_underscores = false;
         while let Some(ch) = self.chars.peek() {
+            // TODO get rid of the as u8
             let digit_value = (ch as u8).wrapping_sub(b'0');
             if digit_value < 10 {
                 if let Some(new_value) = value
@@ -325,6 +328,7 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
         if overflowing {
             let mut value: I::Larger = value.into_larger();
             while let Some(ch) = self.chars.peek() {
+                // TODO get rid of the as u8
                 let digit_value = (ch as u8).wrapping_sub(b'0');
                 if digit_value < 10 {
                     if let Some(new_value) = value
@@ -457,6 +461,7 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
         value |= first_hex_value as UnsignedLarge;
 
         while let Some(ch) = self.chars.peek() {
+            // TODO get rid of the as u8
             let ch = ch as u8;
 
             let hex_value = if let Some(zero_relative) = ch.checked_sub(b'0') {
@@ -512,6 +517,7 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
         let mut read_at_least_one_digit = false;
 
         while let Some(ch) = self.chars.peek() {
+            // TODO get rid of the as u8
             let ch = ch as u8;
 
             let hex_value = if let Some(zero_relative) = ch.checked_sub(b'0') {
@@ -600,6 +606,7 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
             if next_char == '0' {
                 self.tokenize_leading_zero_number(signed, negative)
             } else if next_char.is_ascii_digit() {
+                // TODO get rid of the as u8
                 let value = (next_char as u8 - b'0') as isize;
                 if negative {
                     self.tokenize_negative_integer(-value)
@@ -629,7 +636,170 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
     }
 
     fn tokenize_string(&mut self) -> Result<Token<'a>, Error> {
-        todo!()
+        loop {
+            match self.next_or_eof()? {
+                '"' => {
+                    // This string had no escapes, we can borrow.
+                    let range = self.chars.marked_range();
+                    let contents = &self.chars.source[range.start + 1..range.end - 1];
+                    return Ok(Token::new(
+                        range,
+                        TokenKind::String(Cow::Borrowed(contents)),
+                    ));
+                }
+                '\\' => break,
+                _ => {}
+            }
+        }
+
+        // We've encountered an escape sequence, which requires us to use our
+        // scratch buffer to decode the escape sequences. First, we need to copy
+        // everything over that wasn't escaped.
+        self.scratch.clear();
+        let starting_range = self.chars.marked_range();
+        self.scratch
+            .push_str(&self.chars.source[starting_range.start + 1..starting_range.end - 1]);
+
+        loop {
+            // Now we need to handle the current escape sequnce
+            match self.next_or_eof()? {
+                '"' => {
+                    self.scratch.push('"');
+                }
+                '\'' => {
+                    self.scratch.push('\'');
+                }
+                'r' => {
+                    self.scratch.push('\r');
+                }
+                'n' => {
+                    self.scratch.push('\n');
+                }
+                't' => {
+                    self.scratch.push('\t');
+                }
+                '\\' => {
+                    self.scratch.push('\\');
+                }
+                '0' => {
+                    self.scratch.push('\0');
+                }
+                'u' => {
+                    let ch = self.tokenize_unicode_escape()?;
+                    self.scratch.push(ch);
+                }
+                'x' => {
+                    let ch = self.tokenize_ascii_escape()?;
+                    self.scratch.push(ch);
+                }
+                '\r' | '\n' => {
+                    self.eat_whitespace_for_string_continue();
+                }
+                _ => todo!("unknown escape sequence"),
+            }
+
+            // and then we resume a loop looking for the next escape sequence.
+            loop {
+                match self.next_or_eof()? {
+                    '"' => {
+                        return Ok(Token::new(
+                            self.chars.marked_range(),
+                            TokenKind::String(Cow::Owned(self.scratch.clone())),
+                        ));
+                    }
+                    '\\' => break,
+                    ch => {
+                        self.scratch.push(ch);
+                    }
+                }
+            }
+        }
+    }
+
+    fn tokenize_unicode_escape(&mut self) -> Result<char, Error> {
+        let start = self.chars.last_offset();
+        // Open brace
+        match self.next_or_eof()? {
+            '{' => {}
+            other => {
+                return Err(Error::new(
+                    self.chars.last_char_range(),
+                    ErrorKind::Unexpected(other),
+                ))
+            }
+        }
+
+        let mut possible_char = 0u32;
+        loop {
+            match self.next_or_eof()? {
+                '}' => {
+                    break;
+                }
+                ch => {
+                    let ch = ch as u8; // TODO get rid of as u8
+
+                    let hex_value = if let Some(zero_relative) = ch.checked_sub(b'0') {
+                        if zero_relative <= 9 {
+                            zero_relative
+                        } else if ch == b'_' {
+                            continue;
+                        } else {
+                            // Setting the 6th bit ensures the ascii letters are always lower
+                            // cased. This allows skipping one more comparison.
+                            let Some(a_relative) = (ch | 0b10_0000).checked_sub(b'a') else { break };
+                            if a_relative <= 5 {
+                                a_relative + 10
+                            } else {
+                                break;
+                            }
+                        }
+                    } else {
+                        break;
+                    };
+
+                    if let Some(next_value) = possible_char.checked_shl(4) {
+                        possible_char = next_value | hex_value as u32;
+                    } else {
+                        // Overflowed
+                        return Err(Error::new(
+                            start..self.chars.last_offset(),
+                            ErrorKind::InvalidUnicode,
+                        ));
+                    }
+                }
+            }
+        }
+
+        char::from_u32(possible_char)
+            .ok_or_else(|| Error::new(start..self.chars.last_offset(), ErrorKind::InvalidUnicode))
+    }
+
+    fn tokenize_ascii_escape(&mut self) -> Result<char, Error> {
+        // The first digit can only be octal
+        let first_digit = u8::try_from(self.next_or_eof()?)
+            .ok()
+            .and_then(|first_digit| {
+                first_digit
+                    .checked_sub(b'0')
+                    .and_then(|digit| (digit < 8).then_some(digit))
+            })
+            .ok_or_else(|| Error::new(self.chars.last_char_range(), ErrorKind::InvalidAscii))?;
+
+        let second_digit = u8::try_from(self.next_or_eof()?)
+            .ok()
+            .and_then(|first_digit| {
+                if let Some(relative_to_zero) = first_digit.checked_sub(b'0') {
+                    (relative_to_zero <= 9).then_some(relative_to_zero)
+                } else {
+                    // Setting the 6th bit ensures the ascii letters are always lower
+                    // cased. This allows skipping one more comparison.
+                    (first_digit | 0b10_0000)
+                        .checked_sub(b'a')
+                        .and_then(|a_relative| (a_relative <= 5).then_some(a_relative + 10))
+                }
+            })
+            .ok_or_else(|| Error::new(self.chars.last_char_range(), ErrorKind::InvalidAscii))?;
+        Ok(char::from((first_digit << 4) | second_digit))
     }
 
     fn tokenize_byte_string(&mut self) -> Result<Token<'a>, Error> {
@@ -638,6 +808,16 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
 
     fn tokenize_raw_string(&mut self) -> Result<Token<'a>, Error> {
         todo!()
+    }
+
+    fn eat_whitespace_for_string_continue(&mut self) {
+        while self
+            .chars
+            .peek()
+            .map_or(false, |ch| matches!(ch, ' ' | '\n' | '\r' | '\t'))
+        {
+            self.chars.next();
+        }
     }
 
     fn tokenize_identifier(&mut self, initial_char: Option<char>) -> Result<Token<'a>, Error> {
@@ -808,6 +988,8 @@ pub enum ErrorKind {
     UnexpectedEof,
     Unexpected(char),
     ExpectedDigitAfterSign,
+    InvalidUnicode,
+    InvalidAscii,
 }
 
 impl Display for ErrorKind {
@@ -816,6 +998,8 @@ impl Display for ErrorKind {
             ErrorKind::UnexpectedEof => f.write_str("unexpected eof"),
             ErrorKind::Unexpected(ch) => write!(f, "unexpected `{ch}`"),
             ErrorKind::ExpectedDigitAfterSign => f.write_str("expected digit after sign"),
+            ErrorKind::InvalidUnicode => f.write_str("invalid unicode escape sequence"),
+            ErrorKind::InvalidAscii => f.write_str("invalid ascii escape sequence"),
         }
     }
 }
@@ -1559,6 +1743,30 @@ mod tests {
                 Token::new(7..8, TokenKind::Integer(Integer::Usize(2))),
                 Token::new(8..9, TokenKind::Close(Balanced::Brace)),
             ],
+        );
+    }
+
+    #[test]
+    fn strings() {
+        test_tokens(
+            r#""""#,
+            &[Token::new(0..2, TokenKind::String(Cow::Borrowed("")))],
+        );
+        test_tokens(
+            r#""abc""#,
+            &[Token::new(0..5, TokenKind::String(Cow::Borrowed("abc")))],
+        );
+        test_tokens(
+            r#""\r\t\n\0\x41\u{1_F980}\\\"""#,
+            &[Token::new(
+                0..28,
+                TokenKind::String(Cow::Borrowed("\r\t\n\0\x41\u{1_F980}\\\"")),
+            )],
+        );
+        // string-continue
+        test_tokens(
+            "\"a\\\n \t \r \n  b\"",
+            &[Token::new(0..14, TokenKind::String(Cow::Borrowed("ab")))],
         );
     }
 }

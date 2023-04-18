@@ -495,6 +495,7 @@ mod tests {
             a: u32,
             b: i32,
         }
+
         let parsed = crate::from_str::<BasicNamed>(r#"BasicNamed{ a: 1, b: -1 }"#).unwrap();
         assert_eq!(parsed, BasicNamed { a: 1, b: -1 });
     }
