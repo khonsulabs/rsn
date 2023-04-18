@@ -26,6 +26,10 @@ impl<'s> Parser<'s> {
         }
     }
 
+    pub fn validate(source: &'s str, config: Config) -> bool {
+        Self::new(source, config).all(|result| result.is_ok())
+    }
+
     fn peek(&mut self) -> Option<&Token<'s>> {
         if self.peeked.is_none() {
             self.peeked = self.tokens.next();
