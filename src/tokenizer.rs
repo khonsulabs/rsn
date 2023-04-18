@@ -205,12 +205,10 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
         let mut had_underscores = false;
         let mut overflowing = false;
         while let Some(ch) = self.chars.peek() {
-            // TODO get rid of the as u8
-            let digit_value = (ch as u8).wrapping_sub(b'0');
-            if digit_value < 10 {
+            if let Some(digit_value) = ch.to_digit(10) {
                 if let Some(new_value) = value
                     .checked_mul(I::from(10))
-                    .and_then(|value| value.checked_add(I::from(digit_value)))
+                    .and_then(|value| value.checked_add(I::from(digit_value as u8)))
                 {
                     value = new_value;
                     self.chars.next();
@@ -238,12 +236,10 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
         if overflowing {
             let mut value: I::Larger = value.into_larger();
             while let Some(ch) = self.chars.peek() {
-                // TODO get rid of the as u8
-                let digit_value = (ch as u8).wrapping_sub(b'0');
-                if digit_value < 10 {
+                if let Some(digit_value) = ch.to_digit(10) {
                     if let Some(new_value) = value
                         .checked_mul(<I::Larger>::from(10))
-                        .and_then(|value| value.checked_add(<I::Larger>::from(digit_value)))
+                        .and_then(|value| value.checked_add(<I::Larger>::from(digit_value as u8)))
                     {
                         value = new_value;
                         self.chars.next();
@@ -295,12 +291,10 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
         let mut overflowing = false;
         let mut had_underscores = false;
         while let Some(ch) = self.chars.peek() {
-            // TODO get rid of the as u8
-            let digit_value = (ch as u8).wrapping_sub(b'0');
-            if digit_value < 10 {
+            if let Some(digit_value) = ch.to_digit(10) {
                 if let Some(new_value) = value
                     .checked_mul(I::from(10))
-                    .and_then(|value| value.checked_sub(I::from(digit_value)))
+                    .and_then(|value| value.checked_sub(I::from(digit_value as u8)))
                 {
                     value = new_value;
                     self.chars.next();
@@ -328,12 +322,10 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
         if overflowing {
             let mut value: I::Larger = value.into_larger();
             while let Some(ch) = self.chars.peek() {
-                // TODO get rid of the as u8
-                let digit_value = (ch as u8).wrapping_sub(b'0');
-                if digit_value < 10 {
+                if let Some(digit_value) = ch.to_digit(10) {
                     if let Some(new_value) = value
                         .checked_mul(<I::Larger>::from(10))
-                        .and_then(|value| value.checked_sub(<I::Larger>::from(digit_value)))
+                        .and_then(|value| value.checked_sub(<I::Larger>::from(digit_value as u8)))
                     {
                         value = new_value;
                         self.chars.next();
@@ -570,17 +562,16 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
         }
     }
 
-    fn tokenize_number(&mut self, start_char: char) -> Result<Token<'a>, Error> {
-        let negative = start_char == '-';
-        let signed = negative || start_char == '+';
+    fn tokenize_number(&mut self, start_char: u8) -> Result<Token<'a>, Error> {
+        let negative = start_char == b'-';
+        let signed = negative || start_char == b'+';
 
         if signed {
             let next_char = self.next_or_eof()?;
             if next_char == '0' {
                 self.tokenize_leading_zero_number(signed, negative)
-            } else if next_char.is_ascii_digit() {
-                // TODO get rid of the as u8
-                let value = (next_char as u8 - b'0') as isize;
+            } else if let Some(value) = next_char.to_digit(10) {
+                let value = value as isize;
                 if negative {
                     self.tokenize_negative_integer(-value)
                 } else {
@@ -592,10 +583,10 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
                     ErrorKind::ExpectedDigitAfterSign,
                 ))
             }
-        } else if start_char == '0' {
+        } else if start_char == b'0' {
             self.tokenize_leading_zero_number(signed, negative)
         } else {
-            let value = (start_char as u8 - b'0') as usize;
+            let value = (start_char - b'0') as usize;
             self.tokenize_positive_integer(value)
         }
     }
@@ -827,7 +818,7 @@ impl<'a, const INCLUDE_ALL: bool> Iterator for Tokenizer<'a, INCLUDE_ALL> {
             self.chars.mark_start();
             let ch = self.chars.next()?;
             let result = match ch {
-                '0'..='9' | '-' | '+' => self.tokenize_number(ch),
+                '0'..='9' | '-' | '+' => self.tokenize_number(ch as u8),
                 '"' => self.tokenize_string(),
                 '\'' => self.tokenize_char(),
                 'r' => match self.chars.peek() {
