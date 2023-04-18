@@ -447,12 +447,12 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
         ))
     }
 
-    fn tokenize_hex_large_number<const BITS: u32>(
+    fn tokenize_radix_large_number<const BITS: u32>(
         &mut self,
         signed: bool,
         negative: bool,
         value: usize,
-        first_hex_value: u8,
+        first_hex_value: u32,
     ) -> Result<Token<'a>, Error> {
         assert!(BITS == 1 || BITS == 3 || BITS == 4);
         let max = 2_u8.pow(BITS);
@@ -460,39 +460,24 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
         value <<= BITS;
         value |= first_hex_value as UnsignedLarge;
 
-        while let Some(ch) = self.chars.peek() {
-            // TODO get rid of the as u8
-            let ch = ch as u8;
-
-            let hex_value = if let Some(zero_relative) = ch.checked_sub(b'0') {
-                if zero_relative <= 9 {
-                    zero_relative
-                } else if ch == b'_' {
+        while let Some(result) = self.chars.peek().map(|ch| ch.to_digit(BITS * 4).ok_or(ch)) {
+            match result {
+                Ok(radix_value) => {
                     self.chars.next();
-                    continue;
-                } else {
-                    // Setting the 6th bit ensures the ascii letters are always lower
-                    // cased. This allows skipping one more comparison.
-                    let Some(a_relative) = (ch | 0b10_0000).checked_sub(b'a') else { break };
-                    if a_relative <= 5 {
-                        a_relative + 10
+                    if let Some(next_value) = value
+                        .checked_mul(max as UnsignedLarge)
+                        .and_then(|value| value.checked_add(radix_value as UnsignedLarge))
+                    {
+                        value = next_value
                     } else {
-                        break;
+                        // Overflowed
+                        todo!("error: overflowed u128")
                     }
                 }
-            } else {
-                break;
-            };
-
-            self.chars.next();
-            if let Some(next_value) = value
-                .checked_mul(max as UnsignedLarge)
-                .and_then(|value| value.checked_add(hex_value as UnsignedLarge))
-            {
-                value = next_value
-            } else {
-                // Overflowed
-                todo!("error: overflowed u128")
+                Err('_') => {
+                    self.chars.next();
+                }
+                Err(_) => break,
             }
         }
 
@@ -516,42 +501,30 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
         let mut value = 0usize;
         let mut read_at_least_one_digit = false;
 
-        while let Some(ch) = self.chars.peek() {
-            // TODO get rid of the as u8
-            let ch = ch as u8;
-
-            let hex_value = if let Some(zero_relative) = ch.checked_sub(b'0') {
-                if zero_relative < 10.min(max) {
-                    zero_relative
-                } else if ch == b'_' {
+        while let Some(result) = self.chars.peek().map(|ch| ch.to_digit(BITS * 4).ok_or(ch)) {
+            match result {
+                Ok(radix_value) => {
+                    read_at_least_one_digit = true;
                     self.chars.next();
-                    continue;
-                } else if BITS == 4 {
-                    // Setting the 6th bit ensures the ascii letters are always lower
-                    // cased. This allows skipping one more comparison.
-                    let Some(a_relative) = (ch | 0b10_0000).checked_sub(b'a') else { break };
-                    if a_relative <= 5 {
-                        a_relative + 10
+                    if let Some(next_value) = value
+                        .checked_mul(max as usize)
+                        .and_then(|value| value.checked_add(radix_value as usize))
+                    {
+                        value = next_value
                     } else {
-                        break;
+                        // Overflowed
+                        return self.tokenize_radix_large_number::<BITS>(
+                            signed,
+                            negative,
+                            value,
+                            radix_value,
+                        );
                     }
-                } else {
-                    break;
                 }
-            } else {
-                break;
-            };
-
-            read_at_least_one_digit = true;
-            self.chars.next();
-            if let Some(next_value) = value
-                .checked_mul(max as usize)
-                .and_then(|value| value.checked_add(hex_value as usize))
-            {
-                value = next_value
-            } else {
-                // Overflowed
-                return self.tokenize_hex_large_number::<BITS>(signed, negative, value, hex_value);
+                Err('_') => {
+                    self.chars.next();
+                }
+                Err(_) => break,
             }
         }
 
@@ -663,11 +636,8 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
         loop {
             // Now we need to handle the current escape sequnce
             match self.next_or_eof()? {
-                '"' => {
-                    self.scratch.push('"');
-                }
-                '\'' => {
-                    self.scratch.push('\'');
+                ch @ ('"' | '\'' | '\\') => {
+                    self.scratch.push(ch);
                 }
                 'r' => {
                     self.scratch.push('\r');
@@ -677,9 +647,6 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
                 }
                 't' => {
                     self.scratch.push('\t');
-                }
-                '\\' => {
-                    self.scratch.push('\\');
                 }
                 '0' => {
                     self.scratch.push('\0');
@@ -735,30 +702,14 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
                 '}' => {
                     break;
                 }
+                '_' => continue,
                 ch => {
-                    let ch = ch as u8; // TODO get rid of as u8
-
-                    let hex_value = if let Some(zero_relative) = ch.checked_sub(b'0') {
-                        if zero_relative <= 9 {
-                            zero_relative
-                        } else if ch == b'_' {
-                            continue;
-                        } else {
-                            // Setting the 6th bit ensures the ascii letters are always lower
-                            // cased. This allows skipping one more comparison.
-                            let Some(a_relative) = (ch | 0b10_0000).checked_sub(b'a') else { break };
-                            if a_relative <= 5 {
-                                a_relative + 10
-                            } else {
-                                break;
-                            }
-                        }
-                    } else {
-                        break;
-                    };
+                    let radix_value = ch.to_digit(16).ok_or_else(|| {
+                        Error::new(self.chars.last_char_range(), ErrorKind::InvalidUnicode)
+                    })?;
 
                     if let Some(next_value) = possible_char.checked_shl(4) {
-                        possible_char = next_value | hex_value as u32;
+                        possible_char = next_value | radix_value;
                     } else {
                         // Overflowed
                         return Err(Error::new(
@@ -776,29 +727,17 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
 
     fn tokenize_ascii_escape(&mut self) -> Result<char, Error> {
         // The first digit can only be octal
-        let first_digit = u8::try_from(self.next_or_eof()?)
-            .ok()
-            .and_then(|first_digit| {
-                first_digit
-                    .checked_sub(b'0')
-                    .and_then(|digit| (digit < 8).then_some(digit))
-            })
-            .ok_or_else(|| Error::new(self.chars.last_char_range(), ErrorKind::InvalidAscii))?;
+        let first_digit = self
+            .next_or_eof()?
+            .to_digit(8)
+            .ok_or_else(|| Error::new(self.chars.last_char_range(), ErrorKind::InvalidAscii))?
+            as u8;
 
-        let second_digit = u8::try_from(self.next_or_eof()?)
-            .ok()
-            .and_then(|first_digit| {
-                if let Some(relative_to_zero) = first_digit.checked_sub(b'0') {
-                    (relative_to_zero <= 9).then_some(relative_to_zero)
-                } else {
-                    // Setting the 6th bit ensures the ascii letters are always lower
-                    // cased. This allows skipping one more comparison.
-                    (first_digit | 0b10_0000)
-                        .checked_sub(b'a')
-                        .and_then(|a_relative| (a_relative <= 5).then_some(a_relative + 10))
-                }
-            })
-            .ok_or_else(|| Error::new(self.chars.last_char_range(), ErrorKind::InvalidAscii))?;
+        let second_digit = self
+            .next_or_eof()?
+            .to_digit(16)
+            .ok_or_else(|| Error::new(self.chars.last_char_range(), ErrorKind::InvalidAscii))?
+            as u8;
         Ok(char::from((first_digit << 4) | second_digit))
     }
 
