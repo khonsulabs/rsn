@@ -893,7 +893,7 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
 
         // String contents
         'contents: loop {
-            match std::dbg!(self.next_or_eof())? {
+            match self.next_or_eof()? {
                 '\r' => {
                     self.forbid_isolated_cr()?;
                 }
@@ -920,6 +920,61 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
         Ok(Token::new(
             source_range,
             TokenKind::String(Cow::Borrowed(value)),
+        ))
+    }
+
+    fn tokenize_raw_byte_string(&mut self) -> Result<Token<'a>, Error> {
+        // Count the number of leading pound signs
+        let mut pound_count = 0;
+        loop {
+            match self.next_or_eof()? {
+                '#' => pound_count += 1,
+                '"' => break,
+                other if pound_count == 0 => return self.tokenize_identifier(Some(other)),
+                other => {
+                    return Err(Error::new(
+                        self.chars.last_char_range(),
+                        ErrorKind::Unexpected(other),
+                    ))
+                }
+            }
+        }
+
+        // String contents
+        'contents: loop {
+            match self.next_or_eof()? {
+                '\r' => {
+                    self.forbid_isolated_cr()?;
+                }
+                '"' => {
+                    let mut pounds_needed = pound_count;
+                    while self.chars.peek() == Some('#') {
+                        self.chars.next();
+                        pounds_needed -= 1;
+
+                        // Only break if the correct number of pound signs has been
+                        // encountered.
+                        if pounds_needed == 0 {
+                            break 'contents;
+                        }
+                    }
+                }
+                ch if ch.is_ascii() => {}
+                _ => {
+                    return Err(Error::new(
+                        self.chars.last_char_range(),
+                        ErrorKind::InvalidAscii,
+                    ))
+                }
+            }
+        }
+
+        let source_range = self.chars.marked_range();
+        let value = &self.chars.source
+            [source_range.start + pound_count + 3..source_range.end - pound_count - 1];
+        Ok(Token::new(
+            source_range,
+            TokenKind::Bytes(Cow::Borrowed(value.as_bytes())),
         ))
     }
 
@@ -1007,6 +1062,10 @@ impl<'a, const INCLUDE_ALL: bool> Iterator for Tokenizer<'a, INCLUDE_ALL> {
                     _ => self.tokenize_identifier(Some(ch)),
                 },
                 'b' => match self.chars.peek() {
+                    Some('r') => {
+                        self.chars.next();
+                        self.tokenize_raw_byte_string()
+                    }
                     Some('"') => {
                         self.chars.next();
                         self.tokenize_byte_string()
@@ -1898,7 +1957,7 @@ mod tests {
     fn raw_strings() {
         macro_rules! test_string {
             ($char:tt) => {
-                let ch = std::dbg!(core::stringify!($char));
+                let ch = core::stringify!($char);
                 test_tokens(
                     ch,
                     &[Token::new(
@@ -1978,5 +2037,24 @@ mod tests {
             "b\"a\\\n \t \r \n  b\"",
             &[Token::new(0..15, TokenKind::Bytes(Cow::Borrowed(b"ab")))],
         );
+    }
+
+    #[test]
+    fn raw_byte_strings() {
+        macro_rules! test_string {
+            ($char:tt) => {
+                let ch = core::stringify!($char);
+                test_tokens(
+                    ch,
+                    &[Token::new(
+                        0..ch.len(),
+                        TokenKind::Bytes(Cow::Borrowed($char)),
+                    )],
+                );
+            };
+        }
+        test_string!(br###""##"###);
+        test_string!(br#"abc"#);
+        test_string!(br#""\r\t\n\0\x41\u{1_F980}\\\"""#);
     }
 }
