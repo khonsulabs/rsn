@@ -594,7 +594,7 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
     fn tokenize_char(&mut self) -> Result<Token<'a>, Error> {
         let ch = match self.next_or_eof()? {
             '\\' => self
-                .tokenize_escaped_char::<false>()?
+                .tokenize_escaped_char::<false, true>()?
                 .expect("underscore disallowed"),
             ch @ ('\n' | '\r' | '\t') => {
                 return Err(Error::new(
@@ -619,7 +619,27 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
     }
 
     fn tokenize_byte(&mut self) -> Result<Token<'a>, Error> {
-        todo!()
+        let ch = match self.next_or_eof()? {
+            '\\' => self
+                .tokenize_escaped_char::<false, false>()?
+                .expect("underscore disallowed"),
+            ch if ch.is_ascii() && !matches!(ch, '\n' | '\r' | '\t') => ch,
+            ch => {
+                return Err(Error::new(
+                    self.chars.last_char_range(),
+                    ErrorKind::Unexpected(ch),
+                ))
+            }
+        } as u8;
+
+        // Handle the trailing quote
+        match self.next_or_eof()? {
+            '\'' => Ok(Token::new(self.chars.marked_range(), TokenKind::Byte(ch))),
+            other => Err(Error::new(
+                self.chars.last_char_range(),
+                ErrorKind::Unexpected(other),
+            )),
+        }
     }
 
     fn tokenize_string(&mut self) -> Result<Token<'a>, Error> {
@@ -649,7 +669,7 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
 
         loop {
             // Handle the escape sequence
-            if let Some(ch) = self.tokenize_escaped_char::<true>()? {
+            if let Some(ch) = self.tokenize_escaped_char::<true, true>()? {
                 self.scratch.push(ch);
             }
             // and then we resume a loop looking for the next escape sequence.
@@ -670,7 +690,9 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
         }
     }
 
-    fn tokenize_escaped_char<const ALLOW_CONTINUE: bool>(&mut self) -> Result<Option<char>, Error> {
+    fn tokenize_escaped_char<const ALLOW_CONTINUE: bool, const ALLOW_UNICODE: bool>(
+        &mut self,
+    ) -> Result<Option<char>, Error> {
         // Now we need to handle the current escape sequnce
         match self.next_or_eof()? {
             ch @ ('"' | '\'' | '\\') => Ok(Some(ch)),
@@ -678,7 +700,7 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
             'n' => Ok(Some('\n')),
             't' => Ok(Some('\t')),
             '0' => Ok(Some('\0')),
-            'u' => self.tokenize_unicode_escape().map(Some),
+            'u' if ALLOW_UNICODE => self.tokenize_unicode_escape().map(Some),
             'x' => self.tokenize_ascii_escape().map(Some),
             '\r' | '\n' if ALLOW_CONTINUE => {
                 self.eat_whitespace_for_string_continue();
@@ -1735,5 +1757,23 @@ mod tests {
         test_char!('\"');
         test_char!('\x42');
         test_char!('\u{1_F980}');
+    }
+
+    #[test]
+    fn bytes() {
+        macro_rules! test_byte {
+            ($char:tt) => {
+                let ch = core::stringify!($char);
+                test_tokens(ch, &[Token::new(0..ch.len(), TokenKind::Byte($char))]);
+            };
+        }
+
+        test_byte!(b'\0');
+        test_byte!(b'\r');
+        test_byte!(b'\t');
+        test_byte!(b'\\');
+        test_byte!(b'\'');
+        test_byte!(b'\"');
+        test_byte!(b'\x42');
     }
 }
