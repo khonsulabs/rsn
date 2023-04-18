@@ -682,6 +682,10 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
                         ));
                     }
                     '\\' => break,
+                    '\r' => {
+                        self.forbid_isolated_cr()?;
+                        self.scratch.push('\r');
+                    }
                     ch => {
                         self.scratch.push(ch);
                     }
@@ -775,8 +779,59 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
         todo!()
     }
 
-    fn tokenize_raw_string(&mut self) -> Result<Token<'a>, Error> {
-        todo!()
+    fn tokenize_raw_string(&mut self, mut pound_count: usize) -> Result<Token<'a>, Error> {
+        loop {
+            match self.next_or_eof()? {
+                '#' => pound_count += 1,
+                '"' => break,
+                other => {
+                    return Err(Error::new(
+                        self.chars.last_char_range(),
+                        ErrorKind::Unexpected(other),
+                    ))
+                }
+            }
+        }
+
+        // String contents
+        'contents: loop {
+            match std::dbg!(self.next_or_eof())? {
+                '\r' => {
+                    self.forbid_isolated_cr()?;
+                }
+                '"' => {
+                    let mut pounds_needed = pound_count;
+                    while self.chars.peek() == Some('#') {
+                        self.chars.next();
+                        pounds_needed -= 1;
+
+                        // Only break if the correct number of pound signs has been
+                        // encountered.
+                        if pounds_needed == 0 {
+                            break 'contents;
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        let source_range = self.chars.marked_range();
+        let value = &self.chars.source
+            [source_range.start + pound_count + 2..source_range.end - pound_count - 1];
+        Ok(Token::new(
+            source_range,
+            TokenKind::String(Cow::Borrowed(value)),
+        ))
+    }
+
+    fn forbid_isolated_cr(&mut self) -> Result<(), Error> {
+        let cr_range = self.chars.last_char_range();
+        if self.chars.peek() == Some('\n') {
+            Ok(())
+        } else {
+            Err(Error::new(cr_range, ErrorKind::InvalidAscii))
+        }
     }
 
     fn eat_whitespace_for_string_continue(&mut self) {
@@ -844,13 +899,12 @@ impl<'a, const INCLUDE_ALL: bool> Iterator for Tokenizer<'a, INCLUDE_ALL> {
                 '"' => self.tokenize_string(),
                 '\'' => self.tokenize_char(),
                 'r' => match self.chars.peek() {
-                    Some('"') => {
-                        self.chars.next();
-                        self.tokenize_raw_string()
-                    }
                     Some('#') => {
                         self.chars.next();
-                        self.tokenize_identifier(None)
+                        match self.chars.peek() {
+                            Some('#' | '"') => self.tokenize_raw_string(1),
+                            _ => self.tokenize_identifier(None),
+                        }
                     }
                     _ => self.tokenize_identifier(Some(ch)),
                 },
@@ -959,6 +1013,7 @@ pub enum ErrorKind {
     ExpectedDigitAfterSign,
     InvalidUnicode,
     InvalidAscii,
+    IsolatedCarriageReturn,
 }
 
 impl Display for ErrorKind {
@@ -969,6 +1024,7 @@ impl Display for ErrorKind {
             ErrorKind::ExpectedDigitAfterSign => f.write_str("expected digit after sign"),
             ErrorKind::InvalidUnicode => f.write_str("invalid unicode escape sequence"),
             ErrorKind::InvalidAscii => f.write_str("invalid ascii escape sequence"),
+            ErrorKind::IsolatedCarriageReturn => f.write_str("unexpected isolated carriage return"),
         }
     }
 }
@@ -1738,6 +1794,25 @@ mod tests {
             "\"a\\\n \t \r \n  b\"",
             &[Token::new(0..14, TokenKind::String(Cow::Borrowed("ab")))],
         );
+    }
+
+    #[test]
+    fn raw_strings() {
+        macro_rules! test_string {
+            ($char:tt) => {
+                let ch = std::dbg!(core::stringify!($char));
+                test_tokens(
+                    ch,
+                    &[Token::new(
+                        0..ch.len(),
+                        TokenKind::String(Cow::Borrowed($char)),
+                    )],
+                );
+            };
+        }
+        test_string!(r###""##"###);
+        test_string!(r#"abc"#);
+        test_string!(r#""\r\t\n\0\x41\u{1_F980}\\\"""#);
     }
 
     #[test]
