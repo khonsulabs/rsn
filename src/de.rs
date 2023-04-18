@@ -507,8 +507,15 @@ mod tests {
             b: i32,
         }
         let parsed = BasicNamed::deserialize(&mut crate::de::Deserializer::new(
-            r#"a: 1,
-            b: -1"#,
+            r#"a: 1 b: -1"#,
+            Config {
+                allow_implicit_map: true,
+            },
+        ))
+        .unwrap();
+        assert_eq!(parsed, BasicNamed { a: 1, b: -1 });
+        let parsed = BasicNamed::deserialize(&mut crate::de::Deserializer::new(
+            r#"a: 1, b: -1,"#,
             Config {
                 allow_implicit_map: true,
             },

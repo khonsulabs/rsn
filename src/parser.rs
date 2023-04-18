@@ -48,13 +48,6 @@ impl<'s> Parser<'s> {
         }
     }
 
-    fn pop_nested_state(&mut self) {
-        if self.nested.pop().is_none() {
-            debug_assert!(matches!(self.root_state, State::ImplicitMap(_)));
-            self.root_state = State::Finished;
-        }
-    }
-
     fn parse_token(
         &mut self,
         token: Token<'s>,
@@ -127,7 +120,7 @@ impl<'s> Parser<'s> {
                 })
             }
             TokenKind::Close(closed) if Some(closed) == allowed_close => {
-                self.pop_nested_state();
+                self.nested.pop();
                 Ok(Event::EndNested)
             }
             TokenKind::Colon | TokenKind::Comma | TokenKind::Close(_) => {
@@ -150,7 +143,7 @@ impl<'s> Parser<'s> {
                 let token = self.next_or_eof()?;
                 match token.kind {
                     TokenKind::Close(closed) if closed == end => {
-                        self.pop_nested_state();
+                        self.nested.pop();
                         Ok(Event::EndNested)
                     }
                     TokenKind::Comma => {
@@ -195,22 +188,73 @@ impl<'s> Parser<'s> {
                 *self.map_state_mut() = MapState::ExpectingComma;
 
                 let token = self.next_or_eof()?;
-                self.parse_token(token, Some(Balanced::Brace))
+                self.parse_token(token, None)
             }
             MapState::ExpectingComma => {
                 let token = self.next_token().transpose()?.map(|token| token.kind);
                 match token {
                     Some(TokenKind::Close(closed)) if closed == Balanced::Brace => {
-                        self.pop_nested_state();
+                        self.nested.pop();
                         Ok(Event::EndNested)
                     }
                     Some(TokenKind::Comma) => {
                         *self.map_state_mut() = MapState::ExpectingKey;
                         self.parse_map(MapState::ExpectingKey)
                     }
-                    None if self.nested.is_empty() => {
-                        // Implicit map
-                        self.pop_nested_state();
+                    _ => todo!("expected comma or end"),
+                }
+            }
+        }
+    }
+
+    fn parse_implicit_map(&mut self, state: MapState) -> Result<Event<'s>, Error> {
+        match state {
+            MapState::ExpectingKey => {
+                let token = self.next_token().transpose()?;
+                match token.map(|token| token.kind) {
+                    Some(TokenKind::Identifier(key)) => {
+                        self.root_state = State::ImplicitMap(MapState::ExpectingColon);
+                        Ok(Event::Primitive(Primitive::Identifier(key)))
+                    }
+                    None => {
+                        self.root_state = State::Finished;
+                        Ok(Event::EndNested)
+                    }
+                    _ => todo!("expected map key"),
+                }
+            }
+            MapState::ExpectingColon => {
+                let token = self.next_or_eof()?;
+                if matches!(token.kind, TokenKind::Colon) {
+                    self.root_state = State::ImplicitMap(MapState::ExpectingValue);
+                    self.parse_implicit_map(MapState::ExpectingValue)
+                } else {
+                    todo!("expected colon, got {token:?}")
+                }
+            }
+            MapState::ExpectingValue => {
+                self.root_state = State::ImplicitMap(MapState::ExpectingComma);
+
+                let token = self.next_or_eof()?;
+                self.parse_token(token, None)
+            }
+            MapState::ExpectingComma => {
+                let token = self.next_token().transpose()?.map(|token| token.kind);
+                match token {
+                    Some(TokenKind::Close(closed)) if closed == Balanced::Brace => {
+                        self.root_state = State::Finished;
+                        Ok(Event::EndNested)
+                    }
+                    Some(TokenKind::Comma) => {
+                        self.root_state = State::ImplicitMap(MapState::ExpectingKey);
+                        self.parse_implicit_map(MapState::ExpectingKey)
+                    }
+                    Some(TokenKind::Identifier(key)) => {
+                        self.root_state = State::ImplicitMap(MapState::ExpectingColon);
+                        Ok(Event::Primitive(Primitive::Identifier(key)))
+                    }
+                    None => {
+                        self.root_state = State::Finished;
                         Ok(Event::EndNested)
                     }
                     _ => todo!("expected comma or end"),
@@ -280,8 +324,11 @@ impl<'s> Iterator for Parser<'s> {
                         else { unreachable!("just matched") };
                     Ok(Event::Primitive(Primitive::Identifier(first_key)))
                 }
-                State::ImplicitMap(state) => self.parse_map(*state),
-                State::Finished => todo!("error: trailing junk"),
+                State::ImplicitMap(state) => self.parse_implicit_map(*state),
+                State::Finished => match self.next_token()? {
+                    Ok(token) => todo!("expected eof, found {token:?}"),
+                    Err(err) => return Some(Err(err.into())),
+                },
             },
 
             Some(NestedState::Tuple(list)) => self.parse_sequence(*list, Balanced::Paren),
