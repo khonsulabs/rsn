@@ -601,7 +601,30 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
     }
 
     fn tokenize_char(&mut self) -> Result<Token<'a>, Error> {
-        todo!()
+        let ch = match self.next_or_eof()? {
+            '\\' => self
+                .tokenize_escaped_char::<false>()?
+                .expect("underscore disallowed"),
+            ch @ ('\n' | '\r' | '\t') => {
+                return Err(Error::new(
+                    self.chars.last_char_range(),
+                    ErrorKind::Unexpected(ch),
+                ))
+            }
+            ch => ch,
+        };
+
+        // Handle the trailing quote
+        match self.next_or_eof()? {
+            '\'' => Ok(Token::new(
+                self.chars.marked_range(),
+                TokenKind::Character(ch),
+            )),
+            other => Err(Error::new(
+                self.chars.last_char_range(),
+                ErrorKind::Unexpected(other),
+            )),
+        }
     }
 
     fn tokenize_byte(&mut self) -> Result<Token<'a>, Error> {
@@ -634,37 +657,10 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
             .push_str(&self.chars.source[starting_range.start + 1..starting_range.end - 1]);
 
         loop {
-            // Now we need to handle the current escape sequnce
-            match self.next_or_eof()? {
-                ch @ ('"' | '\'' | '\\') => {
-                    self.scratch.push(ch);
-                }
-                'r' => {
-                    self.scratch.push('\r');
-                }
-                'n' => {
-                    self.scratch.push('\n');
-                }
-                't' => {
-                    self.scratch.push('\t');
-                }
-                '0' => {
-                    self.scratch.push('\0');
-                }
-                'u' => {
-                    let ch = self.tokenize_unicode_escape()?;
-                    self.scratch.push(ch);
-                }
-                'x' => {
-                    let ch = self.tokenize_ascii_escape()?;
-                    self.scratch.push(ch);
-                }
-                '\r' | '\n' => {
-                    self.eat_whitespace_for_string_continue();
-                }
-                _ => todo!("unknown escape sequence"),
+            // Handle the escape sequence
+            if let Some(ch) = self.tokenize_escaped_char::<true>()? {
+                self.scratch.push(ch);
             }
-
             // and then we resume a loop looking for the next escape sequence.
             loop {
                 match self.next_or_eof()? {
@@ -680,6 +676,27 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
                     }
                 }
             }
+        }
+    }
+
+    fn tokenize_escaped_char<const ALLOW_CONTINUE: bool>(&mut self) -> Result<Option<char>, Error> {
+        // Now we need to handle the current escape sequnce
+        match self.next_or_eof()? {
+            ch @ ('"' | '\'' | '\\') => Ok(Some(ch)),
+            'r' => Ok(Some('\r')),
+            'n' => Ok(Some('\n')),
+            't' => Ok(Some('\t')),
+            '0' => Ok(Some('\0')),
+            'u' => self.tokenize_unicode_escape().map(Some),
+            'x' => self.tokenize_ascii_escape().map(Some),
+            '\r' | '\n' if ALLOW_CONTINUE => {
+                self.eat_whitespace_for_string_continue();
+                Ok(None)
+            }
+            ch => Err(Error::new(
+                self.chars.last_char_range(),
+                ErrorKind::Unexpected(ch),
+            )),
         }
     }
 
@@ -1687,25 +1704,45 @@ mod tests {
 
     #[test]
     fn strings() {
-        test_tokens(
-            r#""""#,
-            &[Token::new(0..2, TokenKind::String(Cow::Borrowed("")))],
-        );
-        test_tokens(
-            r#""abc""#,
-            &[Token::new(0..5, TokenKind::String(Cow::Borrowed("abc")))],
-        );
-        test_tokens(
-            r#""\r\t\n\0\x41\u{1_F980}\\\"""#,
-            &[Token::new(
-                0..28,
-                TokenKind::String(Cow::Borrowed("\r\t\n\0\x41\u{1_F980}\\\"")),
-            )],
-        );
-        // string-continue
+        macro_rules! test_string {
+            ($char:tt) => {
+                let ch = core::stringify!($char);
+                test_tokens(
+                    ch,
+                    &[Token::new(
+                        0..ch.len(),
+                        TokenKind::String(Cow::Borrowed($char)),
+                    )],
+                );
+            };
+        }
+        test_string!("");
+        test_string!("abc");
+        test_string!("\r\t\n\0\x41\u{1_F980}\\\"");
+        // string-continue, better tested with an escaped literal than trust the
+        // line endings being preserved in git.
         test_tokens(
             "\"a\\\n \t \r \n  b\"",
             &[Token::new(0..14, TokenKind::String(Cow::Borrowed("ab")))],
         );
+    }
+
+    #[test]
+    fn chars() {
+        macro_rules! test_char {
+            ($char:tt) => {
+                let ch = core::stringify!($char);
+                test_tokens(ch, &[Token::new(0..ch.len(), TokenKind::Character($char))]);
+            };
+        }
+
+        test_char!('\0');
+        test_char!('\r');
+        test_char!('\t');
+        test_char!('\\');
+        test_char!('\'');
+        test_char!('\"');
+        test_char!('\x42');
+        test_char!('\u{1_F980}');
     }
 }
