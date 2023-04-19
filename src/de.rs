@@ -1,11 +1,14 @@
 use alloc::borrow::Cow;
-use alloc::string::String;
+use alloc::string::{String, ToString};
+use core::fmt::Display;
 use core::iter::Peekable;
+use core::ops::Range;
 
 use serde::de::{EnumAccess, MapAccess, SeqAccess, VariantAccess};
 use serde::Deserializer as _;
 
-use crate::parser::{Config, Error, Event, Nested, Parser, Primitive};
+use crate::parser::{self, Config, Event, EventKind, Name, Nested, Parser, Primitive};
+use crate::tokenizer;
 
 pub struct Deserializer<'de> {
     parser: Peekable<Parser<'de>>,
@@ -17,6 +20,38 @@ impl<'de> Deserializer<'de> {
             parser: Parser::new(source, config.include_comments(false)).peekable(),
         }
     }
+
+    fn handle_unit(&mut self) -> Result<(), Error> {
+        match self.parser.next().transpose()? {
+            Some(Event {
+                kind:
+                    EventKind::BeginNested {
+                        kind: Nested::Tuple,
+                        ..
+                    },
+                ..
+            }) => {
+                let mut nests = 1;
+                while nests > 0 {
+                    match self.parser.next().transpose()? {
+                        Some(Event {
+                            kind: EventKind::BeginNested { .. },
+                            ..
+                        }) => nests += 1,
+                        Some(Event {
+                            kind: EventKind::EndNested,
+                            ..
+                        }) => nests -= 1,
+                        Some(_) => {}
+                        None => unreachable!("parser errors on early eof"),
+                    }
+                }
+                Ok(())
+            }
+            Some(evt) => Err(Error::new(evt.location, ErrorKind::ExpectedUnit)),
+            None => Err(Error::new(None, ErrorKind::ExpectedUnit)),
+        }
+    }
 }
 
 macro_rules! deserialize_int_impl {
@@ -26,11 +61,16 @@ macro_rules! deserialize_int_impl {
             V: serde::de::Visitor<'de>,
         {
             match self.parser.next().transpose()? {
-                Some(Event::Primitive(Primitive::Integer(value))) => {
-                    visitor.$visit_name(value.$conv_name().unwrap())
+                Some(Event {
+                    kind: EventKind::Primitive(Primitive::Integer(value)),
+                    location,
+                }) => {
+                    visitor.$visit_name(value.$conv_name().ok_or_else(|| {
+                        Error::new(location, tokenizer::ErrorKind::IntegerTooLarge)
+                    })?)
                 }
-                Some(_) => todo!("expected integer"),
-                None => todo!("unexpected eof"),
+                Some(evt) => Err(Error::new(evt.location, ErrorKind::ExpectedInteger)),
+                None => Err(Error::new(None, ErrorKind::ExpectedInteger)),
             }
         }
     };
@@ -71,12 +111,16 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
         V: serde::de::Visitor<'de>,
     {
         match self.parser.next().transpose()? {
-            Some(Event::Primitive(Primitive::Bool(value))) => visitor.visit_bool(value),
-            Some(Event::Primitive(Primitive::Integer(value))) => {
-                visitor.visit_bool(!value.is_zero())
-            }
-            Some(_) => todo!("expected bool"),
-            None => todo!("unexpected eof"),
+            Some(Event {
+                kind: EventKind::Primitive(Primitive::Bool(value)),
+                ..
+            }) => visitor.visit_bool(value),
+            Some(Event {
+                kind: EventKind::Primitive(Primitive::Integer(value)),
+                ..
+            }) => visitor.visit_bool(!value.is_zero()),
+            Some(evt) => Err(Error::new(evt.location, ErrorKind::ExpectedInteger)),
+            None => Err(Error::new(None, ErrorKind::ExpectedInteger)),
         }
     }
 
@@ -92,9 +136,16 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
         V: serde::de::Visitor<'de>,
     {
         match self.parser.next().transpose()? {
-            Some(Event::Primitive(Primitive::Float(value))) => visitor.visit_f64(value),
-            Some(_) => todo!("expected float"),
-            None => todo!("unexpected eof"),
+            Some(Event {
+                kind: EventKind::Primitive(Primitive::Float(value)),
+                ..
+            }) => visitor.visit_f64(value),
+            Some(Event {
+                kind: EventKind::Primitive(Primitive::Integer(value)),
+                ..
+            }) => visitor.visit_f64(value.as_f64()),
+            Some(evt) => Err(Error::new(evt.location, ErrorKind::ExpectedFloat)),
+            None => Err(Error::new(None, ErrorKind::ExpectedFloat)),
         }
     }
 
@@ -103,9 +154,12 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
         V: serde::de::Visitor<'de>,
     {
         match self.parser.next().transpose()? {
-            Some(Event::Primitive(Primitive::Char(value))) => visitor.visit_char(value),
-            Some(_) => todo!("expected char"),
-            None => todo!("unexpected eof"),
+            Some(Event {
+                kind: EventKind::Primitive(Primitive::Char(value)),
+                ..
+            }) => visitor.visit_char(value),
+            Some(evt) => Err(Error::new(evt.location, ErrorKind::ExpectedChar)),
+            None => Err(Error::new(None, ErrorKind::ExpectedChar)),
         }
     }
 
@@ -114,19 +168,32 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
         V: serde::de::Visitor<'de>,
     {
         match self.parser.next().transpose()? {
-            Some(Event::Primitive(Primitive::Identifier(str))) => visitor.visit_borrowed_str(str),
-            Some(Event::Primitive(Primitive::String(str))) => match str {
+            Some(Event {
+                kind: EventKind::Primitive(Primitive::Identifier(str)),
+                ..
+            }) => visitor.visit_borrowed_str(str),
+            Some(Event {
+                kind: EventKind::Primitive(Primitive::String(str)),
+                ..
+            }) => match str {
                 Cow::Borrowed(str) => visitor.visit_borrowed_str(str),
                 Cow::Owned(str) => visitor.visit_string(str),
             },
-            Some(Event::Primitive(Primitive::Bytes(bytes))) => match bytes {
-                Cow::Borrowed(bytes) => {
-                    visitor.visit_borrowed_str(core::str::from_utf8(bytes).unwrap())
-                }
-                Cow::Owned(bytes) => visitor.visit_string(String::from_utf8(bytes).unwrap()),
+            Some(Event {
+                kind: EventKind::Primitive(Primitive::Bytes(bytes)),
+                location,
+            }) => match bytes {
+                Cow::Borrowed(bytes) => visitor.visit_borrowed_str(
+                    core::str::from_utf8(bytes)
+                        .map_err(|_| Error::new(location, ErrorKind::InvalidUtf8))?,
+                ),
+                Cow::Owned(bytes) => visitor.visit_string(
+                    String::from_utf8(bytes)
+                        .map_err(|_| Error::new(location, ErrorKind::InvalidUtf8))?,
+                ),
             },
-            Some(_) => todo!("expected string"),
-            None => todo!("unexpected eof"),
+            Some(evt) => Err(Error::new(evt.location, ErrorKind::ExpectedString)),
+            None => Err(Error::new(None, ErrorKind::ExpectedString)),
         }
     }
 
@@ -142,19 +209,26 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
         V: serde::de::Visitor<'de>,
     {
         match self.parser.next().transpose()? {
-            Some(Event::Primitive(Primitive::Identifier(str))) => {
-                visitor.visit_borrowed_bytes(str.as_bytes())
-            }
-            Some(Event::Primitive(Primitive::String(str))) => match str {
+            Some(Event {
+                kind: EventKind::Primitive(Primitive::Identifier(str)),
+                ..
+            }) => visitor.visit_borrowed_bytes(str.as_bytes()),
+            Some(Event {
+                kind: EventKind::Primitive(Primitive::String(str)),
+                ..
+            }) => match str {
                 Cow::Borrowed(str) => visitor.visit_borrowed_bytes(str.as_bytes()),
                 Cow::Owned(str) => visitor.visit_byte_buf(str.into_bytes()),
             },
-            Some(Event::Primitive(Primitive::Bytes(bytes))) => match bytes {
+            Some(Event {
+                kind: EventKind::Primitive(Primitive::Bytes(bytes)),
+                ..
+            }) => match bytes {
                 Cow::Borrowed(bytes) => visitor.visit_borrowed_bytes(bytes),
                 Cow::Owned(bytes) => visitor.visit_byte_buf(bytes),
             },
-            Some(_) => todo!("expected bytes"),
-            None => todo!("unexpected eof"),
+            Some(evt) => Err(Error::new(evt.location, ErrorKind::ExpectedBytes)),
+            None => Err(Error::new(None, ErrorKind::ExpectedBytes)),
         }
     }
 
@@ -170,22 +244,33 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
         V: serde::de::Visitor<'de>,
     {
         match self.parser.next().transpose()? {
-            Some(Event::Primitive(Primitive::Identifier(str))) if str == "None" => {
-                visitor.visit_none()
-            }
-            Some(Event::BeginNested {
-                name,
-                kind: Nested::Tuple,
-            }) if name == Some("Some") => {
+            Some(Event {
+                kind: EventKind::Primitive(Primitive::Identifier(str)),
+                ..
+            }) if str == "None" => visitor.visit_none(),
+            Some(Event {
+                kind:
+                    EventKind::BeginNested {
+                        name,
+                        kind: Nested::Tuple,
+                    },
+                ..
+            }) if matches!(name, Some(Name { name: "Some", .. })) => {
                 let result = visitor.visit_some(&mut *self)?;
                 match self.parser.next().transpose()? {
-                    Some(Event::EndNested) => {}
-                    _ => todo!("expected end paren"),
+                    Some(Event {
+                        kind: EventKind::EndNested,
+                        ..
+                    }) => Ok(result),
+                    Some(evt) => Err(Error::new(
+                        evt.location,
+                        ErrorKind::SomeCanOnlyContainOneValue,
+                    )),
+                    None => unreachable!("parser errors on early eof"),
                 }
-                Ok(result)
             }
-            Some(_) => todo!("expected option"),
-            None => todo!("unexpected eof"),
+            Some(evt) => Err(Error::new(evt.location, ErrorKind::ExpectedOption)),
+            None => Err(Error::new(None, ErrorKind::ExpectedOption)),
         }
     }
 
@@ -193,18 +278,9 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: serde::de::Visitor<'de>,
     {
-        match self.parser.next().transpose()? {
-            Some(Event::BeginNested {
-                kind: Nested::Tuple,
-                ..
-            }) => match self.parser.next().transpose()? {
-                Some(Event::EndNested) => visitor.visit_unit(),
-                Some(_) => todo!("expected unit, found tuple"),
-                None => todo!("unexpected eof"),
-            },
-            Some(_) => todo!("expected unit, found tuple"),
-            None => todo!("unexpected eof"),
-        }
+        self.handle_unit()?;
+
+        visitor.visit_unit()
     }
 
     fn deserialize_unit_struct<V>(
@@ -234,17 +310,18 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
         V: serde::de::Visitor<'de>,
     {
         match self.parser.next().transpose()? {
-            Some(Event::BeginNested { kind, .. }) => {
+            Some(Event {
+                kind: EventKind::BeginNested { kind, .. },
+                location,
+            }) => {
                 if !matches!(kind, Nested::Tuple | Nested::List) {
-                    todo!("expected a tuple or list")
+                    return Err(Error::new(location, ErrorKind::ExpectedSequence));
                 }
 
                 visitor.visit_seq(self)
             }
-            Some(_other) => {
-                todo!("expected struct")
-            }
-            None => todo!("unexpected eof"),
+            Some(other) => Err(Error::new(other.location, ErrorKind::ExpectedSequence)),
+            None => Err(Error::new(None, parser::ErrorKind::UnexpectedEof)),
         }
     }
 
@@ -265,19 +342,22 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
         V: serde::de::Visitor<'de>,
     {
         match self.parser.next().transpose()? {
-            Some(Event::BeginNested { name, kind }) => {
+            Some(Event {
+                kind: EventKind::BeginNested { name, kind },
+                location,
+            }) => {
                 if name.map_or(false, |name| name != struct_name) {
-                    todo!("struct name mismatch")
+                    return Err(Error::new(location, ErrorKind::NameMismatch(struct_name)));
                 }
 
                 if kind != Nested::Tuple {
-                    todo!("expected a tuple")
+                    return Err(Error::new(location, ErrorKind::ExpectedTupleStruct));
                 }
             }
-            Some(_other) => {
-                todo!("expected tuple struct")
+            Some(other) => {
+                return Err(Error::new(other.location, ErrorKind::ExpectedTupleStruct));
             }
-            None => todo!("unexpected eof"),
+            None => return Err(Error::new(None, parser::ErrorKind::UnexpectedEof)),
         }
 
         visitor.visit_seq(self)
@@ -288,17 +368,18 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
         V: serde::de::Visitor<'de>,
     {
         match self.parser.next().transpose()? {
-            Some(Event::BeginNested { kind, .. }) => {
+            Some(Event {
+                kind: EventKind::BeginNested { kind, .. },
+                location,
+            }) => {
                 if kind != Nested::Map {
-                    todo!("expected a map")
+                    return Err(Error::new(location, ErrorKind::ExpectedMap));
                 }
 
                 visitor.visit_map(self)
             }
-            Some(_other) => {
-                todo!("expected struct")
-            }
-            None => todo!("unexpected eof"),
+            Some(other) => Err(Error::new(other.location, ErrorKind::ExpectedMap)),
+            None => Err(Error::new(None, parser::ErrorKind::UnexpectedEof)),
         }
     }
 
@@ -312,19 +393,22 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
         V: serde::de::Visitor<'de>,
     {
         match self.parser.next().transpose()? {
-            Some(Event::BeginNested { name, kind }) => {
+            Some(Event {
+                kind: EventKind::BeginNested { name, kind },
+                location,
+            }) => {
                 if name.map_or(false, |name| name != struct_name) {
-                    todo!("struct name mismatch")
+                    return Err(Error::new(location, ErrorKind::NameMismatch(struct_name)));
                 }
 
                 if kind != Nested::Map {
-                    todo!("expected a map")
+                    return Err(Error::new(location, ErrorKind::ExpectedMapStruct));
                 }
             }
             Some(other) => {
-                todo!("expected struct, got {other:?}")
+                return Err(Error::new(other.location, ErrorKind::ExpectedMapStruct));
             }
-            None => todo!("unexpected eof"),
+            None => return Err(Error::new(None, parser::ErrorKind::UnexpectedEof)),
         }
 
         visitor.visit_map(self)
@@ -356,14 +440,23 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
         let mut depth = 0;
         loop {
             match self.parser.next().transpose()? {
-                Some(Event::BeginNested { .. }) => {
+                Some(Event {
+                    kind: EventKind::BeginNested { .. },
+                    ..
+                }) => {
                     depth += 1;
                 }
-                Some(Event::EndNested) => {
+                Some(Event {
+                    kind: EventKind::EndNested,
+                    ..
+                }) => {
                     depth -= 1;
                 }
-                Some(Event::Primitive(_) | Event::Comment(_)) => {}
-                None => todo!("unexpected eof"),
+                Some(Event {
+                    kind: EventKind::Primitive(_) | EventKind::Comment(_),
+                    ..
+                }) => {}
+                None => return Err(Error::new(None, parser::ErrorKind::UnexpectedEof)),
             }
 
             if depth == 0 {
@@ -383,12 +476,15 @@ impl<'de> MapAccess<'de> for Deserializer<'de> {
         K: serde::de::DeserializeSeed<'de>,
     {
         match self.parser.peek() {
-            Some(Ok(Event::EndNested)) => {
+            Some(Ok(Event {
+                kind: EventKind::EndNested,
+                ..
+            })) => {
                 self.parser.next();
                 Ok(None)
             }
             Some(_) => seed.deserialize(self).map(Some),
-            None => todo!("unexpected eof"),
+            None => Err(Error::new(None, parser::ErrorKind::UnexpectedEof)),
         }
     }
 
@@ -408,12 +504,15 @@ impl<'de> SeqAccess<'de> for Deserializer<'de> {
         T: serde::de::DeserializeSeed<'de>,
     {
         match self.parser.peek() {
-            Some(Ok(Event::EndNested)) => {
+            Some(Ok(Event {
+                kind: EventKind::EndNested,
+                ..
+            })) => {
                 self.parser.next();
                 Ok(None)
             }
             Some(_) => seed.deserialize(self).map(Some),
-            None => todo!("unexpected eof"),
+            None => Err(Error::new(None, parser::ErrorKind::UnexpectedEof)),
         }
     }
 }
@@ -435,18 +534,7 @@ impl<'a, 'de> VariantAccess<'de> for &'a mut Deserializer<'de> {
     type Error = Error;
 
     fn unit_variant(self) -> Result<(), Self::Error> {
-        match self.parser.next().transpose()? {
-            Some(Event::BeginNested {
-                kind: Nested::Tuple,
-                ..
-            }) => match self.parser.next().transpose()? {
-                Some(Event::EndNested) => Ok(()),
-                Some(_) => todo!("expected unit, found tuple"),
-                None => todo!("unexpected eof"),
-            },
-            Some(_) => todo!("expected unit, found tuple"),
-            None => todo!("unexpected eof"),
-        }
+        self.handle_unit()
     }
 
     fn newtype_variant_seed<T>(self, seed: T) -> Result<T::Value, Self::Error>
@@ -475,14 +563,113 @@ impl<'a, 'de> VariantAccess<'de> for &'a mut Deserializer<'de> {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub struct Error {
+    pub location: Option<Range<usize>>,
+    pub kind: ErrorKind,
+}
+
+impl Error {
+    pub fn new(location: impl Into<Option<Range<usize>>>, kind: impl Into<ErrorKind>) -> Self {
+        Self {
+            location: location.into(),
+            kind: kind.into(),
+        }
+    }
+}
+
 impl serde::de::Error for Error {
     fn custom<T>(msg: T) -> Self
     where
-        T: core::fmt::Display,
+        T: Display,
     {
-        todo!("custom error: {msg}")
+        Self {
+            location: None,
+            kind: ErrorKind::Message(msg.to_string()),
+        }
     }
 }
+
+impl Display for Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        if let Some(location) = &self.location {
+            write!(f, "{} at {}..{}", self.kind, location.start, location.end)
+        } else {
+            Display::fmt(&self.kind, f)
+        }
+    }
+}
+
+impl From<parser::Error> for Error {
+    fn from(err: parser::Error) -> Self {
+        Self {
+            location: Some(err.location),
+            kind: err.kind.into(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub enum ErrorKind {
+    ExpectedInteger,
+    ExpectedFloat,
+    ExpectedUnit,
+    ExpectedBool,
+    ExpectedOption,
+    ExpectedChar,
+    ExpectedString,
+    ExpectedBytes,
+    ExpectedSequence,
+    ExpectedMap,
+    ExpectedTupleStruct,
+    ExpectedMapStruct,
+    InvalidUtf8,
+    NameMismatch(&'static str),
+    SomeCanOnlyContainOneValue,
+    Parser(parser::ErrorKind),
+    Message(String),
+}
+
+impl From<parser::ErrorKind> for ErrorKind {
+    fn from(kind: parser::ErrorKind) -> Self {
+        Self::Parser(kind)
+    }
+}
+
+impl From<tokenizer::ErrorKind> for ErrorKind {
+    fn from(kind: tokenizer::ErrorKind) -> Self {
+        Self::Parser(kind.into())
+    }
+}
+
+impl Display for ErrorKind {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        match self {
+            ErrorKind::Parser(parser) => Display::fmt(parser, f),
+            ErrorKind::Message(message) => f.write_str(message),
+            ErrorKind::ExpectedInteger => f.write_str("expected integer"),
+            ErrorKind::ExpectedFloat => f.write_str("expected float"),
+            ErrorKind::ExpectedBool => f.write_str("expected bool"),
+            ErrorKind::ExpectedUnit => f.write_str("expected unit"),
+            ErrorKind::ExpectedOption => f.write_str("expected option"),
+            ErrorKind::ExpectedChar => f.write_str("expected char"),
+            ErrorKind::ExpectedString => f.write_str("expected string"),
+            ErrorKind::ExpectedBytes => f.write_str("expected bytes"),
+            ErrorKind::SomeCanOnlyContainOneValue => {
+                f.write_str("Some(_) can only contain one value")
+            }
+            ErrorKind::ExpectedSequence => f.write_str("expected sequence"),
+            ErrorKind::ExpectedMap => f.write_str("expected map"),
+            ErrorKind::ExpectedTupleStruct => f.write_str("expected tuple struct"),
+            ErrorKind::ExpectedMapStruct => f.write_str("expected map struct"),
+            ErrorKind::NameMismatch(name) => write!(f, "name mismatch, expected {name}"),
+            ErrorKind::InvalidUtf8 => f.write_str("invalid utf-8"),
+        }
+    }
+}
+
+#[cfg(feature = "std")]
+impl std::error::Error for Error {}
 
 #[cfg(test)]
 mod tests {
