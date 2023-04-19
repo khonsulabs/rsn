@@ -131,18 +131,22 @@ impl<'s> Parser<'s> {
             TokenKind::Colon | TokenKind::Comma | TokenKind::Close(_) => {
                 todo!("expected value, got something else.")
             }
-            TokenKind::Comment(_) | TokenKind::Whitespace => unreachable!("disabled"),
+            TokenKind::Comment(comment) => Ok(Event::Comment(comment)),
+            TokenKind::Whitespace(_) => unreachable!("disabled"),
         }
     }
 
     fn parse_sequence(&mut self, state: ListState, end: Balanced) -> Result<Event<'s>, Error> {
         match state {
             ListState::ExpectingValue => {
-                *self.nested.last_mut().expect("required for this fn") =
-                    NestedState::list(end, ListState::ExpectingComma);
-
                 let token = self.next_or_eof()?;
-                self.parse_token(token, Some(end))
+                if let TokenKind::Comment(comment) = &token.kind {
+                    Ok(Event::Comment(comment))
+                } else {
+                    *self.nested.last_mut().expect("required for this fn") =
+                        NestedState::list(end, ListState::ExpectingComma);
+                    self.parse_token(token, Some(end))
+                }
             }
             ListState::ExpectingComma => {
                 let token = self.next_or_eof()?;
@@ -156,6 +160,7 @@ impl<'s> Parser<'s> {
                             NestedState::list(end, ListState::ExpectingValue);
                         self.parse_sequence(ListState::ExpectingValue, end)
                     }
+                    TokenKind::Comment(comment) => Ok(Event::Comment(comment)),
                     _ => todo!("expected comma or end"),
                 }
             }
@@ -163,37 +168,40 @@ impl<'s> Parser<'s> {
     }
 
     fn map_state_mut(&mut self) -> &mut MapState {
-        if let Some(nested) = self.nested.last_mut() {
-            let NestedState::Map(map_state) = nested else { unreachable!("not a map state") };
-            map_state
-        } else {
-            let State::ImplicitMap(map_state) = &mut self.root_state else { unreachable!("not a map state") };
-            map_state
-        }
+        let Some(NestedState::Map(map_state)) = self.nested.last_mut() else { unreachable!("not a map state") };
+        map_state
     }
 
     fn parse_map(&mut self, state: MapState) -> Result<Event<'s>, Error> {
         match state {
             MapState::ExpectingKey => {
-                *self.map_state_mut() = MapState::ExpectingColon;
-
                 let token = self.next_or_eof()?;
-                self.parse_token(token, Some(Balanced::Brace))
+                if let TokenKind::Comment(comment) = &token.kind {
+                    Ok(Event::Comment(comment))
+                } else {
+                    *self.map_state_mut() = MapState::ExpectingColon;
+                    self.parse_token(token, Some(Balanced::Brace))
+                }
             }
             MapState::ExpectingColon => {
                 let token = self.next_or_eof()?;
                 if matches!(token.kind, TokenKind::Colon) {
                     *self.map_state_mut() = MapState::ExpectingValue;
                     self.parse_map(MapState::ExpectingValue)
+                } else if let TokenKind::Comment(comment) = token.kind {
+                    Ok(Event::Comment(comment))
                 } else {
                     todo!("expected colon, got {token:?}")
                 }
             }
             MapState::ExpectingValue => {
-                *self.map_state_mut() = MapState::ExpectingComma;
-
                 let token = self.next_or_eof()?;
-                self.parse_token(token, None)
+                if let TokenKind::Comment(comment) = &token.kind {
+                    Ok(Event::Comment(comment))
+                } else {
+                    *self.map_state_mut() = MapState::ExpectingComma;
+                    self.parse_token(token, None)
+                }
             }
             MapState::ExpectingComma => {
                 let token = self.next_token().transpose()?.map(|token| token.kind);
@@ -206,6 +214,7 @@ impl<'s> Parser<'s> {
                         *self.map_state_mut() = MapState::ExpectingKey;
                         self.parse_map(MapState::ExpectingKey)
                     }
+                    Some(TokenKind::Comment(comment)) => Ok(Event::Comment(comment)),
                     _ => todo!("expected comma or end"),
                 }
             }
@@ -221,6 +230,7 @@ impl<'s> Parser<'s> {
                         self.root_state = State::ImplicitMap(MapState::ExpectingColon);
                         Ok(Event::Primitive(Primitive::Identifier(key)))
                     }
+                    Some(TokenKind::Comment(comment)) => Ok(Event::Comment(comment)),
                     None => {
                         self.root_state = State::Finished;
                         Ok(Event::EndNested)
@@ -233,15 +243,20 @@ impl<'s> Parser<'s> {
                 if matches!(token.kind, TokenKind::Colon) {
                     self.root_state = State::ImplicitMap(MapState::ExpectingValue);
                     self.parse_implicit_map(MapState::ExpectingValue)
+                } else if let TokenKind::Comment(comment) = token.kind {
+                    Ok(Event::Comment(comment))
                 } else {
                     todo!("expected colon, got {token:?}")
                 }
             }
             MapState::ExpectingValue => {
-                self.root_state = State::ImplicitMap(MapState::ExpectingComma);
-
                 let token = self.next_or_eof()?;
-                self.parse_token(token, None)
+                if let TokenKind::Comment(comment) = &token.kind {
+                    Ok(Event::Comment(comment))
+                } else {
+                    self.root_state = State::ImplicitMap(MapState::ExpectingComma);
+                    self.parse_token(token, None)
+                }
             }
             MapState::ExpectingComma => {
                 let token = self.next_token().transpose()?.map(|token| token.kind);
@@ -258,6 +273,7 @@ impl<'s> Parser<'s> {
                         self.root_state = State::ImplicitMap(MapState::ExpectingColon);
                         Ok(Event::Primitive(Primitive::Identifier(key)))
                     }
+                    Some(TokenKind::Comment(comment)) => Ok(Event::Comment(comment)),
                     None => {
                         self.root_state = State::Finished;
                         Ok(Event::EndNested)
@@ -267,12 +283,8 @@ impl<'s> Parser<'s> {
             }
         }
     }
-}
 
-impl<'s> Iterator for Parser<'s> {
-    type Item = Result<Event<'s>, Error>;
-
-    fn next(&mut self) -> Option<Self::Item> {
+    fn next_event(&mut self) -> Option<Result<Event<'s>, Error>> {
         Some(match self.nested.last() {
             None => match &self.root_state {
                 State::AtStart => {
@@ -280,48 +292,50 @@ impl<'s> Iterator for Parser<'s> {
                         Ok(token) => token,
                         Err(err) => return Some(Err(err.into())),
                     };
-                    if self.config.allow_implicit_map
-                        && matches!(token.kind, TokenKind::Identifier(_))
-                    {
-                        let TokenKind::Identifier(identifier) = token.kind
-                            else { unreachable!("just matched")};
-                        match self.peek() {
-                            Some(token) if matches!(token.kind, TokenKind::Colon) => {
-                                // Switch to parsing an implicit map
-                                self.root_state = State::StartingImplicitMap(identifier);
-                                Ok(Event::BeginNested {
-                                    name: None,
-                                    kind: Nested::Map,
-                                })
-                            }
-                            Some(token)
-                                if matches!(
-                                    token.kind,
-                                    TokenKind::Open(Balanced::Brace | Balanced::Paren,)
-                                ) =>
-                            {
-                                let Some(Ok(Token{ kind: TokenKind::Open(kind), ..})) = self.next_token()
-                                    else { unreachable!("just peeked") };
-                                self.root_state = State::Finished;
-                                Ok(Event::BeginNested {
-                                    name: Some(identifier),
-                                    kind: match kind {
-                                        Balanced::Paren => Nested::Tuple,
-                                        Balanced::Brace => Nested::Map,
-                                        Balanced::Bracket => {
-                                            unreachable!("not matched in peek")
-                                        }
-                                    },
-                                })
-                            }
-                            _ => {
-                                self.root_state = State::Finished;
-                                Ok(Event::Primitive(Primitive::Identifier(identifier)))
+                    match &token.kind {
+                        TokenKind::Identifier(_) if self.config.allow_implicit_map => {
+                            let TokenKind::Identifier(identifier) = token.kind
+                                else { unreachable!("just matched")};
+                            match self.peek() {
+                                Some(token) if matches!(token.kind, TokenKind::Colon) => {
+                                    // Switch to parsing an implicit map
+                                    self.root_state = State::StartingImplicitMap(identifier);
+                                    Ok(Event::BeginNested {
+                                        name: None,
+                                        kind: Nested::Map,
+                                    })
+                                }
+                                Some(token)
+                                    if matches!(
+                                        token.kind,
+                                        TokenKind::Open(Balanced::Brace | Balanced::Paren,)
+                                    ) =>
+                                {
+                                    let Some(Ok(Token{ kind: TokenKind::Open(kind), ..})) = self.next_token()
+                                        else { unreachable!("just peeked") };
+                                    self.root_state = State::Finished;
+                                    Ok(Event::BeginNested {
+                                        name: Some(identifier),
+                                        kind: match kind {
+                                            Balanced::Paren => Nested::Tuple,
+                                            Balanced::Brace => Nested::Map,
+                                            Balanced::Bracket => {
+                                                unreachable!("not matched in peek")
+                                            }
+                                        },
+                                    })
+                                }
+                                _ => {
+                                    self.root_state = State::Finished;
+                                    Ok(Event::Primitive(Primitive::Identifier(identifier)))
+                                }
                             }
                         }
-                    } else {
-                        self.root_state = State::Finished;
-                        self.parse_token(token, None)
+                        TokenKind::Comment(comment) => Ok(Event::Comment(comment)),
+                        _ => {
+                            self.root_state = State::Finished;
+                            self.parse_token(token, None)
+                        }
                     }
                 }
                 State::StartingImplicitMap(_) => {
@@ -331,7 +345,11 @@ impl<'s> Iterator for Parser<'s> {
                 }
                 State::ImplicitMap(state) => self.parse_implicit_map(*state),
                 State::Finished => match self.next_token()? {
-                    Ok(token) => todo!("expected eof, found {token:?}"),
+                    Ok(token) => match token.kind {
+                        TokenKind::Comment(comment) => Ok(Event::Comment(comment)),
+                        TokenKind::Whitespace(_) => unreachable!("disabled"),
+                        _ => todo!("trailing junk"),
+                    },
                     Err(err) => return Some(Err(err.into())),
                 },
             },
@@ -343,15 +361,44 @@ impl<'s> Iterator for Parser<'s> {
     }
 }
 
+impl<'s> Iterator for Parser<'s> {
+    type Item = Result<Event<'s>, Error>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        loop {
+            let event = self.next_event()?;
+            if !matches!(event, Ok(Event::Comment(_))) || self.config.include_comments {
+                break Some(event);
+            } else {
+                // Eat the comment
+                continue;
+            }
+        }
+    }
+}
+
 #[derive(Default, Debug)]
 pub struct Config {
     pub allow_implicit_map: bool,
+    pub include_comments: bool,
+}
+
+impl Config {
+    pub const fn allow_implicit_map(mut self, allow: bool) -> Self {
+        self.allow_implicit_map = allow;
+        self
+    }
+
+    pub const fn include_comments(mut self, include: bool) -> Self {
+        self.include_comments = include;
+        self
+    }
 }
 
 #[derive(Debug, Clone, Eq, PartialEq)]
 enum State<'s> {
     AtStart,
-    StartingImplicitMap(Cow<'s, str>),
+    StartingImplicitMap(&'s str),
     ImplicitMap(MapState),
     Finished,
 }
@@ -397,12 +444,10 @@ pub enum ErrorKind {
 
 #[derive(Debug, PartialEq, Clone)]
 pub enum Event<'s> {
-    BeginNested {
-        name: Option<Cow<'s, str>>,
-        kind: Nested,
-    },
+    BeginNested { name: Option<&'s str>, kind: Nested },
     EndNested,
     Primitive(Primitive<'s>),
+    Comment(&'s str),
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -450,7 +495,7 @@ pub enum Primitive<'s> {
     Float(f64),
     Char(char),
     String(Cow<'s, str>),
-    Identifier(Cow<'s, str>),
+    Identifier(&'s str),
     Bytes(Cow<'s, [u8]>),
 }
 
@@ -541,9 +586,9 @@ mod tests {
                     name: None,
                     kind: Nested::Map
                 },
-                Event::Primitive(Primitive::Identifier(Cow::Borrowed("a"))),
+                Event::Primitive(Primitive::Identifier("a")),
                 Event::Primitive(Primitive::Integer(Integer::Usize(1))),
-                Event::Primitive(Primitive::Identifier(Cow::Borrowed("b"))),
+                Event::Primitive(Primitive::Identifier("b")),
                 Event::Primitive(Primitive::Integer(Integer::Usize(2))),
                 Event::EndNested,
             ]
@@ -558,11 +603,55 @@ mod tests {
                     name: None,
                     kind: Nested::Map
                 },
-                Event::Primitive(Primitive::Identifier(Cow::Borrowed("a"))),
+                Event::Primitive(Primitive::Identifier("a")),
                 Event::Primitive(Primitive::Integer(Integer::Usize(1))),
-                Event::Primitive(Primitive::Identifier(Cow::Borrowed("b"))),
+                Event::Primitive(Primitive::Identifier("b")),
                 Event::Primitive(Primitive::Integer(Integer::Usize(2))),
                 Event::EndNested,
+            ]
+        );
+    }
+
+    #[test]
+    fn commented() {
+        let events = Parser::new(
+            "/**/{/**/a/**/:/**/1/**/,/**/b/**/:/**/[/**/2/**/,/**/3/**/]/**/}/**/",
+            Config::default().include_comments(true),
+        )
+        .collect::<Result<Vec<_>, _>>()
+        .unwrap();
+        assert_eq!(
+            &events,
+            &[
+                Event::Comment("/**/"),
+                Event::BeginNested {
+                    name: None,
+                    kind: Nested::Map
+                },
+                Event::Comment("/**/"),
+                Event::Primitive(Primitive::Identifier("a")),
+                Event::Comment("/**/"),
+                Event::Comment("/**/"),
+                Event::Primitive(Primitive::Integer(Integer::Usize(1))),
+                Event::Comment("/**/"),
+                Event::Comment("/**/"),
+                Event::Primitive(Primitive::Identifier("b")),
+                Event::Comment("/**/"),
+                Event::Comment("/**/"),
+                Event::BeginNested {
+                    name: None,
+                    kind: Nested::List
+                },
+                Event::Comment("/**/"),
+                Event::Primitive(Primitive::Integer(Integer::Usize(2))),
+                Event::Comment("/**/"),
+                Event::Comment("/**/"),
+                Event::Primitive(Primitive::Integer(Integer::Usize(3))),
+                Event::Comment("/**/"),
+                Event::EndNested,
+                Event::Comment("/**/"),
+                Event::EndNested,
+                Event::Comment("/**/"),
             ]
         );
     }

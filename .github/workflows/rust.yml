@@ -12,26 +12,37 @@ jobs:
       - name: Install Rust
         uses: hecrj/setup-rust-action@v1
 
-      - name: Run clippy (all features)
-        run: |
-          cargo clippy --features std,serde
-
       - name: Run clippy (no features)
         run: |
           cargo clippy --no-default-features
 
-      - name: Run clippy (serde-only)
+      - name: Run clippy (all features)
+        run: |
+          cargo clippy --features std,serde,integer128
+
+      - name: Run clippy (std,serde)
+        run: |
+          cargo clippy --features std,serde
+
+      - name: Run clippy (serde)
         run: |
           cargo clippy --no-default-features --features serde
 
-      - name: Run clippy (std-only)
+      - name: Run clippy (std)
         run: |
           cargo clippy --no-default-features --features std
 
-      # Do not pass --all-features, as it enables the "nightly" flag.
+      - name: Run clippy (integer128)
+        run: |
+          cargo clippy --no-default-features --features integer128
+
       - name: Run unit tests
         run: |
           cargo test --all-targets --features std,serde
+
+      - name: Run unit tests (integer128)
+        run: |
+          cargo test --all-targets --features std,serde,integer128
 
   build-msrv:
     name: Test on MSRV
@@ -43,7 +54,7 @@ jobs:
         with:
           rust-version: 1.65
       - name: Run unit tests
-        run: cargo test --all-targets --features std,serde
+        run: cargo test --all-targets --features std,serde,integer128
 
   build-nostd:
     name: Build on no_std target (thumbv7em-none-eabi)
@@ -65,4 +76,4 @@ jobs:
         with:
           toolchain: stable
           targets: thumbv7em-none-eabi
-      - run: cargo build --target thumbv7em-none-eabi --lib --release --no-default-features --features serde
+      - run: cargo build --target thumbv7em-none-eabi --lib --release --no-default-features --features serde,integer128

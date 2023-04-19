@@ -1,6 +1,7 @@
 use alloc::borrow::Cow;
 use alloc::string::String;
 use core::fmt::Display;
+use core::mem;
 use core::ops::Range;
 
 use unicode_ident::{is_xid_continue, is_xid_start};
@@ -32,11 +33,11 @@ pub enum TokenKind<'a> {
     Byte(u8),
     String(Cow<'a, str>),
     Bytes(Cow<'a, [u8]>),
-    Identifier(Cow<'a, str>),
+    Identifier(&'a str),
     Open(Balanced),
     Close(Balanced),
-    Comment(Cow<'a, str>), // TODO needs comment kind -- block vs line
-    Whitespace,
+    Comment(&'a str),
+    Whitespace(&'a str),
 }
 
 impl<'a> Eq for TokenKind<'a> {}
@@ -192,7 +193,26 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
     fn next_or_eof(&mut self) -> Result<char, Error> {
         self.chars
             .next()
-            .ok_or_else(|| Error::new(self.chars.last_char_range(), ErrorKind::UnexpectedEof))
+            .ok_or_else(|| self.error_at_last_char(ErrorKind::UnexpectedEof))
+    }
+
+    fn error(&self, kind: ErrorKind) -> Error {
+        Error::new(self.chars.marked_range(), kind)
+    }
+
+    fn error_at_last_char(&self, kind: ErrorKind) -> Error {
+        Error::new(self.chars.last_char_range(), kind)
+    }
+
+    fn error_at_next_char(&mut self, kind: ErrorKind) -> Error {
+        let range = if let Some((offset, ch)) = self.chars.peek_full() {
+            offset..offset + ch.len_utf8()
+        } else {
+            let mut range = self.chars.last_char_range();
+            range.start = range.end;
+            range
+        };
+        Error::new(range, kind)
     }
 
     fn tokenize_positive_integer<I>(&mut self, mut value: I) -> Result<Token<'a>, Error>
@@ -205,12 +225,10 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
         let mut had_underscores = false;
         let mut overflowing = false;
         while let Some(ch) = self.chars.peek() {
-            // TODO get rid of the as u8
-            let digit_value = (ch as u8).wrapping_sub(b'0');
-            if digit_value < 10 {
+            if let Some(digit_value) = ch.to_digit(10) {
                 if let Some(new_value) = value
                     .checked_mul(I::from(10))
-                    .and_then(|value| value.checked_add(I::from(digit_value)))
+                    .and_then(|value| value.checked_add(I::from(digit_value as u8)))
                 {
                     value = new_value;
                     self.chars.next();
@@ -238,17 +256,15 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
         if overflowing {
             let mut value: I::Larger = value.into_larger();
             while let Some(ch) = self.chars.peek() {
-                // TODO get rid of the as u8
-                let digit_value = (ch as u8).wrapping_sub(b'0');
-                if digit_value < 10 {
+                if let Some(digit_value) = ch.to_digit(10) {
                     if let Some(new_value) = value
                         .checked_mul(<I::Larger>::from(10))
-                        .and_then(|value| value.checked_add(<I::Larger>::from(digit_value)))
+                        .and_then(|value| value.checked_add(<I::Larger>::from(digit_value as u8)))
                     {
                         value = new_value;
                         self.chars.next();
                     } else {
-                        todo!("overflowed large")
+                        return Err(self.error(ErrorKind::IntegerTooLarge));
                     }
                 } else if ch == '.' {
                     has_decimal = true;
@@ -295,12 +311,10 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
         let mut overflowing = false;
         let mut had_underscores = false;
         while let Some(ch) = self.chars.peek() {
-            // TODO get rid of the as u8
-            let digit_value = (ch as u8).wrapping_sub(b'0');
-            if digit_value < 10 {
+            if let Some(digit_value) = ch.to_digit(10) {
                 if let Some(new_value) = value
                     .checked_mul(I::from(10))
-                    .and_then(|value| value.checked_sub(I::from(digit_value)))
+                    .and_then(|value| value.checked_sub(I::from(digit_value as u8)))
                 {
                     value = new_value;
                     self.chars.next();
@@ -328,17 +342,15 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
         if overflowing {
             let mut value: I::Larger = value.into_larger();
             while let Some(ch) = self.chars.peek() {
-                // TODO get rid of the as u8
-                let digit_value = (ch as u8).wrapping_sub(b'0');
-                if digit_value < 10 {
+                if let Some(digit_value) = ch.to_digit(10) {
                     if let Some(new_value) = value
                         .checked_mul(<I::Larger>::from(10))
-                        .and_then(|value| value.checked_sub(<I::Larger>::from(digit_value)))
+                        .and_then(|value| value.checked_sub(<I::Larger>::from(digit_value as u8)))
                     {
                         value = new_value;
                         self.chars.next();
                     } else {
-                        todo!("overflowed large")
+                        return Err(self.error(ErrorKind::IntegerTooLarge));
                     }
                 } else if ch == '.' {
                     has_decimal = true;
@@ -435,11 +447,14 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
             }
 
             if !has_exponent_digit {
-                todo!("expected exponent digit")
+                return Err(self.error_at_next_char(ErrorKind::ExpectedDigit));
             }
         }
 
-        let parsed = self.scratch.parse::<f64>().unwrap(); // TODO handle this error
+        let parsed = self
+            .scratch
+            .parse::<f64>()
+            .map_err(|_| self.error(ErrorKind::InvalidFloat))?;
 
         Ok(Token::new(
             self.chars.marked_range(),
@@ -470,8 +485,7 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
                     {
                         value = next_value
                     } else {
-                        // Overflowed
-                        todo!("error: overflowed u128")
+                        return Err(self.error(ErrorKind::IntegerTooLarge));
                     }
                 }
                 Err('_') => {
@@ -491,17 +505,17 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
         ))
     }
 
-    fn tokenize_radix_number<const BITS: u32>(
+    fn tokenize_radix_number<const RADIX: u32>(
         &mut self,
         signed: bool,
         negative: bool,
     ) -> Result<Token<'a>, Error> {
-        assert!(BITS == 1 || BITS == 3 || BITS == 4);
-        let max = 2_u8.pow(BITS);
+        assert!(RADIX == 1 || RADIX == 3 || RADIX == 4);
+        let max = 2_u32.pow(RADIX);
         let mut value = 0usize;
         let mut read_at_least_one_digit = false;
 
-        while let Some(result) = self.chars.peek().map(|ch| ch.to_digit(BITS * 4).ok_or(ch)) {
+        while let Some(result) = self.chars.peek().map(|ch| ch.to_digit(max).ok_or(ch)) {
             match result {
                 Ok(radix_value) => {
                     read_at_least_one_digit = true;
@@ -513,7 +527,7 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
                         value = next_value
                     } else {
                         // Overflowed
-                        return self.tokenize_radix_large_number::<BITS>(
+                        return self.tokenize_radix_large_number::<RADIX>(
                             signed,
                             negative,
                             value,
@@ -538,7 +552,7 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
                 }),
             ))
         } else {
-            todo!("expected hex digit")
+            Err(self.error(ErrorKind::ExpectedDigit))
         }
     }
 
@@ -570,42 +584,74 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
         }
     }
 
-    fn tokenize_number(&mut self, start_char: char) -> Result<Token<'a>, Error> {
-        let negative = start_char == '-';
-        let signed = negative || start_char == '+';
+    fn tokenize_number(&mut self, start_char: u8) -> Result<Token<'a>, Error> {
+        let negative = start_char == b'-';
+        let signed = negative || start_char == b'+';
+        // Check for inf/NaN
+        if signed && matches!(self.chars.peek(), Some('i' | 'N')) {
+            // We pass in 'i', but it doesn't matter as long as we provide a
+            // xid_start character -- identifiers are always borrowed, so the
+            // char is never passed to the output.
+            return self.tokenize_identifier(Some('i'));
+        }
 
         if signed {
             let next_char = self.next_or_eof()?;
             if next_char == '0' {
                 self.tokenize_leading_zero_number(signed, negative)
-            } else if next_char.is_ascii_digit() {
-                // TODO get rid of the as u8
-                let value = (next_char as u8 - b'0') as isize;
+            } else if let Some(value) = next_char.to_digit(10) {
+                let value = value as isize;
                 if negative {
                     self.tokenize_negative_integer(-value)
                 } else {
                     self.tokenize_positive_integer(value)
                 }
             } else {
-                Err(Error::new(
-                    self.chars.marked_range(),
-                    ErrorKind::ExpectedDigitAfterSign,
-                ))
+                Err(self.error(ErrorKind::ExpectedDigit))
             }
-        } else if start_char == '0' {
+        } else if start_char == b'0' {
             self.tokenize_leading_zero_number(signed, negative)
         } else {
-            let value = (start_char as u8 - b'0') as usize;
+            let value = (start_char - b'0') as usize;
             self.tokenize_positive_integer(value)
         }
     }
 
     fn tokenize_char(&mut self) -> Result<Token<'a>, Error> {
-        todo!()
+        let ch = match self.next_or_eof()? {
+            '\\' => self
+                .tokenize_escaped_char::<false, true>()?
+                .expect("underscore disallowed"),
+            ch @ ('\n' | '\r' | '\t') => {
+                return Err(self.error_at_last_char(ErrorKind::Unexpected(ch)))
+            }
+            ch => ch,
+        };
+
+        // Handle the trailing quote
+        match self.next_or_eof()? {
+            '\'' => Ok(Token::new(
+                self.chars.marked_range(),
+                TokenKind::Character(ch),
+            )),
+            other => Err(self.error_at_last_char(ErrorKind::Unexpected(other))),
+        }
     }
 
     fn tokenize_byte(&mut self) -> Result<Token<'a>, Error> {
-        todo!()
+        let ch = match self.next_or_eof()? {
+            '\\' => self
+                .tokenize_escaped_char::<false, false>()?
+                .expect("underscore disallowed"),
+            ch if ch.is_ascii() && !matches!(ch, '\n' | '\r' | '\t') => ch,
+            ch => return Err(self.error_at_last_char(ErrorKind::Unexpected(ch))),
+        } as u8;
+
+        // Handle the trailing quote
+        match self.next_or_eof()? {
+            '\'' => Ok(Token::new(self.chars.marked_range(), TokenKind::Byte(ch))),
+            other => Err(self.error_at_last_char(ErrorKind::Unexpected(other))),
+        }
     }
 
     fn tokenize_string(&mut self) -> Result<Token<'a>, Error> {
@@ -621,6 +667,9 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
                     ));
                 }
                 '\\' => break,
+                '\r' => {
+                    self.forbid_isolated_cr()?;
+                }
                 _ => {}
             }
         }
@@ -634,37 +683,10 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
             .push_str(&self.chars.source[starting_range.start + 1..starting_range.end - 1]);
 
         loop {
-            // Now we need to handle the current escape sequnce
-            match self.next_or_eof()? {
-                ch @ ('"' | '\'' | '\\') => {
-                    self.scratch.push(ch);
-                }
-                'r' => {
-                    self.scratch.push('\r');
-                }
-                'n' => {
-                    self.scratch.push('\n');
-                }
-                't' => {
-                    self.scratch.push('\t');
-                }
-                '0' => {
-                    self.scratch.push('\0');
-                }
-                'u' => {
-                    let ch = self.tokenize_unicode_escape()?;
-                    self.scratch.push(ch);
-                }
-                'x' => {
-                    let ch = self.tokenize_ascii_escape()?;
-                    self.scratch.push(ch);
-                }
-                '\r' | '\n' => {
-                    self.eat_whitespace_for_string_continue();
-                }
-                _ => todo!("unknown escape sequence"),
+            // Handle the escape sequence
+            if let Some(ch) = self.tokenize_escaped_char::<true, true>()? {
+                self.scratch.push(ch);
             }
-
             // and then we resume a loop looking for the next escape sequence.
             loop {
                 match self.next_or_eof()? {
@@ -675,6 +697,10 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
                         ));
                     }
                     '\\' => break,
+                    '\r' => {
+                        self.forbid_isolated_cr()?;
+                        self.scratch.push('\r');
+                    }
                     ch => {
                         self.scratch.push(ch);
                     }
@@ -683,17 +709,46 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
         }
     }
 
+    fn tokenize_escaped_char<const ALLOW_CONTINUE: bool, const ALLOW_UNICODE: bool>(
+        &mut self,
+    ) -> Result<Option<char>, Error> {
+        // Now we need to handle the current escape sequnce
+        match self.next_or_eof()? {
+            ch @ ('"' | '\'' | '\\') => Ok(Some(ch)),
+            'r' => Ok(Some('\r')),
+            'n' => Ok(Some('\n')),
+            't' => Ok(Some('\t')),
+            '0' => Ok(Some('\0')),
+            'u' if ALLOW_UNICODE => self.tokenize_unicode_escape().map(Some),
+            'x' => {
+                let escape_start = self.chars.last_offset();
+                match self.tokenize_ascii_escape()? {
+                    byte if byte.is_ascii() => Ok(Some(byte as char)),
+                    _ => Err(Error::new(
+                        escape_start..self.chars.last_offset(),
+                        ErrorKind::InvalidAscii,
+                    )),
+                }
+            }
+            '\r' if ALLOW_CONTINUE => {
+                self.forbid_isolated_cr()?;
+                self.eat_whitespace_for_string_continue();
+                Ok(None)
+            }
+            '\n' if ALLOW_CONTINUE => {
+                self.eat_whitespace_for_string_continue();
+                Ok(None)
+            }
+            ch => Err(self.error_at_last_char(ErrorKind::Unexpected(ch))),
+        }
+    }
+
     fn tokenize_unicode_escape(&mut self) -> Result<char, Error> {
         let start = self.chars.last_offset();
         // Open brace
         match self.next_or_eof()? {
             '{' => {}
-            other => {
-                return Err(Error::new(
-                    self.chars.last_char_range(),
-                    ErrorKind::Unexpected(other),
-                ))
-            }
+            other => return Err(self.error_at_last_char(ErrorKind::Unexpected(other))),
         }
 
         let mut possible_char = 0u32;
@@ -704,9 +759,9 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
                 }
                 '_' => continue,
                 ch => {
-                    let radix_value = ch.to_digit(16).ok_or_else(|| {
-                        Error::new(self.chars.last_char_range(), ErrorKind::InvalidUnicode)
-                    })?;
+                    let radix_value = ch
+                        .to_digit(16)
+                        .ok_or_else(|| self.error_at_last_char(ErrorKind::InvalidUnicode))?;
 
                     if let Some(next_value) = possible_char.checked_shl(4) {
                         possible_char = next_value | radix_value;
@@ -725,28 +780,184 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
             .ok_or_else(|| Error::new(start..self.chars.last_offset(), ErrorKind::InvalidUnicode))
     }
 
-    fn tokenize_ascii_escape(&mut self) -> Result<char, Error> {
-        // The first digit can only be octal
-        let first_digit = self
-            .next_or_eof()?
-            .to_digit(8)
-            .ok_or_else(|| Error::new(self.chars.last_char_range(), ErrorKind::InvalidAscii))?
-            as u8;
+    fn tokenize_ascii_escape(&mut self) -> Result<u8, Error> {
+        let first_digit =
+            self.next_or_eof()?
+                .to_digit(16)
+                .ok_or_else(|| self.error_at_last_char(ErrorKind::InvalidAscii))? as u8;
 
-        let second_digit = self
-            .next_or_eof()?
-            .to_digit(16)
-            .ok_or_else(|| Error::new(self.chars.last_char_range(), ErrorKind::InvalidAscii))?
-            as u8;
-        Ok(char::from((first_digit << 4) | second_digit))
+        let second_digit =
+            self.next_or_eof()?
+                .to_digit(16)
+                .ok_or_else(|| self.error_at_last_char(ErrorKind::InvalidAscii))? as u8;
+        Ok((first_digit << 4) | second_digit)
     }
 
     fn tokenize_byte_string(&mut self) -> Result<Token<'a>, Error> {
-        todo!()
+        loop {
+            match self.next_or_eof()? {
+                '"' => {
+                    let range = self.chars.marked_range();
+                    let contents = &self.chars.source[range.start + 1..range.end - 1];
+                    return Ok(Token::new(
+                        range,
+                        TokenKind::Bytes(Cow::Borrowed(contents.as_bytes())),
+                    ));
+                }
+                '\\' => break,
+                ch if ch.is_ascii() => {}
+                _ => return Err(self.error_at_last_char(ErrorKind::InvalidAscii)),
+            }
+        }
+
+        // We need a scratch buffer to handle escape sequences
+        let mut scratch = mem::take(&mut self.scratch).into_bytes();
+        scratch.clear();
+        let start_range = self.chars.marked_range();
+        scratch.extend_from_slice(
+            self.chars.source[start_range.start + 2..start_range.end - 1].as_bytes(),
+        );
+
+        loop {
+            let byte = match self.next_or_eof()? {
+                ch @ ('"' | '\'' | '\\') => Some(ch as u8),
+                'r' => Some(b'\r'),
+                'n' => Some(b'\n'),
+                't' => Some(b'\t'),
+                '0' => Some(b'\0'),
+                'x' => Some(self.tokenize_ascii_escape()?),
+                '\r' => {
+                    self.forbid_isolated_cr()?;
+                    self.eat_whitespace_for_string_continue();
+                    None
+                }
+                '\n' => {
+                    self.eat_whitespace_for_string_continue();
+                    None
+                }
+                ch => return Err(self.error_at_last_char(ErrorKind::Unexpected(ch))),
+            };
+
+            if let Some(byte) = byte {
+                scratch.push(byte);
+            }
+
+            loop {
+                match self.next_or_eof()? {
+                    '"' => {
+                        // We want to keep the scratch buffer around to keep
+                        // from needing to constantly grow it while parsing.
+                        let contents = scratch.clone();
+                        scratch.clear();
+                        self.scratch = String::from_utf8(scratch).expect("empty vec");
+                        return Ok(Token::new(
+                            self.chars.marked_range(),
+                            TokenKind::Bytes(Cow::Owned(contents)),
+                        ));
+                    }
+                    '\\' => break,
+                    ch if ch.is_ascii() => {
+                        scratch.push(ch as u8);
+                    }
+                    _ => return Err(self.error_at_last_char(ErrorKind::InvalidAscii)),
+                }
+            }
+        }
     }
 
-    fn tokenize_raw_string(&mut self) -> Result<Token<'a>, Error> {
-        todo!()
+    fn tokenize_raw_string(&mut self, mut pound_count: usize) -> Result<Token<'a>, Error> {
+        // Count the number of leading pound signs
+        loop {
+            match self.next_or_eof()? {
+                '#' => pound_count += 1,
+                '"' => break,
+                other => return Err(self.error_at_last_char(ErrorKind::Unexpected(other))),
+            }
+        }
+
+        // String contents
+        'contents: loop {
+            match self.next_or_eof()? {
+                '\r' => {
+                    self.forbid_isolated_cr()?;
+                }
+                '"' => {
+                    let mut pounds_needed = pound_count;
+                    while self.chars.peek() == Some('#') {
+                        self.chars.next();
+                        pounds_needed -= 1;
+
+                        // Only break if the correct number of pound signs has been
+                        // encountered.
+                        if pounds_needed == 0 {
+                            break 'contents;
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        let source_range = self.chars.marked_range();
+        let value = &self.chars.source
+            [source_range.start + pound_count + 2..source_range.end - pound_count - 1];
+        Ok(Token::new(
+            source_range,
+            TokenKind::String(Cow::Borrowed(value)),
+        ))
+    }
+
+    fn tokenize_raw_byte_string(&mut self) -> Result<Token<'a>, Error> {
+        // Count the number of leading pound signs
+        let mut pound_count = 0;
+        loop {
+            match self.next_or_eof()? {
+                '#' => pound_count += 1,
+                '"' => break,
+                other if pound_count == 0 => return self.tokenize_identifier(Some(other)),
+                other => return Err(self.error_at_last_char(ErrorKind::Unexpected(other))),
+            }
+        }
+
+        // String contents
+        'contents: loop {
+            match self.next_or_eof()? {
+                '\r' => {
+                    self.forbid_isolated_cr()?;
+                }
+                '"' => {
+                    let mut pounds_needed = pound_count;
+                    while self.chars.peek() == Some('#') {
+                        self.chars.next();
+                        pounds_needed -= 1;
+
+                        // Only break if the correct number of pound signs has been
+                        // encountered.
+                        if pounds_needed == 0 {
+                            break 'contents;
+                        }
+                    }
+                }
+                ch if ch.is_ascii() => {}
+                _ => return Err(self.error_at_last_char(ErrorKind::InvalidAscii)),
+            }
+        }
+
+        let source_range = self.chars.marked_range();
+        let value = &self.chars.source
+            [source_range.start + pound_count + 3..source_range.end - pound_count - 1];
+        Ok(Token::new(
+            source_range,
+            TokenKind::Bytes(Cow::Borrowed(value.as_bytes())),
+        ))
+    }
+
+    fn forbid_isolated_cr(&mut self) -> Result<(), Error> {
+        if self.chars.peek() == Some('\n') {
+            Ok(())
+        } else {
+            Err(self.error_at_last_char(ErrorKind::InvalidAscii))
+        }
     }
 
     fn eat_whitespace_for_string_continue(&mut self) {
@@ -790,7 +1001,11 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
                 match source {
                     "true" if !is_raw => TokenKind::Bool(true),
                     "false" if !is_raw => TokenKind::Bool(false),
-                    _ => TokenKind::Identifier(Cow::Borrowed(source)),
+                    "inf" | "+inf" if !is_raw => TokenKind::Float(f64::INFINITY),
+                    "NaN" | "+NaN" if !is_raw => TokenKind::Float(f64::NAN),
+                    "-inf" if !is_raw => TokenKind::Float(-f64::INFINITY),
+                    "-NaN" if !is_raw => TokenKind::Float(-f64::NAN),
+                    _ => TokenKind::Identifier(source),
                 },
             ))
         } else {
@@ -799,6 +1014,66 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
                 kind: ErrorKind::Unexpected(initial_char),
             })
         }
+    }
+
+    fn tokenize_comment(&mut self) -> Result<Token<'a>, Error> {
+        match self.next_or_eof()? {
+            '*' => self.tokenize_block_comment(),
+            '/' => self.tokenize_single_line_comment(),
+            other => Err(self.error_at_last_char(ErrorKind::Unexpected(other))),
+        }
+    }
+
+    fn tokenize_block_comment(&mut self) -> Result<Token<'a>, Error> {
+        let mut nests = 1;
+        while nests > 0 {
+            match self.next_or_eof()? {
+                '*' => {
+                    if self.chars.peek() == Some('/') {
+                        self.chars.next();
+                        nests -= 1;
+                        if nests == 0 {
+                            break;
+                        }
+                    }
+                }
+                '/' => {
+                    if self.chars.peek() == Some('*') {
+                        self.chars.next();
+                        nests += 1;
+                    }
+                }
+                '\r' => {
+                    self.forbid_isolated_cr()?;
+                }
+                _ => {}
+            }
+        }
+
+        Ok(Token::new(
+            self.chars.marked_range(),
+            TokenKind::Comment(&self.chars.source[self.chars.marked_range()]),
+        ))
+    }
+
+    fn tokenize_single_line_comment(&mut self) -> Result<Token<'a>, Error> {
+        loop {
+            match self.chars.peek() {
+                Some('\r') => {
+                    self.forbid_isolated_cr()?;
+                    break;
+                }
+                Some('\n') | None => break,
+                _ => {
+                    self.chars.next();
+                }
+            }
+        }
+        let range = self.chars.marked_range();
+        Ok(Token::new(
+            range.clone(),
+            TokenKind::Comment(&self.chars.source[range]),
+        ))
     }
 }
 
@@ -810,21 +1085,24 @@ impl<'a, const INCLUDE_ALL: bool> Iterator for Tokenizer<'a, INCLUDE_ALL> {
             self.chars.mark_start();
             let ch = self.chars.next()?;
             let result = match ch {
-                '0'..='9' | '-' | '+' => self.tokenize_number(ch),
+                '0'..='9' | '-' | '+' => self.tokenize_number(ch as u8),
                 '"' => self.tokenize_string(),
                 '\'' => self.tokenize_char(),
                 'r' => match self.chars.peek() {
-                    Some('"') => {
-                        self.chars.next();
-                        self.tokenize_raw_string()
-                    }
                     Some('#') => {
                         self.chars.next();
-                        self.tokenize_identifier(None)
+                        match self.chars.peek() {
+                            Some('#' | '"') => self.tokenize_raw_string(1),
+                            _ => self.tokenize_identifier(None),
+                        }
                     }
                     _ => self.tokenize_identifier(Some(ch)),
                 },
                 'b' => match self.chars.peek() {
+                    Some('r') => {
+                        self.chars.next();
+                        self.tokenize_raw_byte_string()
+                    }
                     Some('"') => {
                         self.chars.next();
                         self.tokenize_byte_string()
@@ -871,12 +1149,15 @@ impl<'a, const INCLUDE_ALL: bool> Iterator for Tokenizer<'a, INCLUDE_ALL> {
                         }
                     }
                     if INCLUDE_ALL {
-                        Ok(Token::new(self.chars.marked_range(), TokenKind::Whitespace))
+                        Ok(Token::new(
+                            self.chars.marked_range(),
+                            TokenKind::Whitespace(self.chars.marked_str()),
+                        ))
                     } else {
                         continue;
                     }
                 }
-                '/' => todo!("comments"),
+                '/' => self.tokenize_comment(),
                 ch => self.tokenize_identifier(Some(ch)),
             };
             break Some(result);
@@ -926,9 +1207,12 @@ impl std::error::Error for Error {}
 pub enum ErrorKind {
     UnexpectedEof,
     Unexpected(char),
-    ExpectedDigitAfterSign,
+    ExpectedDigit,
+    IntegerTooLarge,
     InvalidUnicode,
     InvalidAscii,
+    InvalidFloat,
+    IsolatedCarriageReturn,
 }
 
 impl Display for ErrorKind {
@@ -936,9 +1220,12 @@ impl Display for ErrorKind {
         match self {
             ErrorKind::UnexpectedEof => f.write_str("unexpected eof"),
             ErrorKind::Unexpected(ch) => write!(f, "unexpected `{ch}`"),
-            ErrorKind::ExpectedDigitAfterSign => f.write_str("expected digit after sign"),
+            ErrorKind::ExpectedDigit => f.write_str("expected digit"),
             ErrorKind::InvalidUnicode => f.write_str("invalid unicode escape sequence"),
             ErrorKind::InvalidAscii => f.write_str("invalid ascii escape sequence"),
+            ErrorKind::IsolatedCarriageReturn => f.write_str("unexpected isolated carriage return"),
+            ErrorKind::IntegerTooLarge => f.write_str("value overflowed the maximum size"),
+            ErrorKind::InvalidFloat => f.write_str("invalid floating point literal"),
         }
     }
 }
@@ -1036,6 +1323,7 @@ mod tests {
     use alloc::vec::Vec;
 
     use super::*;
+
     #[track_caller]
     fn test_tokens(source: &str, tokens: &[Token<'_>]) {
         assert_eq!(
@@ -1045,6 +1333,17 @@ mod tests {
             tokens
         );
     }
+
+    #[track_caller]
+    fn test_tokens_full(source: &str, tokens: &[Token<'_>]) {
+        assert_eq!(
+            &Tokenizer::full(source)
+                .collect::<Result<Vec<_>, _>>()
+                .unwrap(),
+            tokens
+        );
+    }
+
     #[track_caller]
     fn test_tokens_err(source: &str, location: Range<usize>, kind: ErrorKind) {
         let err = Tokenizer::minified(source)
@@ -1059,30 +1358,15 @@ mod tests {
         test_tokens("true", &[Token::new(0..4, TokenKind::Bool(true))]);
         test_tokens("false", &[Token::new(0..5, TokenKind::Bool(false))]);
 
-        test_tokens(
-            "r#true",
-            &[Token::new(
-                0..6,
-                TokenKind::Identifier(Cow::Borrowed("true")),
-            )],
-        );
+        test_tokens("r#true", &[Token::new(0..6, TokenKind::Identifier("true"))]);
         test_tokens(
             "r#false",
-            &[Token::new(
-                0..7,
-                TokenKind::Identifier(Cow::Borrowed("false")),
-            )],
+            &[Token::new(0..7, TokenKind::Identifier("false"))],
         );
 
-        test_tokens(
-            "_",
-            &[Token::new(0..1, TokenKind::Identifier(Cow::Borrowed("_")))],
-        );
+        test_tokens("_", &[Token::new(0..1, TokenKind::Identifier("_"))]);
 
-        test_tokens(
-            "_0",
-            &[Token::new(0..2, TokenKind::Identifier(Cow::Borrowed("_0")))],
-        );
+        test_tokens("_0", &[Token::new(0..2, TokenKind::Identifier("_0"))]);
 
         test_tokens_err("=", 0..1, ErrorKind::Unexpected('='));
     }
@@ -1665,6 +1949,15 @@ mod tests {
         test_tokens("+1.0e10", &[Token::new(0..7, TokenKind::Float(1.0e10))]);
         test_tokens("-1e10", &[Token::new(0..5, TokenKind::Float(-1e10))]);
         test_tokens("+1e10", &[Token::new(0..5, TokenKind::Float(1e10))]);
+        test_tokens("inf", &[Token::new(0..3, TokenKind::Float(f64::INFINITY))]);
+        test_tokens("NaN", &[Token::new(0..3, TokenKind::Float(f64::NAN))]);
+        test_tokens(
+            "-inf",
+            &[Token::new(0..4, TokenKind::Float(-f64::INFINITY))],
+        );
+        test_tokens("-NaN", &[Token::new(0..4, TokenKind::Float(-f64::NAN))]);
+        test_tokens("+inf", &[Token::new(0..4, TokenKind::Float(f64::INFINITY))]);
+        test_tokens("+NaN", &[Token::new(0..4, TokenKind::Float(f64::NAN))]);
     }
 
     #[test]
@@ -1673,11 +1966,11 @@ mod tests {
             "{a:1,b:2}",
             &[
                 Token::new(0..1, TokenKind::Open(Balanced::Brace)),
-                Token::new(1..2, TokenKind::Identifier(Cow::Borrowed("a"))),
+                Token::new(1..2, TokenKind::Identifier("a")),
                 Token::new(2..3, TokenKind::Colon),
                 Token::new(3..4, TokenKind::Integer(Integer::Usize(1))),
                 Token::new(4..5, TokenKind::Comma),
-                Token::new(5..6, TokenKind::Identifier(Cow::Borrowed("b"))),
+                Token::new(5..6, TokenKind::Identifier("b")),
                 Token::new(6..7, TokenKind::Colon),
                 Token::new(7..8, TokenKind::Integer(Integer::Usize(2))),
                 Token::new(8..9, TokenKind::Close(Balanced::Brace)),
@@ -1687,25 +1980,160 @@ mod tests {
 
     #[test]
     fn strings() {
-        test_tokens(
-            r#""""#,
-            &[Token::new(0..2, TokenKind::String(Cow::Borrowed("")))],
-        );
-        test_tokens(
-            r#""abc""#,
-            &[Token::new(0..5, TokenKind::String(Cow::Borrowed("abc")))],
-        );
-        test_tokens(
-            r#""\r\t\n\0\x41\u{1_F980}\\\"""#,
-            &[Token::new(
-                0..28,
-                TokenKind::String(Cow::Borrowed("\r\t\n\0\x41\u{1_F980}\\\"")),
-            )],
-        );
-        // string-continue
+        macro_rules! test_string {
+            ($char:tt) => {
+                let ch = core::stringify!($char);
+                test_tokens(
+                    ch,
+                    &[Token::new(
+                        0..ch.len(),
+                        TokenKind::String(Cow::Borrowed($char)),
+                    )],
+                );
+            };
+        }
+        test_string!("");
+        test_string!("abc");
+        test_string!("\r\t\n\0\x41\u{1_F980}\\\"");
+        // string-continue, better tested with an escaped literal than trust the
+        // line endings being preserved in git.
         test_tokens(
             "\"a\\\n \t \r \n  b\"",
             &[Token::new(0..14, TokenKind::String(Cow::Borrowed("ab")))],
+        );
+    }
+
+    #[test]
+    fn raw_strings() {
+        macro_rules! test_string {
+            ($char:tt) => {
+                let ch = core::stringify!($char);
+                test_tokens(
+                    ch,
+                    &[Token::new(
+                        0..ch.len(),
+                        TokenKind::String(Cow::Borrowed($char)),
+                    )],
+                );
+            };
+        }
+        test_string!(r###""##"###);
+        test_string!(r#"abc"#);
+        test_string!(r#""\r\t\n\0\x41\u{1_F980}\\\"""#);
+    }
+
+    #[test]
+    fn chars() {
+        macro_rules! test_char {
+            ($char:tt) => {
+                let ch = core::stringify!($char);
+                test_tokens(ch, &[Token::new(0..ch.len(), TokenKind::Character($char))]);
+            };
+        }
+
+        test_char!('\0');
+        test_char!('\r');
+        test_char!('\t');
+        test_char!('\\');
+        test_char!('\'');
+        test_char!('\"');
+        test_char!('\x42');
+        test_char!('\u{1_F980}');
+    }
+
+    #[test]
+    fn bytes() {
+        macro_rules! test_byte {
+            ($char:tt) => {
+                let ch = core::stringify!($char);
+                test_tokens(ch, &[Token::new(0..ch.len(), TokenKind::Byte($char))]);
+            };
+        }
+
+        test_byte!(b'\0');
+        test_byte!(b'\r');
+        test_byte!(b'\t');
+        test_byte!(b'\\');
+        test_byte!(b'\'');
+        test_byte!(b'\"');
+        test_byte!(b'\x42');
+    }
+
+    #[test]
+    fn byte_strings() {
+        macro_rules! test_byte_string {
+            ($char:tt) => {
+                let ch = core::stringify!($char);
+                test_tokens(
+                    ch,
+                    &[Token::new(
+                        0..ch.len(),
+                        TokenKind::Bytes(Cow::Borrowed($char)),
+                    )],
+                );
+            };
+        }
+
+        test_byte_string!(b"\0");
+        test_byte_string!(b"\r");
+        test_byte_string!(b"\t");
+        test_byte_string!(b"\\");
+        test_byte_string!(b"\'");
+        test_byte_string!(b"\"");
+        test_byte_string!(b"\x42");
+        // string-continue, better tested with an escaped literal than trust the
+        // line endings being preserved in git.
+        test_tokens(
+            "b\"a\\\n \t \r \n  b\"",
+            &[Token::new(0..15, TokenKind::Bytes(Cow::Borrowed(b"ab")))],
+        );
+    }
+
+    #[test]
+    fn raw_byte_strings() {
+        macro_rules! test_string {
+            ($char:tt) => {
+                let ch = core::stringify!($char);
+                test_tokens(
+                    ch,
+                    &[Token::new(
+                        0..ch.len(),
+                        TokenKind::Bytes(Cow::Borrowed($char)),
+                    )],
+                );
+            };
+        }
+        test_string!(br###""##"###);
+        test_string!(br#"abc"#);
+        test_string!(br#""\r\t\n\0\x41\u{1_F980}\\\"""#);
+    }
+
+    #[test]
+    fn block_comments() {
+        macro_rules! test_comment {
+            ($comment:tt) => {
+                test_tokens_full(
+                    $comment,
+                    &[Token::new(0..$comment.len(), TokenKind::Comment($comment))],
+                );
+            };
+        }
+        test_comment!("/* hello */");
+        test_comment!("/*** /* hello */ **/");
+    }
+
+    #[test]
+    fn single_line_comments() {
+        test_tokens_full(
+            "// test",
+            &[Token::new(0..7, TokenKind::Comment("// test"))],
+        );
+        test_tokens_full(
+            "// test\n",
+            &[
+                Token::new(0..7, TokenKind::Comment("// test")),
+                Token::new(7..8, TokenKind::Whitespace("\n")),
+            ],
         );
     }
 }
