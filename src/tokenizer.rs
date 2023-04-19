@@ -36,7 +36,7 @@ pub enum TokenKind<'a> {
     Identifier(&'a str),
     Open(Balanced),
     Close(Balanced),
-    Comment(&'a str), // TODO needs comment kind -- block vs line
+    Comment(&'a str),
     Whitespace(&'a str),
 }
 
@@ -193,7 +193,22 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
     fn next_or_eof(&mut self) -> Result<char, Error> {
         self.chars
             .next()
-            .ok_or_else(|| Error::new(self.chars.last_char_range(), ErrorKind::UnexpectedEof))
+            .ok_or_else(|| self.error_at_last_char(ErrorKind::UnexpectedEof))
+    }
+
+    fn error(&self, kind: ErrorKind) -> Error {
+        Error::new(self.chars.marked_range(), kind)
+    }
+
+    fn error_at_last_char(&self, kind: ErrorKind) -> Error {
+        Error::new(self.chars.last_char_range(), kind)
+    }
+
+    fn error_at_next_char(&self, kind: ErrorKind) -> Error {
+        let mut range = self.chars.last_char_range();
+        range.start += 1;
+        range.end += 1;
+        Error::new(range, kind)
     }
 
     fn tokenize_positive_integer<I>(&mut self, mut value: I) -> Result<Token<'a>, Error>
@@ -245,7 +260,7 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
                         value = new_value;
                         self.chars.next();
                     } else {
-                        todo!("overflowed large")
+                        return Err(self.error(ErrorKind::IntegerTooLarge));
                     }
                 } else if ch == '.' {
                     has_decimal = true;
@@ -331,7 +346,7 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
                         value = new_value;
                         self.chars.next();
                     } else {
-                        todo!("overflowed large")
+                        return Err(self.error(ErrorKind::IntegerTooLarge));
                     }
                 } else if ch == '.' {
                     has_decimal = true;
@@ -428,11 +443,14 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
             }
 
             if !has_exponent_digit {
-                todo!("expected exponent digit")
+                return Err(self.error_at_next_char(ErrorKind::ExpectedDigit));
             }
         }
 
-        let parsed = self.scratch.parse::<f64>().unwrap(); // TODO handle this error
+        let parsed = self
+            .scratch
+            .parse::<f64>()
+            .map_err(|_| self.error(ErrorKind::InvalidFloat))?;
 
         Ok(Token::new(
             self.chars.marked_range(),
@@ -463,8 +481,7 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
                     {
                         value = next_value
                     } else {
-                        // Overflowed
-                        todo!("error: overflowed u128")
+                        return Err(self.error(ErrorKind::IntegerTooLarge));
                     }
                 }
                 Err('_') => {
@@ -484,17 +501,17 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
         ))
     }
 
-    fn tokenize_radix_number<const BITS: u32>(
+    fn tokenize_radix_number<const RADIX: u32>(
         &mut self,
         signed: bool,
         negative: bool,
     ) -> Result<Token<'a>, Error> {
-        assert!(BITS == 1 || BITS == 3 || BITS == 4);
-        let max = 2_u8.pow(BITS);
+        assert!(RADIX == 1 || RADIX == 3 || RADIX == 4);
+        let max = 2_u32.pow(RADIX);
         let mut value = 0usize;
         let mut read_at_least_one_digit = false;
 
-        while let Some(result) = self.chars.peek().map(|ch| ch.to_digit(BITS * 4).ok_or(ch)) {
+        while let Some(result) = self.chars.peek().map(|ch| ch.to_digit(max).ok_or(ch)) {
             match result {
                 Ok(radix_value) => {
                     read_at_least_one_digit = true;
@@ -506,7 +523,7 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
                         value = next_value
                     } else {
                         // Overflowed
-                        return self.tokenize_radix_large_number::<BITS>(
+                        return self.tokenize_radix_large_number::<RADIX>(
                             signed,
                             negative,
                             value,
@@ -531,7 +548,7 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
                 }),
             ))
         } else {
-            todo!("expected hex digit")
+            Err(self.error(ErrorKind::ExpectedDigit))
         }
     }
 
@@ -579,10 +596,7 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
                     self.tokenize_positive_integer(value)
                 }
             } else {
-                Err(Error::new(
-                    self.chars.marked_range(),
-                    ErrorKind::ExpectedDigitAfterSign,
-                ))
+                Err(self.error(ErrorKind::ExpectedDigit))
             }
         } else if start_char == b'0' {
             self.tokenize_leading_zero_number(signed, negative)
@@ -598,10 +612,7 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
                 .tokenize_escaped_char::<false, true>()?
                 .expect("underscore disallowed"),
             ch @ ('\n' | '\r' | '\t') => {
-                return Err(Error::new(
-                    self.chars.last_char_range(),
-                    ErrorKind::Unexpected(ch),
-                ))
+                return Err(self.error_at_last_char(ErrorKind::Unexpected(ch)))
             }
             ch => ch,
         };
@@ -612,10 +623,7 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
                 self.chars.marked_range(),
                 TokenKind::Character(ch),
             )),
-            other => Err(Error::new(
-                self.chars.last_char_range(),
-                ErrorKind::Unexpected(other),
-            )),
+            other => Err(self.error_at_last_char(ErrorKind::Unexpected(other))),
         }
     }
 
@@ -625,21 +633,13 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
                 .tokenize_escaped_char::<false, false>()?
                 .expect("underscore disallowed"),
             ch if ch.is_ascii() && !matches!(ch, '\n' | '\r' | '\t') => ch,
-            ch => {
-                return Err(Error::new(
-                    self.chars.last_char_range(),
-                    ErrorKind::Unexpected(ch),
-                ))
-            }
+            ch => return Err(self.error_at_last_char(ErrorKind::Unexpected(ch))),
         } as u8;
 
         // Handle the trailing quote
         match self.next_or_eof()? {
             '\'' => Ok(Token::new(self.chars.marked_range(), TokenKind::Byte(ch))),
-            other => Err(Error::new(
-                self.chars.last_char_range(),
-                ErrorKind::Unexpected(other),
-            )),
+            other => Err(self.error_at_last_char(ErrorKind::Unexpected(other))),
         }
     }
 
@@ -725,10 +725,7 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
                 self.eat_whitespace_for_string_continue();
                 Ok(None)
             }
-            ch => Err(Error::new(
-                self.chars.last_char_range(),
-                ErrorKind::Unexpected(ch),
-            )),
+            ch => Err(self.error_at_last_char(ErrorKind::Unexpected(ch))),
         }
     }
 
@@ -737,12 +734,7 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
         // Open brace
         match self.next_or_eof()? {
             '{' => {}
-            other => {
-                return Err(Error::new(
-                    self.chars.last_char_range(),
-                    ErrorKind::Unexpected(other),
-                ))
-            }
+            other => return Err(self.error_at_last_char(ErrorKind::Unexpected(other))),
         }
 
         let mut possible_char = 0u32;
@@ -753,9 +745,9 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
                 }
                 '_' => continue,
                 ch => {
-                    let radix_value = ch.to_digit(16).ok_or_else(|| {
-                        Error::new(self.chars.last_char_range(), ErrorKind::InvalidUnicode)
-                    })?;
+                    let radix_value = ch
+                        .to_digit(16)
+                        .ok_or_else(|| self.error_at_last_char(ErrorKind::InvalidUnicode))?;
 
                     if let Some(next_value) = possible_char.checked_shl(4) {
                         possible_char = next_value | radix_value;
@@ -775,17 +767,15 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
     }
 
     fn tokenize_ascii_escape(&mut self) -> Result<u8, Error> {
-        let first_digit = self
-            .next_or_eof()?
-            .to_digit(16)
-            .ok_or_else(|| Error::new(self.chars.last_char_range(), ErrorKind::InvalidAscii))?
-            as u8;
+        let first_digit =
+            self.next_or_eof()?
+                .to_digit(16)
+                .ok_or_else(|| self.error_at_last_char(ErrorKind::InvalidAscii))? as u8;
 
-        let second_digit = self
-            .next_or_eof()?
-            .to_digit(16)
-            .ok_or_else(|| Error::new(self.chars.last_char_range(), ErrorKind::InvalidAscii))?
-            as u8;
+        let second_digit =
+            self.next_or_eof()?
+                .to_digit(16)
+                .ok_or_else(|| self.error_at_last_char(ErrorKind::InvalidAscii))? as u8;
         Ok((first_digit << 4) | second_digit)
     }
 
@@ -802,12 +792,7 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
                 }
                 '\\' => break,
                 ch if ch.is_ascii() => {}
-                _ => {
-                    return Err(Error::new(
-                        self.chars.last_char_range(),
-                        ErrorKind::InvalidAscii,
-                    ))
-                }
+                _ => return Err(self.error_at_last_char(ErrorKind::InvalidAscii)),
             }
         }
 
@@ -836,12 +821,7 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
                     self.eat_whitespace_for_string_continue();
                     None
                 }
-                ch => {
-                    return Err(Error::new(
-                        self.chars.last_char_range(),
-                        ErrorKind::Unexpected(ch),
-                    ))
-                }
+                ch => return Err(self.error_at_last_char(ErrorKind::Unexpected(ch))),
             };
 
             if let Some(byte) = byte {
@@ -865,12 +845,7 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
                     ch if ch.is_ascii() => {
                         scratch.push(ch as u8);
                     }
-                    _ => {
-                        return Err(Error::new(
-                            self.chars.last_char_range(),
-                            ErrorKind::InvalidAscii,
-                        ))
-                    }
+                    _ => return Err(self.error_at_last_char(ErrorKind::InvalidAscii)),
                 }
             }
         }
@@ -882,12 +857,7 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
             match self.next_or_eof()? {
                 '#' => pound_count += 1,
                 '"' => break,
-                other => {
-                    return Err(Error::new(
-                        self.chars.last_char_range(),
-                        ErrorKind::Unexpected(other),
-                    ))
-                }
+                other => return Err(self.error_at_last_char(ErrorKind::Unexpected(other))),
             }
         }
 
@@ -931,12 +901,7 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
                 '#' => pound_count += 1,
                 '"' => break,
                 other if pound_count == 0 => return self.tokenize_identifier(Some(other)),
-                other => {
-                    return Err(Error::new(
-                        self.chars.last_char_range(),
-                        ErrorKind::Unexpected(other),
-                    ))
-                }
+                other => return Err(self.error_at_last_char(ErrorKind::Unexpected(other))),
             }
         }
 
@@ -960,12 +925,7 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
                     }
                 }
                 ch if ch.is_ascii() => {}
-                _ => {
-                    return Err(Error::new(
-                        self.chars.last_char_range(),
-                        ErrorKind::InvalidAscii,
-                    ))
-                }
+                _ => return Err(self.error_at_last_char(ErrorKind::InvalidAscii)),
             }
         }
 
@@ -979,11 +939,10 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
     }
 
     fn forbid_isolated_cr(&mut self) -> Result<(), Error> {
-        let cr_range = self.chars.last_char_range();
         if self.chars.peek() == Some('\n') {
             Ok(())
         } else {
-            Err(Error::new(cr_range, ErrorKind::InvalidAscii))
+            Err(self.error_at_last_char(ErrorKind::InvalidAscii))
         }
     }
 
@@ -1043,10 +1002,7 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
         match self.next_or_eof()? {
             '*' => self.tokenize_block_comment(),
             '/' => self.tokenize_single_line_comment(),
-            other => Err(Error::new(
-                self.chars.last_char_range(),
-                ErrorKind::Unexpected(other),
-            )),
+            other => Err(self.error_at_last_char(ErrorKind::Unexpected(other))),
         }
     }
 
@@ -1242,9 +1198,11 @@ impl std::error::Error for Error {}
 pub enum ErrorKind {
     UnexpectedEof,
     Unexpected(char),
-    ExpectedDigitAfterSign,
+    ExpectedDigit,
+    IntegerTooLarge,
     InvalidUnicode,
     InvalidAscii,
+    InvalidFloat,
     IsolatedCarriageReturn,
 }
 
@@ -1253,10 +1211,12 @@ impl Display for ErrorKind {
         match self {
             ErrorKind::UnexpectedEof => f.write_str("unexpected eof"),
             ErrorKind::Unexpected(ch) => write!(f, "unexpected `{ch}`"),
-            ErrorKind::ExpectedDigitAfterSign => f.write_str("expected digit after sign"),
+            ErrorKind::ExpectedDigit => f.write_str("expected digit"),
             ErrorKind::InvalidUnicode => f.write_str("invalid unicode escape sequence"),
             ErrorKind::InvalidAscii => f.write_str("invalid ascii escape sequence"),
             ErrorKind::IsolatedCarriageReturn => f.write_str("unexpected isolated carriage return"),
+            ErrorKind::IntegerTooLarge => f.write_str("value overflowed the maximum size"),
+            ErrorKind::InvalidFloat => f.write_str("invalid floating point literal"),
         }
     }
 }
