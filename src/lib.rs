@@ -30,5 +30,15 @@ pub fn to_string<S: serde::Serialize>(value: &S) -> alloc::string::String {
     serializer.finish()
 }
 
+#[cfg(feature = "serde")]
+pub fn to_string_pretty<S: serde::Serialize>(value: &S) -> alloc::string::String {
+    let mut serializer = ser::Serializer::new(writer::Config::Pretty {
+        indentation: alloc::borrow::Cow::Borrowed("  "),
+        newline: alloc::borrow::Cow::Borrowed("\n"),
+    });
+    value.serialize(&mut serializer).expect("infallible");
+    serializer.finish()
+}
+
 #[cfg(test)]
 mod tests;

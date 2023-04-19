@@ -80,11 +80,33 @@ fn roundtrip<T: Debug + Serialize + for<'de> Deserialize<'de> + PartialEq>(value
     assert_eq!(&restored, value);
 }
 
+#[track_caller]
+fn roundtrip_pretty<T: Debug + Serialize + for<'de> Deserialize<'de> + PartialEq>(
+    value: &T,
+    check: &str,
+) {
+    let rendered = crate::to_string_pretty(value);
+    #[cfg(feature = "std")]
+    {
+        std::println!("{rendered}");
+    }
+    assert_eq!(rendered, check);
+    let restored: T = crate::from_str(&rendered).expect("deserialization failed");
+    assert_eq!(&restored, value);
+}
+
 #[test]
 fn struct_of_everything() {
     roundtrip(&StructOfEverything::default(), "StructOfEverything{str:\"\",bytes:b\"\",char:'\\0',u8:0,u16:0,u32:0,u64:0,u128:0,usize:0,i8:0,i16:0,i32:0,i64:0,i128:0,isize:0,bool:false}");
     roundtrip(&StructOfEverything::min(), "StructOfEverything{str:\"\\0\",bytes:b\"\\0\",char:'\\0',u8:0,u16:0,u32:0,u64:0,u128:0,usize:0,i8:-128,i16:-32768,i32:-2147483648,i64:-9223372036854775808,i128:-9223372036854775808,isize:-9223372036854775808,bool:false}");
     roundtrip(&StructOfEverything::max(), "StructOfEverything{str:\"hello 🦀\",bytes:b\"hello, world\",char:'🦀',u8:255,u16:65535,u32:4294967295,u64:18446744073709551615,u128:18446744073709551615,usize:18446744073709551615,i8:127,i16:32767,i32:2147483647,i64:9223372036854775807,i128:9223372036854775807,isize:9223372036854775807,bool:true}");
+}
+
+#[test]
+fn struct_of_everything_pretty() {
+    roundtrip_pretty(&StructOfEverything::default(), "StructOfEverything {\n  str: \"\",\n  bytes: b\"\",\n  char: '\\0',\n  u8: 0,\n  u16: 0,\n  u32: 0,\n  u64: 0,\n  u128: 0,\n  usize: 0,\n  i8: 0,\n  i16: 0,\n  i32: 0,\n  i64: 0,\n  i128: 0,\n  isize: 0,\n  bool: false\n}");
+    roundtrip_pretty(&StructOfEverything::min(), "StructOfEverything {\n  str: \"\\0\",\n  bytes: b\"\\0\",\n  char: '\\0',\n  u8: 0,\n  u16: 0,\n  u32: 0,\n  u64: 0,\n  u128: 0,\n  usize: 0,\n  i8: -128,\n  i16: -32768,\n  i32: -2147483648,\n  i64: -9223372036854775808,\n  i128: -9223372036854775808,\n  isize: -9223372036854775808,\n  bool: false\n}");
+    roundtrip_pretty(&StructOfEverything::max(), "StructOfEverything {\n  str: \"hello 🦀\",\n  bytes: b\"hello, world\",\n  char: '🦀',\n  u8: 255,\n  u16: 65535,\n  u32: 4294967295,\n  u64: 18446744073709551615,\n  u128: 18446744073709551615,\n  usize: 18446744073709551615,\n  i8: 127,\n  i16: 32767,\n  i32: 2147483647,\n  i64: 9223372036854775807,\n  i128: 9223372036854775807,\n  isize: 9223372036854775807,\n  bool: true\n}");
 }
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]

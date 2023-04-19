@@ -5,7 +5,6 @@ use core::iter::Peekable;
 use core::ops::Range;
 
 use serde::de::{EnumAccess, MapAccess, SeqAccess, VariantAccess};
-use serde::Deserializer as _;
 
 use crate::parser::{self, Config, Event, EventKind, Name, Nested, Parser, Primitive};
 use crate::tokenizer::{self, Integer};
@@ -266,7 +265,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: serde::de::Visitor<'de>,
     {
-        match self.parser.next().transpose()? {
+        match std::dbg!(self.parser.next().transpose()?) {
             Some(Event {
                 kind: EventKind::Primitive(Primitive::Identifier(str)),
                 ..
@@ -291,6 +290,13 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
                         .map_err(|_| Error::new(location, ErrorKind::InvalidUtf8))?,
                 ),
             },
+            Some(Event {
+                kind:
+                    EventKind::BeginNested {
+                        name: Some(name), ..
+                    },
+                ..
+            }) => visitor.visit_str(name.name),
             Some(evt) => Err(Error::new(evt.location, ErrorKind::ExpectedString)),
             None => Err(Error::new(None, ErrorKind::ExpectedString)),
         }
@@ -633,21 +639,34 @@ impl<'a, 'de> VariantAccess<'de> for &'a mut Deserializer<'de> {
     type Error = Error;
 
     fn unit_variant(self) -> Result<(), Self::Error> {
-        self.handle_unit()
+        Ok(())
     }
 
     fn newtype_variant_seed<T>(self, seed: T) -> Result<T::Value, Self::Error>
     where
         T: serde::de::DeserializeSeed<'de>,
     {
-        seed.deserialize(self)
+        let result = seed.deserialize(&mut *self)?;
+        loop {
+            if let Event {
+                kind: EventKind::EndNested,
+                ..
+            } = self
+                .parser
+                .next()
+                .transpose()?
+                .expect("eof handled by parser")
+            {
+                return Ok(result);
+            }
+        }
     }
 
-    fn tuple_variant<V>(self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
+    fn tuple_variant<V>(self, _len: usize, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: serde::de::Visitor<'de>,
     {
-        self.deserialize_tuple(len, visitor)
+        visitor.visit_seq(self)
     }
 
     fn struct_variant<V>(
@@ -658,7 +677,7 @@ impl<'a, 'de> VariantAccess<'de> for &'a mut Deserializer<'de> {
     where
         V: serde::de::Visitor<'de>,
     {
-        self.deserialize_map(visitor)
+        visitor.visit_map(self)
     }
 }
 

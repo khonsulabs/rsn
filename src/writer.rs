@@ -1,3 +1,4 @@
+use alloc::borrow::Cow;
 use alloc::string::{String, ToString};
 use alloc::vec::Vec;
 use core::fmt::Write;
@@ -6,9 +7,18 @@ use core::fmt::Write;
 pub struct Writer {
     output: String,
     nested: Vec<NestedState>,
+    config: Config,
 }
 
 impl Writer {
+    pub fn new(config: Config) -> Self {
+        Self {
+            output: String::new(),
+            nested: Vec::new(),
+            config,
+        }
+    }
+
     pub fn finish(self) -> String {
         assert!(self.nested.is_empty());
         self.output
@@ -17,13 +27,18 @@ impl Writer {
     pub fn begin_named_map(&mut self, name: &str) {
         self.prepare_to_write_value();
         self.output.push_str(name);
-        self.begin_map()
+        if matches!(self.config, Config::Pretty { .. }) {
+            self.output.push(' ');
+        }
+        self.output.push('{');
+        self.nested.push(NestedState::Map(MapState::Empty));
     }
 
     pub fn begin_named_tuple(&mut self, name: &str) {
         self.prepare_to_write_value();
         self.output.push_str(name);
-        self.begin_tuple()
+        self.output.push('(');
+        self.nested.push(NestedState::Tuple(SequenceState::Empty));
     }
 
     pub fn begin_map(&mut self) {
@@ -62,28 +77,68 @@ impl Writer {
             Some(
                 NestedState::List(state @ SequenceState::Empty)
                 | NestedState::Tuple(state @ SequenceState::Empty),
-            ) => *state = SequenceState::NotEmpty,
+            ) => {
+                *state = SequenceState::NotEmpty;
+                self.insert_newline();
+            }
             Some(NestedState::List(_) | NestedState::Tuple(_)) => {
                 self.output.push(',');
+                self.insert_newline();
             }
-            Some(NestedState::Map(state @ MapState::Empty)) => *state = MapState::AfterKey,
+            Some(NestedState::Map(state @ MapState::Empty)) => {
+                *state = MapState::AfterKey;
+                self.insert_newline();
+            }
             Some(NestedState::Map(state @ MapState::AfterEntry)) => {
                 *state = MapState::AfterKey;
                 self.output.push(',');
+                self.insert_newline();
             }
             Some(NestedState::Map(state @ MapState::AfterKey)) => {
                 *state = MapState::AfterEntry;
-                self.output.push(':');
+                if matches!(self.config, Config::Compact) {
+                    self.output.push(':');
+                } else {
+                    self.output.push_str(": ");
+                }
             }
             None => {}
         }
     }
 
+    fn insert_newline(&mut self) {
+        if let Config::Pretty {
+            indentation,
+            newline,
+        } = &self.config
+        {
+            self.output.push_str(newline);
+            for _ in 0..self.nested.len() {
+                self.output.push_str(indentation);
+            }
+        }
+    }
+
     pub fn finish_nested(&mut self) {
         match self.nested.pop().expect("not in a nested state") {
-            NestedState::Tuple(_) => self.output.push(')'),
-            NestedState::List(_) => self.output.push(']'),
-            NestedState::Map(MapState::AfterEntry | MapState::Empty) => self.output.push('}'),
+            NestedState::Tuple(state) => {
+                if matches!(state, SequenceState::NotEmpty) {
+                    self.insert_newline();
+                }
+                self.output.push(')')
+            }
+            NestedState::List(state) => {
+                if matches!(state, SequenceState::NotEmpty) {
+                    self.insert_newline();
+                }
+                self.output.push(']')
+            }
+            NestedState::Map(state @ (MapState::AfterEntry | MapState::Empty)) => {
+                if matches!(state, MapState::AfterEntry) {
+                    self.insert_newline();
+                }
+                self.output.push('}')
+            }
             NestedState::Map(_) => unreachable!("map entry not complete"),
         }
     }
@@ -225,6 +280,16 @@ enum MapState {
     Empty,
     AfterEntry,
     AfterKey,
+}
+
+#[derive(Debug, Default)]
+pub enum Config {
+    #[default]
+    Compact,
+    Pretty {
+        indentation: Cow<'static, str>,
+        newline: Cow<'static, str>,
+    },
 }
 
 #[test]

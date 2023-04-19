@@ -6,7 +6,7 @@ use serde::ser::{
     SerializeTupleStruct, SerializeTupleVariant,
 };
 
-use crate::writer::Writer;
+use crate::writer::{Config, Writer};
 
 #[derive(Debug, Default)]
 pub struct Serializer {
@@ -14,6 +14,12 @@ pub struct Serializer {
 }
 
 impl Serializer {
+    pub fn new(config: Config) -> Self {
+        Self {
+            writer: Writer::new(config),
+        }
+    }
+
     pub fn finish(self) -> String {
         self.writer.finish()
     }
