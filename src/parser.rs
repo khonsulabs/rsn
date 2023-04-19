@@ -42,6 +42,18 @@ impl<'s> Parser<'s> {
         self.peeked.take().or_else(|| self.tokens.next())
     }
 
+    fn next_token_parts(
+        &mut self,
+    ) -> Result<(Range<usize>, Option<TokenKind<'s>>), tokenizer::Error> {
+        Ok(match self.next_token().transpose()? {
+            Some(token) => (token.location, Some(token.kind)),
+            None => (
+                self.tokens.current_offset()..self.tokens.current_offset(),
+                None,
+            ),
+        })
+    }
+
     fn next_or_eof(&mut self) -> Result<Token<'s>, Error> {
         match self.next_token() {
             Some(Ok(token)) => Ok(token),
@@ -129,7 +141,7 @@ impl<'s> Parser<'s> {
                 Ok(Event::EndNested)
             }
             TokenKind::Colon | TokenKind::Comma | TokenKind::Close(_) => {
-                todo!("expected value, got something else.")
+                Err(Error::new(token.location, ErrorKind::ExpectedValue))
             }
             TokenKind::Comment(comment) => Ok(Event::Comment(comment)),
             TokenKind::Whitespace(_) => unreachable!("disabled"),
@@ -148,22 +160,22 @@ impl<'s> Parser<'s> {
                     self.parse_token(token, Some(end))
                 }
             }
-            ListState::ExpectingComma => {
-                let token = self.next_or_eof()?;
-                match token.kind {
-                    TokenKind::Close(closed) if closed == end => {
-                        self.nested.pop();
-                        Ok(Event::EndNested)
-                    }
-                    TokenKind::Comma => {
-                        *self.nested.last_mut().expect("required for this fn") =
-                            NestedState::list(end, ListState::ExpectingValue);
-                        self.parse_sequence(ListState::ExpectingValue, end)
-                    }
-                    TokenKind::Comment(comment) => Ok(Event::Comment(comment)),
-                    _ => todo!("expected comma or end"),
+            ListState::ExpectingComma => match self.next_token_parts()? {
+                (_, Some(TokenKind::Close(closed))) if closed == end => {
+                    self.nested.pop();
+                    Ok(Event::EndNested)
                 }
-            }
+                (_, Some(TokenKind::Comma)) => {
+                    *self.nested.last_mut().expect("required for this fn") =
+                        NestedState::list(end, ListState::ExpectingValue);
+                    self.parse_sequence(ListState::ExpectingValue, end)
+                }
+                (_, Some(TokenKind::Comment(comment))) => Ok(Event::Comment(comment)),
+                (location, _) => Err(Error::new(
+                    location,
+                    ErrorKind::ExpectedCommaOrEnd(end.into()),
+                )),
+            },
         }
     }
 
@@ -174,113 +186,116 @@ impl<'s> Parser<'s> {
 
     fn parse_map(&mut self, state: MapState) -> Result<Event<'s>, Error> {
         match state {
-            MapState::ExpectingKey => {
-                let token = self.next_or_eof()?;
-                if let TokenKind::Comment(comment) = &token.kind {
-                    Ok(Event::Comment(comment))
-                } else {
+            MapState::ExpectingKey => match self.next_token().transpose()? {
+                Some(Token {
+                    kind: TokenKind::Comment(comment),
+                    ..
+                }) => Ok(Event::Comment(comment)),
+                Some(token) => {
                     *self.map_state_mut() = MapState::ExpectingColon;
                     self.parse_token(token, Some(Balanced::Brace))
                 }
-            }
-            MapState::ExpectingColon => {
-                let token = self.next_or_eof()?;
-                if matches!(token.kind, TokenKind::Colon) {
+                None => Err(Error::new(
+                    self.tokens.current_offset()..self.tokens.current_offset(),
+                    ErrorKind::ExpectedKey,
+                )),
+            },
+            MapState::ExpectingColon => match self.next_token_parts()? {
+                (_, Some(TokenKind::Colon)) => {
                     *self.map_state_mut() = MapState::ExpectingValue;
                     self.parse_map(MapState::ExpectingValue)
-                } else if let TokenKind::Comment(comment) = token.kind {
-                    Ok(Event::Comment(comment))
-                } else {
-                    todo!("expected colon, got {token:?}")
                 }
-            }
-            MapState::ExpectingValue => {
-                let token = self.next_or_eof()?;
-                if let TokenKind::Comment(comment) = &token.kind {
-                    Ok(Event::Comment(comment))
-                } else {
+                (_, Some(TokenKind::Comment(comment))) => Ok(Event::Comment(comment)),
+                (location, _) => Err(Error::new(location, ErrorKind::ExpectedColon)),
+            },
+            MapState::ExpectingValue => match self.next_token().transpose()? {
+                Some(Token {
+                    kind: TokenKind::Comment(comment),
+                    ..
+                }) => Ok(Event::Comment(comment)),
+                Some(token) => {
                     *self.map_state_mut() = MapState::ExpectingComma;
                     self.parse_token(token, None)
                 }
-            }
-            MapState::ExpectingComma => {
-                let token = self.next_token().transpose()?.map(|token| token.kind);
-                match token {
-                    Some(TokenKind::Close(closed)) if closed == Balanced::Brace => {
-                        self.nested.pop();
-                        Ok(Event::EndNested)
-                    }
-                    Some(TokenKind::Comma) => {
-                        *self.map_state_mut() = MapState::ExpectingKey;
-                        self.parse_map(MapState::ExpectingKey)
-                    }
-                    Some(TokenKind::Comment(comment)) => Ok(Event::Comment(comment)),
-                    _ => todo!("expected comma or end"),
+                None => Err(Error::new(
+                    self.tokens.current_offset()..self.tokens.current_offset(),
+                    ErrorKind::ExpectedValue,
+                )),
+            },
+            MapState::ExpectingComma => match self.next_token_parts()? {
+                (_, Some(TokenKind::Close(closed))) if closed == Balanced::Brace => {
+                    self.nested.pop();
+                    Ok(Event::EndNested)
                 }
-            }
+                (_, Some(TokenKind::Comma)) => {
+                    *self.map_state_mut() = MapState::ExpectingKey;
+                    self.parse_map(MapState::ExpectingKey)
+                }
+                (_, Some(TokenKind::Comment(comment))) => Ok(Event::Comment(comment)),
+                (location, _) => Err(Error::new(
+                    location,
+                    ErrorKind::ExpectedCommaOrEnd(Nested::Map),
+                )),
+            },
         }
     }
 
     fn parse_implicit_map(&mut self, state: MapState) -> Result<Event<'s>, Error> {
         match state {
-            MapState::ExpectingKey => {
-                let token = self.next_token().transpose()?;
-                match token.map(|token| token.kind) {
-                    Some(TokenKind::Identifier(key)) => {
-                        self.root_state = State::ImplicitMap(MapState::ExpectingColon);
-                        Ok(Event::Primitive(Primitive::Identifier(key)))
-                    }
-                    Some(TokenKind::Comment(comment)) => Ok(Event::Comment(comment)),
-                    None => {
-                        self.root_state = State::Finished;
-                        Ok(Event::EndNested)
-                    }
-                    _ => todo!("expected map key"),
+            MapState::ExpectingKey => match self.next_token_parts()? {
+                (_, Some(TokenKind::Identifier(key))) => {
+                    self.root_state = State::ImplicitMap(MapState::ExpectingColon);
+                    Ok(Event::Primitive(Primitive::Identifier(key)))
                 }
-            }
-            MapState::ExpectingColon => {
-                let token = self.next_or_eof()?;
-                if matches!(token.kind, TokenKind::Colon) {
+                (_, Some(TokenKind::Comment(comment))) => Ok(Event::Comment(comment)),
+                (_, None) => {
+                    self.root_state = State::Finished;
+                    Ok(Event::EndNested)
+                }
+                (location, _) => Err(Error::new(location, ErrorKind::ExpectedKey)),
+            },
+            MapState::ExpectingColon => match self.next_token_parts()? {
+                (_, Some(TokenKind::Colon)) => {
                     self.root_state = State::ImplicitMap(MapState::ExpectingValue);
                     self.parse_implicit_map(MapState::ExpectingValue)
-                } else if let TokenKind::Comment(comment) = token.kind {
-                    Ok(Event::Comment(comment))
-                } else {
-                    todo!("expected colon, got {token:?}")
                 }
-            }
-            MapState::ExpectingValue => {
-                let token = self.next_or_eof()?;
-                if let TokenKind::Comment(comment) = &token.kind {
-                    Ok(Event::Comment(comment))
-                } else {
+                (_, Some(TokenKind::Comment(comment))) => Ok(Event::Comment(comment)),
+                (location, _) => Err(Error::new(location, ErrorKind::ExpectedColon)),
+            },
+            MapState::ExpectingValue => match self.next_token().transpose()? {
+                Some(Token {
+                    kind: TokenKind::Comment(comment),
+                    ..
+                }) => Ok(Event::Comment(comment)),
+                Some(token) => {
                     self.root_state = State::ImplicitMap(MapState::ExpectingComma);
                     self.parse_token(token, None)
                 }
-            }
-            MapState::ExpectingComma => {
-                let token = self.next_token().transpose()?.map(|token| token.kind);
-                match token {
-                    Some(TokenKind::Close(closed)) if closed == Balanced::Brace => {
-                        self.root_state = State::Finished;
-                        Ok(Event::EndNested)
-                    }
-                    Some(TokenKind::Comma) => {
-                        self.root_state = State::ImplicitMap(MapState::ExpectingKey);
-                        self.parse_implicit_map(MapState::ExpectingKey)
-                    }
-                    Some(TokenKind::Identifier(key)) => {
-                        self.root_state = State::ImplicitMap(MapState::ExpectingColon);
-                        Ok(Event::Primitive(Primitive::Identifier(key)))
-                    }
-                    Some(TokenKind::Comment(comment)) => Ok(Event::Comment(comment)),
-                    None => {
-                        self.root_state = State::Finished;
-                        Ok(Event::EndNested)
-                    }
-                    _ => todo!("expected comma or end"),
+                None => Err(Error::new(
+                    self.tokens.current_offset()..self.tokens.current_offset(),
+                    ErrorKind::ExpectedValue,
+                )),
+            },
+            MapState::ExpectingComma => match self.next_token_parts()? {
+                (_, Some(TokenKind::Close(closed))) if closed == Balanced::Brace => {
+                    self.root_state = State::Finished;
+                    Ok(Event::EndNested)
                 }
-            }
+                (_, Some(TokenKind::Comma)) => {
+                    self.root_state = State::ImplicitMap(MapState::ExpectingKey);
+                    self.parse_implicit_map(MapState::ExpectingKey)
+                }
+                (_, Some(TokenKind::Identifier(key))) => {
+                    self.root_state = State::ImplicitMap(MapState::ExpectingColon);
+                    Ok(Event::Primitive(Primitive::Identifier(key)))
+                }
+                (_, Some(TokenKind::Comment(comment))) => Ok(Event::Comment(comment)),
+                (_, None) => {
+                    self.root_state = State::Finished;
+                    Ok(Event::EndNested)
+                }
+                (location, _) => Err(Error::new(location, ErrorKind::ExpectedKey)),
+            },
         }
     }
 
@@ -348,9 +363,9 @@ impl<'s> Parser<'s> {
                     Ok(token) => match token.kind {
                         TokenKind::Comment(comment) => Ok(Event::Comment(comment)),
                         TokenKind::Whitespace(_) => unreachable!("disabled"),
-                        _ => todo!("trailing junk"),
+                        _ => Err(Error::new(token.location, ErrorKind::TrailingData)),
                     },
-                    Err(err) => return Some(Err(err.into())),
+                    Err(err) => Err(err.into()),
                 },
             },
 
@@ -423,6 +438,15 @@ impl Display for Error {
         match &self.kind {
             ErrorKind::Tokenizer(err) => Display::fmt(err, f),
             ErrorKind::UnexpectedEof => f.write_str("unexpected end of file"),
+            ErrorKind::ExpectedValue => f.write_str("a value was expected"),
+            ErrorKind::ExpectedCommaOrEnd(nested) => {
+                write!(f, "expected `,` or {}", nested.err_display())
+            }
+            ErrorKind::ExpectedColon => f.write_str("expected `:`"),
+            ErrorKind::ExpectedKey => f.write_str("expected map key"),
+            ErrorKind::TrailingData => f.write_str(
+                "source contained extra trailing data after a value was completely read",
+            ),
         }
     }
 }
@@ -440,6 +464,11 @@ impl From<tokenizer::Error> for Error {
 pub enum ErrorKind {
     Tokenizer(tokenizer::ErrorKind),
     UnexpectedEof,
+    ExpectedKey,
+    ExpectedColon,
+    ExpectedValue,
+    ExpectedCommaOrEnd(Nested),
+    TrailingData,
 }
 
 #[derive(Debug, PartialEq, Clone)]
@@ -455,6 +484,26 @@ pub enum Nested {
     Tuple,
     Map,
     List,
+}
+
+impl Nested {
+    fn err_display(&self) -> &'static str {
+        match self {
+            Nested::Tuple => "`)`",
+            Nested::Map => "`}`",
+            Nested::List => "`]`",
+        }
+    }
+}
+
+impl From<Balanced> for Nested {
+    fn from(kind: Balanced) -> Self {
+        match kind {
+            Balanced::Paren => Self::Tuple,
+            Balanced::Bracket => Self::List,
+            Balanced::Brace => Self::Map,
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
