@@ -2,6 +2,13 @@
 
 **This crate is very early in development and is not ready for consumption.**
 
+![rsn forbids unsafe code](https://img.shields.io/badge/unsafe-forbid-success)
+![rsn is considered alpha](https://img.shields.io/badge/status-alpha-orange)
+[![crate version](https://img.shields.io/crates/v/rsn.svg)](https://crates.io/crates/rsn)
+[![Live Build Status](https://img.shields.io/github/actions/workflow/status/khonsulabs/rsn/rust.yml?branch=main)](https://github.com/khonsulabs/rsn/actions?query=workflow:Tests)
+[![HTML Coverage Report for `main`](https://khonsulabs.github.io/rsn/coverage/badge.svg)]($pages-base$/coverage/)
+[![Documentation for `main`](https://img.shields.io/badge/docs-main-informational)](https://khonsulabs.github.io/rsn/main/rsn/)
+
 A UTF-8 based text format that looks very similar to valid Rust code.
 
 The syntax differs from valid Rust code for:
