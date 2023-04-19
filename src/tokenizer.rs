@@ -583,6 +583,19 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
     fn tokenize_number(&mut self, start_char: u8) -> Result<Token<'a>, Error> {
         let negative = start_char == b'-';
         let signed = negative || start_char == b'+';
+        // Check for inf/NaN
+        if signed && matches!(self.chars.peek(), Some('i' | 'N')) {
+            let mut token = self.tokenize_identifier(None)?;
+            match &mut token.kind {
+                TokenKind::Float(float) => {
+                    if negative {
+                        *float = -*float
+                    }
+                    return Ok(token);
+                }
+                _ => return Err(Error::new(token.location, ErrorKind::ExpectedDigit)),
+            }
+        }
 
         if signed {
             let next_char = self.next_or_eof()?;
@@ -987,6 +1000,8 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
                 match source {
                     "true" if !is_raw => TokenKind::Bool(true),
                     "false" if !is_raw => TokenKind::Bool(false),
+                    "inf" if !is_raw => TokenKind::Float(f64::INFINITY),
+                    "NaN" if !is_raw => TokenKind::Float(f64::NAN),
                     _ => TokenKind::Identifier(source),
                 },
             ))
@@ -1940,6 +1955,15 @@ mod tests {
         test_tokens("+1.0e10", &[Token::new(0..7, TokenKind::Float(1.0e10))]);
         test_tokens("-1e10", &[Token::new(0..5, TokenKind::Float(-1e10))]);
         test_tokens("+1e10", &[Token::new(0..5, TokenKind::Float(1e10))]);
+        test_tokens("inf", &[Token::new(0..3, TokenKind::Float(f64::INFINITY))]);
+        test_tokens("NaN", &[Token::new(0..3, TokenKind::Float(f64::NAN))]);
+        test_tokens(
+            "-inf",
+            &[Token::new(0..4, TokenKind::Float(-f64::INFINITY))],
+        );
+        test_tokens("-NaN", &[Token::new(0..4, TokenKind::Float(-f64::NAN))]);
+        test_tokens("+inf", &[Token::new(0..4, TokenKind::Float(f64::INFINITY))]);
+        test_tokens("+NaN", &[Token::new(0..4, TokenKind::Float(f64::NAN))]);
     }
 
     #[test]

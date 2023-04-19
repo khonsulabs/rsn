@@ -75,7 +75,7 @@ Binary values are parsed after encountering `0b` while parsing an
 ## Float
 
 - [x] Tokenizer support
-  - [ ] `inf`/`NaN` support
+  - [x] `inf`/`NaN` support
 - [x] Parser support
 - [ ] Deserializer Support
 - [ ] Documentation
@@ -85,40 +85,40 @@ Binary values are parsed after encountering `0b` while parsing an
 
 - [x] Tokenizer support
 - [x] Parser support
-- [ ] Deserializer Support
+- [x] Deserializer Support
 - [ ] Documentation
 
 ## Character
 
-- [ ] Tokenizer support
+- [x] Tokenizer support
 - [x] Parser support
-- [ ] Deserializer Support
+- [x] Deserializer Support
 - [ ] Documentation
 
 ## Byte
 
-- [ ] Tokenizer support
+- [x] Tokenizer support
 - [x] Parser support
-- [ ] Deserializer Support
+- [x] Deserializer Support
 - [ ] Documentation
 
 ## String
 
-- [ ] Tokenizer support
-  - [ ] Support same whitespace rules on raw line ending escaping.
+- [x] Tokenizer support
+  - [x] Support same whitespace rules on raw line ending escaping.
   - [ ] Error-by-default on multiple line ending removal with raw line ending
     escaping, just like rustc, but allow a parsing option that prevents the
     errors.
 - [x] Parser support
-- [ ] Deserializer Support
+- [x] Deserializer Support
 - [ ] Documentation
 
 ## Byte String
 
-- [ ] Tokenizer support
+- [x] Tokenizer support
   - [ ] `b64` prefixed base64-encoded byte strings
 - [x] Parser support
-- [ ] Deserializer Support
+- [x] Deserializer Support
 - [ ] Documentation
 
 ## Map
