@@ -7,7 +7,7 @@ use core::ops::Range;
 use serde::de::{EnumAccess, MapAccess, SeqAccess, VariantAccess};
 use serde::Deserializer as _;
 
-use crate::parser::{self, Config, Event, EventKind, Nested, Parser, Primitive};
+use crate::parser::{self, Config, Event, EventKind, Name, Nested, Parser, Primitive};
 use crate::tokenizer;
 
 pub struct Deserializer<'de> {
@@ -255,7 +255,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
                         kind: Nested::Tuple,
                     },
                 ..
-            }) if matches!(name, Some((_, "Some"))) => {
+            }) if matches!(name, Some(Name { name: "Some", .. })) => {
                 let result = visitor.visit_some(&mut *self)?;
                 match self.parser.next().transpose()? {
                     Some(Event {
@@ -346,7 +346,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
                 kind: EventKind::BeginNested { name, kind },
                 location,
             }) => {
-                if name.map_or(false, |(_, name)| name != struct_name) {
+                if name.map_or(false, |name| name != struct_name) {
                     return Err(Error::new(location, ErrorKind::NameMismatch(struct_name)));
                 }
 
@@ -397,7 +397,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
                 kind: EventKind::BeginNested { name, kind },
                 location,
             }) => {
-                if name.map_or(false, |(_, name)| name != struct_name) {
+                if name.map_or(false, |name| name != struct_name) {
                     return Err(Error::new(location, ErrorKind::NameMismatch(struct_name)));
                 }
 

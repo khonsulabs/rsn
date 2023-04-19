@@ -127,7 +127,10 @@ impl<'s> Parser<'s> {
                     Ok(Event::new(
                         open_location,
                         EventKind::BeginNested {
-                            name: Some((token.location, value)),
+                            name: Some(Name {
+                                location: token.location,
+                                name: value,
+                            }),
                             kind,
                         },
                     ))
@@ -390,7 +393,10 @@ impl<'s> Parser<'s> {
                                     Ok(Event::new(
                                         token.location,
                                         EventKind::BeginNested {
-                                            name: Some((open_location, identifier)),
+                                            name: Some(Name {
+                                                location: open_location,
+                                                name: identifier,
+                                            }),
                                             kind: match kind {
                                                 Balanced::Paren => Nested::Tuple,
                                                 Balanced::Brace => Nested::Map,
@@ -577,12 +583,30 @@ impl<'s> Event<'s> {
 #[derive(Debug, PartialEq, Clone)]
 pub enum EventKind<'s> {
     BeginNested {
-        name: Option<(Range<usize>, &'s str)>,
+        name: Option<Name<'s>>,
         kind: Nested,
     },
     EndNested,
     Primitive(Primitive<'s>),
     Comment(&'s str),
+}
+
+#[derive(Debug, PartialEq, Clone)]
+pub struct Name<'s> {
+    pub location: Range<usize>,
+    pub name: &'s str,
+}
+
+impl<'s> PartialEq<str> for Name<'s> {
+    fn eq(&self, other: &str) -> bool {
+        self.name == other
+    }
+}
+
+impl<'a, 's> PartialEq<&'a str> for Name<'s> {
+    fn eq(&self, other: &&'a str) -> bool {
+        self.name == *other
+    }
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
