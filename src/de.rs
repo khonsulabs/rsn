@@ -14,7 +14,7 @@ pub struct Deserializer<'de> {
 impl<'de> Deserializer<'de> {
     pub fn new(source: &'de str, config: Config) -> Self {
         Self {
-            parser: Parser::new(source, config).peekable(),
+            parser: Parser::new(source, config.include_comments(false)).peekable(),
         }
     }
 }

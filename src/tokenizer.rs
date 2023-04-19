@@ -204,10 +204,14 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
         Error::new(self.chars.last_char_range(), kind)
     }
 
-    fn error_at_next_char(&self, kind: ErrorKind) -> Error {
-        let mut range = self.chars.last_char_range();
-        range.start += 1;
-        range.end += 1;
+    fn error_at_next_char(&mut self, kind: ErrorKind) -> Error {
+        let range = if let Some((offset, ch)) = self.chars.peek_full() {
+            offset..offset + ch.len_utf8()
+        } else {
+            let mut range = self.chars.last_char_range();
+            range.start = range.end;
+            range
+        };
         Error::new(range, kind)
     }
 
