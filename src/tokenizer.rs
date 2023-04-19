@@ -852,7 +852,7 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
             match self.next_or_eof()? {
                 '"' => {
                     let range = self.chars.marked_range();
-                    let contents = &self.chars.source[range.start + 1..range.end - 1];
+                    let contents = &self.chars.source[range.start + 2..range.end - 1];
                     return Ok(Token::new(
                         range,
                         TokenKind::Bytes(Cow::Borrowed(contents.as_bytes())),
@@ -2128,6 +2128,7 @@ mod tests {
             };
         }
 
+        test_byte_string!(b"hello world");
         test_byte_string!(b"\0");
         test_byte_string!(b"\r");
         test_byte_string!(b"\t");

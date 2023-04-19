@@ -21,6 +21,14 @@ impl<'de> Deserializer<'de> {
         }
     }
 
+    pub fn ensure_eof(mut self) -> Result<(), Error> {
+        match self.parser.next() {
+            None => Ok(()),
+            Some(Ok(event)) => Err(Error::new(event.location, parser::ErrorKind::TrailingData)),
+            Some(Err(err)) => Err(err.into()),
+        }
+    }
+
     fn handle_unit(&mut self) -> Result<(), Error> {
         match self.parser.next().transpose()? {
             Some(Event {
@@ -681,6 +689,8 @@ impl serde::de::Error for Error {
     }
 }
 
+impl serde::ser::StdError for Error {}
+
 impl Display for Error {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         if let Some(location) = &self.location {
@@ -758,9 +768,6 @@ impl Display for ErrorKind {
         }
     }
 }
-
-#[cfg(feature = "std")]
-impl std::error::Error for Error {}
 
 #[cfg(test)]
 mod tests {
