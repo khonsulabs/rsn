@@ -585,16 +585,10 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
         let signed = negative || start_char == b'+';
         // Check for inf/NaN
         if signed && matches!(self.chars.peek(), Some('i' | 'N')) {
-            let mut token = self.tokenize_identifier(None)?;
-            match &mut token.kind {
-                TokenKind::Float(float) => {
-                    if negative {
-                        *float = -*float
-                    }
-                    return Ok(token);
-                }
-                _ => return Err(Error::new(token.location, ErrorKind::ExpectedDigit)),
-            }
+            // We pass in 'i', but it doesn't matter as long as we provide a
+            // xid_start character -- identifiers are always borrowed, so the
+            // char is never passed to the output.
+            return self.tokenize_identifier(Some('i'));
         }
 
         if signed {
@@ -669,6 +663,9 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
                     ));
                 }
                 '\\' => break,
+                '\r' => {
+                    self.forbid_isolated_cr()?;
+                }
                 _ => {}
             }
         }
@@ -1000,8 +997,10 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
                 match source {
                     "true" if !is_raw => TokenKind::Bool(true),
                     "false" if !is_raw => TokenKind::Bool(false),
-                    "inf" if !is_raw => TokenKind::Float(f64::INFINITY),
-                    "NaN" if !is_raw => TokenKind::Float(f64::NAN),
+                    "inf" | "+inf" if !is_raw => TokenKind::Float(f64::INFINITY),
+                    "NaN" | "+NaN" if !is_raw => TokenKind::Float(f64::NAN),
+                    "-inf" if !is_raw => TokenKind::Float(-f64::INFINITY),
+                    "-NaN" if !is_raw => TokenKind::Float(-f64::NAN),
                     _ => TokenKind::Identifier(source),
                 },
             ))
