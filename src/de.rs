@@ -362,7 +362,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
                 Some(Event::EndNested) => {
                     depth -= 1;
                 }
-                Some(Event::Primitive(_)) => {}
+                Some(Event::Primitive(_) | Event::Comment(_)) => {}
                 None => todo!("unexpected eof"),
             }
 
@@ -511,17 +511,13 @@ mod tests {
         }
         let parsed = BasicNamed::deserialize(&mut crate::de::Deserializer::new(
             r#"a: 1 b: -1"#,
-            Config {
-                allow_implicit_map: true,
-            },
+            Config::default().allow_implicit_map(true),
         ))
         .unwrap();
         assert_eq!(parsed, BasicNamed { a: 1, b: -1 });
         let parsed = BasicNamed::deserialize(&mut crate::de::Deserializer::new(
             r#"a: 1, b: -1,"#,
-            Config {
-                allow_implicit_map: true,
-            },
+            Config::default().allow_implicit_map(true),
         ))
         .unwrap();
         assert_eq!(parsed, BasicNamed { a: 1, b: -1 });

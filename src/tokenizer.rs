@@ -1153,16 +1153,7 @@ impl<'a, const INCLUDE_ALL: bool> Iterator for Tokenizer<'a, INCLUDE_ALL> {
                         continue;
                     }
                 }
-                '/' => {
-                    let comment = self.tokenize_comment();
-                    if INCLUDE_ALL {
-                        comment
-                    } else if let Err(err) = comment {
-                        Err(err)
-                    } else {
-                        continue;
-                    }
-                }
+                '/' => self.tokenize_comment(),
                 ch => self.tokenize_identifier(Some(ch)),
             };
             break Some(result);
