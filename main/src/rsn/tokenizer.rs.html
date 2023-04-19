@@ -2137,6 +2137,15 @@
 <a href="#2137" id="2137">2137</a>
 <a href="#2138" id="2138">2138</a>
 <a href="#2139" id="2139">2139</a>
+<a href="#2140" id="2140">2140</a>
+<a href="#2141" id="2141">2141</a>
+<a href="#2142" id="2142">2142</a>
+<a href="#2143" id="2143">2143</a>
+<a href="#2144" id="2144">2144</a>
+<a href="#2145" id="2145">2145</a>
+<a href="#2146" id="2146">2146</a>
+<a href="#2147" id="2147">2147</a>
+<a href="#2148" id="2148">2148</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>alloc::borrow::Cow;
 <span class="kw">use </span>alloc::string::String;
 <span class="kw">use </span>core::fmt::Display;
@@ -2254,6 +2263,15 @@
             Integer::Isize(value) =&gt; value == <span class="number">0</span>,
             Integer::UnsignedLarge(value) =&gt; value == <span class="number">0</span>,
             Integer::SignedLarge(value) =&gt; value == <span class="number">0</span>,
+        }
+    }
+
+    <span class="kw">pub fn </span>as_f64(<span class="self">self</span>) -&gt; f64 {
+        <span class="kw">match </span><span class="self">self </span>{
+            Integer::Usize(value) =&gt; value <span class="kw">as </span>f64,
+            Integer::Isize(value) =&gt; value <span class="kw">as </span>f64,
+            Integer::UnsignedLarge(value) =&gt; value <span class="kw">as </span>f64,
+            Integer::SignedLarge(value) =&gt; value <span class="kw">as </span>f64,
         }
     }
 }
