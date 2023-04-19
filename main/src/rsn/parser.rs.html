@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/parser.rs`."><title>parser.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Bold-a2c9cd1067f8b328.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-ba5701c5741a7b69.css" id="mainThemeStyle"><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="rsn" data-themes="" data-resource-suffix="" data-rustdoc-version="1.71.0-nightly (7908a1d65 2023-04-17)" data-search-js="search-e077946657036a58.js" data-settings-js="settings-298e1ea74db45b39.js" data-settings-css="settings-7bfb4c59cc6bc502.css" data-theme-light-css="light-0f8c037637f9eb3e.css" data-theme-dark-css="dark-1097f8e92a01e3cf.css" data-theme-ayu-css="ayu-614652228113ac93.css" ></div><script src="../../static.files/storage-62ce34ea385b278a.js"></script><script defer src="../../static.files/source-script-905937fbbdc8e9ea.js"></script><script defer src="../../source-files.js"></script><script defer src="../../static.files/main-1a524efa7bd4ab32.js"></script><noscript><link rel="stylesheet" media="(prefers-color-scheme:light)" href="../../static.files/light-0f8c037637f9eb3e.css"><link rel="stylesheet" media="(prefers-color-scheme:dark)" href="../../static.files/dark-1097f8e92a01e3cf.css"><link rel="stylesheet" href="../../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><a class="sub-logo-container" href="../../rsn/index.html"><img class="rust-logo" src="../../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/parser.rs`."><title>parser.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Bold-a2c9cd1067f8b328.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-ba5701c5741a7b69.css" id="mainThemeStyle"><div id="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="rsn" data-themes="" data-resource-suffix="" data-rustdoc-version="1.71.0-nightly (c609da59d 2023-04-18)" data-search-js="search-e077946657036a58.js" data-settings-js="settings-298e1ea74db45b39.js" data-settings-css="settings-7bfb4c59cc6bc502.css" data-theme-light-css="light-0f8c037637f9eb3e.css" data-theme-dark-css="dark-1097f8e92a01e3cf.css" data-theme-ayu-css="ayu-614652228113ac93.css" ></div><script src="../../static.files/storage-62ce34ea385b278a.js"></script><script defer src="../../static.files/source-script-905937fbbdc8e9ea.js"></script><script defer src="../../source-files.js"></script><script defer src="../../static.files/main-1a524efa7bd4ab32.js"></script><noscript><link rel="stylesheet" media="(prefers-color-scheme:light)" href="../../static.files/light-0f8c037637f9eb3e.css"><link rel="stylesheet" media="(prefers-color-scheme:dark)" href="../../static.files/dark-1097f8e92a01e3cf.css"><link rel="stylesheet" href="../../static.files/noscript-13285aec31fa243e.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc source"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><a class="sub-logo-container" href="../../rsn/index.html"><img class="rust-logo" src="../../static.files/rust-logo-151179464ae7ed46.svg" alt="logo"></a><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -567,6 +567,95 @@
 <a href="#567" id="567">567</a>
 <a href="#568" id="568">568</a>
 <a href="#569" id="569">569</a>
+<a href="#570" id="570">570</a>
+<a href="#571" id="571">571</a>
+<a href="#572" id="572">572</a>
+<a href="#573" id="573">573</a>
+<a href="#574" id="574">574</a>
+<a href="#575" id="575">575</a>
+<a href="#576" id="576">576</a>
+<a href="#577" id="577">577</a>
+<a href="#578" id="578">578</a>
+<a href="#579" id="579">579</a>
+<a href="#580" id="580">580</a>
+<a href="#581" id="581">581</a>
+<a href="#582" id="582">582</a>
+<a href="#583" id="583">583</a>
+<a href="#584" id="584">584</a>
+<a href="#585" id="585">585</a>
+<a href="#586" id="586">586</a>
+<a href="#587" id="587">587</a>
+<a href="#588" id="588">588</a>
+<a href="#589" id="589">589</a>
+<a href="#590" id="590">590</a>
+<a href="#591" id="591">591</a>
+<a href="#592" id="592">592</a>
+<a href="#593" id="593">593</a>
+<a href="#594" id="594">594</a>
+<a href="#595" id="595">595</a>
+<a href="#596" id="596">596</a>
+<a href="#597" id="597">597</a>
+<a href="#598" id="598">598</a>
+<a href="#599" id="599">599</a>
+<a href="#600" id="600">600</a>
+<a href="#601" id="601">601</a>
+<a href="#602" id="602">602</a>
+<a href="#603" id="603">603</a>
+<a href="#604" id="604">604</a>
+<a href="#605" id="605">605</a>
+<a href="#606" id="606">606</a>
+<a href="#607" id="607">607</a>
+<a href="#608" id="608">608</a>
+<a href="#609" id="609">609</a>
+<a href="#610" id="610">610</a>
+<a href="#611" id="611">611</a>
+<a href="#612" id="612">612</a>
+<a href="#613" id="613">613</a>
+<a href="#614" id="614">614</a>
+<a href="#615" id="615">615</a>
+<a href="#616" id="616">616</a>
+<a href="#617" id="617">617</a>
+<a href="#618" id="618">618</a>
+<a href="#619" id="619">619</a>
+<a href="#620" id="620">620</a>
+<a href="#621" id="621">621</a>
+<a href="#622" id="622">622</a>
+<a href="#623" id="623">623</a>
+<a href="#624" id="624">624</a>
+<a href="#625" id="625">625</a>
+<a href="#626" id="626">626</a>
+<a href="#627" id="627">627</a>
+<a href="#628" id="628">628</a>
+<a href="#629" id="629">629</a>
+<a href="#630" id="630">630</a>
+<a href="#631" id="631">631</a>
+<a href="#632" id="632">632</a>
+<a href="#633" id="633">633</a>
+<a href="#634" id="634">634</a>
+<a href="#635" id="635">635</a>
+<a href="#636" id="636">636</a>
+<a href="#637" id="637">637</a>
+<a href="#638" id="638">638</a>
+<a href="#639" id="639">639</a>
+<a href="#640" id="640">640</a>
+<a href="#641" id="641">641</a>
+<a href="#642" id="642">642</a>
+<a href="#643" id="643">643</a>
+<a href="#644" id="644">644</a>
+<a href="#645" id="645">645</a>
+<a href="#646" id="646">646</a>
+<a href="#647" id="647">647</a>
+<a href="#648" id="648">648</a>
+<a href="#649" id="649">649</a>
+<a href="#650" id="650">650</a>
+<a href="#651" id="651">651</a>
+<a href="#652" id="652">652</a>
+<a href="#653" id="653">653</a>
+<a href="#654" id="654">654</a>
+<a href="#655" id="655">655</a>
+<a href="#656" id="656">656</a>
+<a href="#657" id="657">657</a>
+<a href="#658" id="658">658</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>alloc::borrow::Cow;
 <span class="kw">use </span>alloc::vec::Vec;
 <span class="kw">use </span>core::fmt::{Display, Formatter};
@@ -700,18 +789,22 @@
             TokenKind::Colon | TokenKind::Comma | TokenKind::Close(<span class="kw">_</span>) =&gt; {
                 <span class="macro">todo!</span>(<span class="string">&quot;expected value, got something else.&quot;</span>)
             }
-            TokenKind::Comment(<span class="kw">_</span>) | TokenKind::Whitespace =&gt; <span class="macro">unreachable!</span>(<span class="string">&quot;disabled&quot;</span>),
+            TokenKind::Comment(comment) =&gt; <span class="prelude-val">Ok</span>(Event::Comment(comment)),
+            TokenKind::Whitespace(<span class="kw">_</span>) =&gt; <span class="macro">unreachable!</span>(<span class="string">&quot;disabled&quot;</span>),
         }
     }
 
     <span class="kw">fn </span>parse_sequence(<span class="kw-2">&amp;mut </span><span class="self">self</span>, state: ListState, end: Balanced) -&gt; <span class="prelude-ty">Result</span>&lt;Event&lt;<span class="lifetime">&#39;s</span>&gt;, Error&gt; {
         <span class="kw">match </span>state {
             ListState::ExpectingValue =&gt; {
-                <span class="kw-2">*</span><span class="self">self</span>.nested.last_mut().expect(<span class="string">&quot;required for this fn&quot;</span>) =
-                    NestedState::list(end, ListState::ExpectingComma);
-
                 <span class="kw">let </span>token = <span class="self">self</span>.next_or_eof()<span class="question-mark">?</span>;
-                <span class="self">self</span>.parse_token(token, <span class="prelude-val">Some</span>(end))
+                <span class="kw">if let </span>TokenKind::Comment(comment) = <span class="kw-2">&amp;</span>token.kind {
+                    <span class="prelude-val">Ok</span>(Event::Comment(comment))
+                } <span class="kw">else </span>{
+                    <span class="kw-2">*</span><span class="self">self</span>.nested.last_mut().expect(<span class="string">&quot;required for this fn&quot;</span>) =
+                        NestedState::list(end, ListState::ExpectingComma);
+                    <span class="self">self</span>.parse_token(token, <span class="prelude-val">Some</span>(end))
+                }
             }
             ListState::ExpectingComma =&gt; {
                 <span class="kw">let </span>token = <span class="self">self</span>.next_or_eof()<span class="question-mark">?</span>;
@@ -725,6 +818,7 @@
                             NestedState::list(end, ListState::ExpectingValue);
                         <span class="self">self</span>.parse_sequence(ListState::ExpectingValue, end)
                     }
+                    TokenKind::Comment(comment) =&gt; <span class="prelude-val">Ok</span>(Event::Comment(comment)),
                     <span class="kw">_ </span>=&gt; <span class="macro">todo!</span>(<span class="string">&quot;expected comma or end&quot;</span>),
                 }
             }
@@ -732,37 +826,40 @@
     }
 
     <span class="kw">fn </span>map_state_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>MapState {
-        <span class="kw">if let </span><span class="prelude-val">Some</span>(nested) = <span class="self">self</span>.nested.last_mut() {
-            <span class="kw">let </span>NestedState::Map(map_state) = nested <span class="kw">else </span>{ <span class="macro">unreachable!</span>(<span class="string">&quot;not a map state&quot;</span>) };
-            map_state
-        } <span class="kw">else </span>{
-            <span class="kw">let </span>State::ImplicitMap(map_state) = <span class="kw-2">&amp;mut </span><span class="self">self</span>.root_state <span class="kw">else </span>{ <span class="macro">unreachable!</span>(<span class="string">&quot;not a map state&quot;</span>) };
-            map_state
-        }
+        <span class="kw">let </span><span class="prelude-val">Some</span>(NestedState::Map(map_state)) = <span class="self">self</span>.nested.last_mut() <span class="kw">else </span>{ <span class="macro">unreachable!</span>(<span class="string">&quot;not a map state&quot;</span>) };
+        map_state
     }
 
     <span class="kw">fn </span>parse_map(<span class="kw-2">&amp;mut </span><span class="self">self</span>, state: MapState) -&gt; <span class="prelude-ty">Result</span>&lt;Event&lt;<span class="lifetime">&#39;s</span>&gt;, Error&gt; {
         <span class="kw">match </span>state {
             MapState::ExpectingKey =&gt; {
-                <span class="kw-2">*</span><span class="self">self</span>.map_state_mut() = MapState::ExpectingColon;
-
                 <span class="kw">let </span>token = <span class="self">self</span>.next_or_eof()<span class="question-mark">?</span>;
-                <span class="self">self</span>.parse_token(token, <span class="prelude-val">Some</span>(Balanced::Brace))
+                <span class="kw">if let </span>TokenKind::Comment(comment) = <span class="kw-2">&amp;</span>token.kind {
+                    <span class="prelude-val">Ok</span>(Event::Comment(comment))
+                } <span class="kw">else </span>{
+                    <span class="kw-2">*</span><span class="self">self</span>.map_state_mut() = MapState::ExpectingColon;
+                    <span class="self">self</span>.parse_token(token, <span class="prelude-val">Some</span>(Balanced::Brace))
+                }
             }
             MapState::ExpectingColon =&gt; {
                 <span class="kw">let </span>token = <span class="self">self</span>.next_or_eof()<span class="question-mark">?</span>;
                 <span class="kw">if </span><span class="macro">matches!</span>(token.kind, TokenKind::Colon) {
                     <span class="kw-2">*</span><span class="self">self</span>.map_state_mut() = MapState::ExpectingValue;
                     <span class="self">self</span>.parse_map(MapState::ExpectingValue)
+                } <span class="kw">else if let </span>TokenKind::Comment(comment) = token.kind {
+                    <span class="prelude-val">Ok</span>(Event::Comment(comment))
                 } <span class="kw">else </span>{
                     <span class="macro">todo!</span>(<span class="string">&quot;expected colon, got {token:?}&quot;</span>)
                 }
             }
             MapState::ExpectingValue =&gt; {
-                <span class="kw-2">*</span><span class="self">self</span>.map_state_mut() = MapState::ExpectingComma;
-
                 <span class="kw">let </span>token = <span class="self">self</span>.next_or_eof()<span class="question-mark">?</span>;
-                <span class="self">self</span>.parse_token(token, <span class="prelude-val">None</span>)
+                <span class="kw">if let </span>TokenKind::Comment(comment) = <span class="kw-2">&amp;</span>token.kind {
+                    <span class="prelude-val">Ok</span>(Event::Comment(comment))
+                } <span class="kw">else </span>{
+                    <span class="kw-2">*</span><span class="self">self</span>.map_state_mut() = MapState::ExpectingComma;
+                    <span class="self">self</span>.parse_token(token, <span class="prelude-val">None</span>)
+                }
             }
             MapState::ExpectingComma =&gt; {
                 <span class="kw">let </span>token = <span class="self">self</span>.next_token().transpose()<span class="question-mark">?</span>.map(|token| token.kind);
@@ -775,6 +872,7 @@
                         <span class="kw-2">*</span><span class="self">self</span>.map_state_mut() = MapState::ExpectingKey;
                         <span class="self">self</span>.parse_map(MapState::ExpectingKey)
                     }
+                    <span class="prelude-val">Some</span>(TokenKind::Comment(comment)) =&gt; <span class="prelude-val">Ok</span>(Event::Comment(comment)),
                     <span class="kw">_ </span>=&gt; <span class="macro">todo!</span>(<span class="string">&quot;expected comma or end&quot;</span>),
                 }
             }
@@ -790,6 +888,7 @@
                         <span class="self">self</span>.root_state = State::ImplicitMap(MapState::ExpectingColon);
                         <span class="prelude-val">Ok</span>(Event::Primitive(Primitive::Identifier(key)))
                     }
+                    <span class="prelude-val">Some</span>(TokenKind::Comment(comment)) =&gt; <span class="prelude-val">Ok</span>(Event::Comment(comment)),
                     <span class="prelude-val">None </span>=&gt; {
                         <span class="self">self</span>.root_state = State::Finished;
                         <span class="prelude-val">Ok</span>(Event::EndNested)
@@ -802,15 +901,20 @@
                 <span class="kw">if </span><span class="macro">matches!</span>(token.kind, TokenKind::Colon) {
                     <span class="self">self</span>.root_state = State::ImplicitMap(MapState::ExpectingValue);
                     <span class="self">self</span>.parse_implicit_map(MapState::ExpectingValue)
+                } <span class="kw">else if let </span>TokenKind::Comment(comment) = token.kind {
+                    <span class="prelude-val">Ok</span>(Event::Comment(comment))
                 } <span class="kw">else </span>{
                     <span class="macro">todo!</span>(<span class="string">&quot;expected colon, got {token:?}&quot;</span>)
                 }
             }
             MapState::ExpectingValue =&gt; {
-                <span class="self">self</span>.root_state = State::ImplicitMap(MapState::ExpectingComma);
-
                 <span class="kw">let </span>token = <span class="self">self</span>.next_or_eof()<span class="question-mark">?</span>;
-                <span class="self">self</span>.parse_token(token, <span class="prelude-val">None</span>)
+                <span class="kw">if let </span>TokenKind::Comment(comment) = <span class="kw-2">&amp;</span>token.kind {
+                    <span class="prelude-val">Ok</span>(Event::Comment(comment))
+                } <span class="kw">else </span>{
+                    <span class="self">self</span>.root_state = State::ImplicitMap(MapState::ExpectingComma);
+                    <span class="self">self</span>.parse_token(token, <span class="prelude-val">None</span>)
+                }
             }
             MapState::ExpectingComma =&gt; {
                 <span class="kw">let </span>token = <span class="self">self</span>.next_token().transpose()<span class="question-mark">?</span>.map(|token| token.kind);
@@ -827,6 +931,7 @@
                         <span class="self">self</span>.root_state = State::ImplicitMap(MapState::ExpectingColon);
                         <span class="prelude-val">Ok</span>(Event::Primitive(Primitive::Identifier(key)))
                     }
+                    <span class="prelude-val">Some</span>(TokenKind::Comment(comment)) =&gt; <span class="prelude-val">Ok</span>(Event::Comment(comment)),
                     <span class="prelude-val">None </span>=&gt; {
                         <span class="self">self</span>.root_state = State::Finished;
                         <span class="prelude-val">Ok</span>(Event::EndNested)
@@ -836,12 +941,8 @@
             }
         }
     }
-}
 
-<span class="kw">impl</span>&lt;<span class="lifetime">&#39;s</span>&gt; Iterator <span class="kw">for </span>Parser&lt;<span class="lifetime">&#39;s</span>&gt; {
-    <span class="kw">type </span>Item = <span class="prelude-ty">Result</span>&lt;Event&lt;<span class="lifetime">&#39;s</span>&gt;, Error&gt;;
-
-    <span class="kw">fn </span>next(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>::Item&gt; {
+    <span class="kw">fn </span>next_event(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="prelude-ty">Result</span>&lt;Event&lt;<span class="lifetime">&#39;s</span>&gt;, Error&gt;&gt; {
         <span class="prelude-val">Some</span>(<span class="kw">match </span><span class="self">self</span>.nested.last() {
             <span class="prelude-val">None </span>=&gt; <span class="kw">match </span><span class="kw-2">&amp;</span><span class="self">self</span>.root_state {
                 State::AtStart =&gt; {
@@ -849,48 +950,50 @@
                         <span class="prelude-val">Ok</span>(token) =&gt; token,
                         <span class="prelude-val">Err</span>(err) =&gt; <span class="kw">return </span><span class="prelude-val">Some</span>(<span class="prelude-val">Err</span>(err.into())),
                     };
-                    <span class="kw">if </span><span class="self">self</span>.config.allow_implicit_map
-                        &amp;&amp; <span class="macro">matches!</span>(token.kind, TokenKind::Identifier(<span class="kw">_</span>))
-                    {
-                        <span class="kw">let </span>TokenKind::Identifier(identifier) = token.kind
-                            <span class="kw">else </span>{ <span class="macro">unreachable!</span>(<span class="string">&quot;just matched&quot;</span>)};
-                        <span class="kw">match </span><span class="self">self</span>.peek() {
-                            <span class="prelude-val">Some</span>(token) <span class="kw">if </span><span class="macro">matches!</span>(token.kind, TokenKind::Colon) =&gt; {
-                                <span class="comment">// Switch to parsing an implicit map
-                                </span><span class="self">self</span>.root_state = State::StartingImplicitMap(identifier);
-                                <span class="prelude-val">Ok</span>(Event::BeginNested {
-                                    name: <span class="prelude-val">None</span>,
-                                    kind: Nested::Map,
-                                })
-                            }
-                            <span class="prelude-val">Some</span>(token)
-                                <span class="kw">if </span><span class="macro">matches!</span>(
-                                    token.kind,
-                                    TokenKind::Open(Balanced::Brace | Balanced::Paren,)
-                                ) =&gt;
-                            {
-                                <span class="kw">let </span><span class="prelude-val">Some</span>(<span class="prelude-val">Ok</span>(Token{ kind: TokenKind::Open(kind), ..})) = <span class="self">self</span>.next_token()
-                                    <span class="kw">else </span>{ <span class="macro">unreachable!</span>(<span class="string">&quot;just peeked&quot;</span>) };
-                                <span class="self">self</span>.root_state = State::Finished;
-                                <span class="prelude-val">Ok</span>(Event::BeginNested {
-                                    name: <span class="prelude-val">Some</span>(identifier),
-                                    kind: <span class="kw">match </span>kind {
-                                        Balanced::Paren =&gt; Nested::Tuple,
-                                        Balanced::Brace =&gt; Nested::Map,
-                                        Balanced::Bracket =&gt; {
-                                            <span class="macro">unreachable!</span>(<span class="string">&quot;not matched in peek&quot;</span>)
-                                        }
-                                    },
-                                })
-                            }
-                            <span class="kw">_ </span>=&gt; {
-                                <span class="self">self</span>.root_state = State::Finished;
-                                <span class="prelude-val">Ok</span>(Event::Primitive(Primitive::Identifier(identifier)))
+                    <span class="kw">match </span><span class="kw-2">&amp;</span>token.kind {
+                        TokenKind::Identifier(<span class="kw">_</span>) <span class="kw">if </span><span class="self">self</span>.config.allow_implicit_map =&gt; {
+                            <span class="kw">let </span>TokenKind::Identifier(identifier) = token.kind
+                                <span class="kw">else </span>{ <span class="macro">unreachable!</span>(<span class="string">&quot;just matched&quot;</span>)};
+                            <span class="kw">match </span><span class="self">self</span>.peek() {
+                                <span class="prelude-val">Some</span>(token) <span class="kw">if </span><span class="macro">matches!</span>(token.kind, TokenKind::Colon) =&gt; {
+                                    <span class="comment">// Switch to parsing an implicit map
+                                    </span><span class="self">self</span>.root_state = State::StartingImplicitMap(identifier);
+                                    <span class="prelude-val">Ok</span>(Event::BeginNested {
+                                        name: <span class="prelude-val">None</span>,
+                                        kind: Nested::Map,
+                                    })
+                                }
+                                <span class="prelude-val">Some</span>(token)
+                                    <span class="kw">if </span><span class="macro">matches!</span>(
+                                        token.kind,
+                                        TokenKind::Open(Balanced::Brace | Balanced::Paren,)
+                                    ) =&gt;
+                                {
+                                    <span class="kw">let </span><span class="prelude-val">Some</span>(<span class="prelude-val">Ok</span>(Token{ kind: TokenKind::Open(kind), ..})) = <span class="self">self</span>.next_token()
+                                        <span class="kw">else </span>{ <span class="macro">unreachable!</span>(<span class="string">&quot;just peeked&quot;</span>) };
+                                    <span class="self">self</span>.root_state = State::Finished;
+                                    <span class="prelude-val">Ok</span>(Event::BeginNested {
+                                        name: <span class="prelude-val">Some</span>(identifier),
+                                        kind: <span class="kw">match </span>kind {
+                                            Balanced::Paren =&gt; Nested::Tuple,
+                                            Balanced::Brace =&gt; Nested::Map,
+                                            Balanced::Bracket =&gt; {
+                                                <span class="macro">unreachable!</span>(<span class="string">&quot;not matched in peek&quot;</span>)
+                                            }
+                                        },
+                                    })
+                                }
+                                <span class="kw">_ </span>=&gt; {
+                                    <span class="self">self</span>.root_state = State::Finished;
+                                    <span class="prelude-val">Ok</span>(Event::Primitive(Primitive::Identifier(identifier)))
+                                }
                             }
                         }
-                    } <span class="kw">else </span>{
-                        <span class="self">self</span>.root_state = State::Finished;
-                        <span class="self">self</span>.parse_token(token, <span class="prelude-val">None</span>)
+                        TokenKind::Comment(comment) =&gt; <span class="prelude-val">Ok</span>(Event::Comment(comment)),
+                        <span class="kw">_ </span>=&gt; {
+                            <span class="self">self</span>.root_state = State::Finished;
+                            <span class="self">self</span>.parse_token(token, <span class="prelude-val">None</span>)
+                        }
                     }
                 }
                 State::StartingImplicitMap(<span class="kw">_</span>) =&gt; {
@@ -900,7 +1003,11 @@
                 }
                 State::ImplicitMap(state) =&gt; <span class="self">self</span>.parse_implicit_map(<span class="kw-2">*</span>state),
                 State::Finished =&gt; <span class="kw">match </span><span class="self">self</span>.next_token()<span class="question-mark">? </span>{
-                    <span class="prelude-val">Ok</span>(token) =&gt; <span class="macro">todo!</span>(<span class="string">&quot;expected eof, found {token:?}&quot;</span>),
+                    <span class="prelude-val">Ok</span>(token) =&gt; <span class="kw">match </span>token.kind {
+                        TokenKind::Comment(comment) =&gt; <span class="prelude-val">Ok</span>(Event::Comment(comment)),
+                        TokenKind::Whitespace(<span class="kw">_</span>) =&gt; <span class="macro">unreachable!</span>(<span class="string">&quot;disabled&quot;</span>),
+                        <span class="kw">_ </span>=&gt; <span class="macro">todo!</span>(<span class="string">&quot;trailing junk&quot;</span>),
+                    },
                     <span class="prelude-val">Err</span>(err) =&gt; <span class="kw">return </span><span class="prelude-val">Some</span>(<span class="prelude-val">Err</span>(err.into())),
                 },
             },
@@ -912,15 +1019,44 @@
     }
 }
 
+<span class="kw">impl</span>&lt;<span class="lifetime">&#39;s</span>&gt; Iterator <span class="kw">for </span>Parser&lt;<span class="lifetime">&#39;s</span>&gt; {
+    <span class="kw">type </span>Item = <span class="prelude-ty">Result</span>&lt;Event&lt;<span class="lifetime">&#39;s</span>&gt;, Error&gt;;
+
+    <span class="kw">fn </span>next(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>::Item&gt; {
+        <span class="kw">loop </span>{
+            <span class="kw">let </span>event = <span class="self">self</span>.next_event()<span class="question-mark">?</span>;
+            <span class="kw">if </span>!<span class="macro">matches!</span>(event, <span class="prelude-val">Ok</span>(Event::Comment(<span class="kw">_</span>))) || <span class="self">self</span>.config.include_comments {
+                <span class="kw">break </span><span class="prelude-val">Some</span>(event);
+            } <span class="kw">else </span>{
+                <span class="comment">// Eat the comment
+                </span><span class="kw">continue</span>;
+            }
+        }
+    }
+}
+
 <span class="attr">#[derive(Default, Debug)]
 </span><span class="kw">pub struct </span>Config {
     <span class="kw">pub </span>allow_implicit_map: bool,
+    <span class="kw">pub </span>include_comments: bool,
+}
+
+<span class="kw">impl </span>Config {
+    <span class="kw">pub const fn </span>allow_implicit_map(<span class="kw-2">mut </span><span class="self">self</span>, allow: bool) -&gt; <span class="self">Self </span>{
+        <span class="self">self</span>.allow_implicit_map = allow;
+        <span class="self">self
+    </span>}
+
+    <span class="kw">pub const fn </span>include_comments(<span class="kw-2">mut </span><span class="self">self</span>, include: bool) -&gt; <span class="self">Self </span>{
+        <span class="self">self</span>.include_comments = include;
+        <span class="self">self
+    </span>}
 }
 
 <span class="attr">#[derive(Debug, Clone, Eq, PartialEq)]
 </span><span class="kw">enum </span>State&lt;<span class="lifetime">&#39;s</span>&gt; {
     AtStart,
-    StartingImplicitMap(Cow&lt;<span class="lifetime">&#39;s</span>, str&gt;),
+    StartingImplicitMap(<span class="kw-2">&amp;</span><span class="lifetime">&#39;s </span>str),
     ImplicitMap(MapState),
     Finished,
 }
@@ -966,12 +1102,10 @@
 
 <span class="attr">#[derive(Debug, PartialEq, Clone)]
 </span><span class="kw">pub enum </span>Event&lt;<span class="lifetime">&#39;s</span>&gt; {
-    BeginNested {
-        name: <span class="prelude-ty">Option</span>&lt;Cow&lt;<span class="lifetime">&#39;s</span>, str&gt;&gt;,
-        kind: Nested,
-    },
+    BeginNested { name: <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;s </span>str&gt;, kind: Nested },
     EndNested,
     Primitive(Primitive&lt;<span class="lifetime">&#39;s</span>&gt;),
+    Comment(<span class="kw-2">&amp;</span><span class="lifetime">&#39;s </span>str),
 }
 
 <span class="attr">#[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -1019,7 +1153,7 @@
     Float(f64),
     Char(char),
     String(Cow&lt;<span class="lifetime">&#39;s</span>, str&gt;),
-    Identifier(Cow&lt;<span class="lifetime">&#39;s</span>, str&gt;),
+    Identifier(<span class="kw-2">&amp;</span><span class="lifetime">&#39;s </span>str),
     Bytes(Cow&lt;<span class="lifetime">&#39;s</span>, [u8]&gt;),
 }
 
@@ -1110,9 +1244,9 @@
                     name: <span class="prelude-val">None</span>,
                     kind: Nested::Map
                 },
-                Event::Primitive(Primitive::Identifier(Cow::Borrowed(<span class="string">&quot;a&quot;</span>))),
+                Event::Primitive(Primitive::Identifier(<span class="string">&quot;a&quot;</span>)),
                 Event::Primitive(Primitive::Integer(Integer::Usize(<span class="number">1</span>))),
-                Event::Primitive(Primitive::Identifier(Cow::Borrowed(<span class="string">&quot;b&quot;</span>))),
+                Event::Primitive(Primitive::Identifier(<span class="string">&quot;b&quot;</span>)),
                 Event::Primitive(Primitive::Integer(Integer::Usize(<span class="number">2</span>))),
                 Event::EndNested,
             ]
@@ -1127,11 +1261,55 @@
                     name: <span class="prelude-val">None</span>,
                     kind: Nested::Map
                 },
-                Event::Primitive(Primitive::Identifier(Cow::Borrowed(<span class="string">&quot;a&quot;</span>))),
+                Event::Primitive(Primitive::Identifier(<span class="string">&quot;a&quot;</span>)),
                 Event::Primitive(Primitive::Integer(Integer::Usize(<span class="number">1</span>))),
-                Event::Primitive(Primitive::Identifier(Cow::Borrowed(<span class="string">&quot;b&quot;</span>))),
+                Event::Primitive(Primitive::Identifier(<span class="string">&quot;b&quot;</span>)),
                 Event::Primitive(Primitive::Integer(Integer::Usize(<span class="number">2</span>))),
                 Event::EndNested,
+            ]
+        );
+    }
+
+    <span class="attr">#[test]
+    </span><span class="kw">fn </span>commented() {
+        <span class="kw">let </span>events = Parser::new(
+            <span class="string">&quot;/**/{/**/a/**/:/**/1/**/,/**/b/**/:/**/[/**/2/**/,/**/3/**/]/**/}/**/&quot;</span>,
+            Config::default().include_comments(<span class="bool-val">true</span>),
+        )
+        .collect::&lt;<span class="prelude-ty">Result</span>&lt;Vec&lt;<span class="kw">_</span>&gt;, <span class="kw">_</span>&gt;&gt;()
+        .unwrap();
+        <span class="macro">assert_eq!</span>(
+            <span class="kw-2">&amp;</span>events,
+            <span class="kw-2">&amp;</span>[
+                Event::Comment(<span class="string">&quot;/**/&quot;</span>),
+                Event::BeginNested {
+                    name: <span class="prelude-val">None</span>,
+                    kind: Nested::Map
+                },
+                Event::Comment(<span class="string">&quot;/**/&quot;</span>),
+                Event::Primitive(Primitive::Identifier(<span class="string">&quot;a&quot;</span>)),
+                Event::Comment(<span class="string">&quot;/**/&quot;</span>),
+                Event::Comment(<span class="string">&quot;/**/&quot;</span>),
+                Event::Primitive(Primitive::Integer(Integer::Usize(<span class="number">1</span>))),
+                Event::Comment(<span class="string">&quot;/**/&quot;</span>),
+                Event::Comment(<span class="string">&quot;/**/&quot;</span>),
+                Event::Primitive(Primitive::Identifier(<span class="string">&quot;b&quot;</span>)),
+                Event::Comment(<span class="string">&quot;/**/&quot;</span>),
+                Event::Comment(<span class="string">&quot;/**/&quot;</span>),
+                Event::BeginNested {
+                    name: <span class="prelude-val">None</span>,
+                    kind: Nested::List
+                },
+                Event::Comment(<span class="string">&quot;/**/&quot;</span>),
+                Event::Primitive(Primitive::Integer(Integer::Usize(<span class="number">2</span>))),
+                Event::Comment(<span class="string">&quot;/**/&quot;</span>),
+                Event::Comment(<span class="string">&quot;/**/&quot;</span>),
+                Event::Primitive(Primitive::Integer(Integer::Usize(<span class="number">3</span>))),
+                Event::Comment(<span class="string">&quot;/**/&quot;</span>),
+                Event::EndNested,
+                Event::Comment(<span class="string">&quot;/**/&quot;</span>),
+                Event::EndNested,
+                Event::Comment(<span class="string">&quot;/**/&quot;</span>),
             ]
         );
     }
