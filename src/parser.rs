@@ -71,15 +71,34 @@ impl<'s> Parser<'s> {
         allowed_close: Option<Balanced>,
     ) -> Result<Event<'s>, Error> {
         match token.kind {
-            TokenKind::Integer(integer) => Ok(Event::Primitive(Primitive::Integer(integer))),
-            TokenKind::Float(float) => Ok(Event::Primitive(Primitive::Float(float))),
-            TokenKind::Bool(value) => Ok(Event::Primitive(Primitive::Bool(value))),
-            TokenKind::Character(value) => Ok(Event::Primitive(Primitive::Char(value))),
-            TokenKind::Byte(value) => Ok(Event::Primitive(Primitive::Integer(Integer::Usize(
-                value as usize,
-            )))),
-            TokenKind::String(value) => Ok(Event::Primitive(Primitive::String(value))),
-            TokenKind::Bytes(value) => Ok(Event::Primitive(Primitive::Bytes(value))),
+            TokenKind::Integer(integer) => Ok(Event::new(
+                token.location,
+                EventKind::Primitive(Primitive::Integer(integer)),
+            )),
+            TokenKind::Float(float) => Ok(Event::new(
+                token.location,
+                EventKind::Primitive(Primitive::Float(float)),
+            )),
+            TokenKind::Bool(value) => Ok(Event::new(
+                token.location,
+                EventKind::Primitive(Primitive::Bool(value)),
+            )),
+            TokenKind::Character(value) => Ok(Event::new(
+                token.location,
+                EventKind::Primitive(Primitive::Char(value)),
+            )),
+            TokenKind::Byte(value) => Ok(Event::new(
+                token.location,
+                EventKind::Primitive(Primitive::Integer(Integer::Usize(value as usize))),
+            )),
+            TokenKind::String(value) => Ok(Event::new(
+                token.location,
+                EventKind::Primitive(Primitive::String(value)),
+            )),
+            TokenKind::Bytes(value) => Ok(Event::new(
+                token.location,
+                EventKind::Primitive(Primitive::Bytes(value)),
+            )),
             TokenKind::Identifier(value) => {
                 if matches!(
                     self.peek(),
@@ -88,7 +107,7 @@ impl<'s> Parser<'s> {
                         ..
                     })
                 ) {
-                    let Some(Ok(Token { kind: TokenKind::Open(balanced), .. })) = self.next_token() else { unreachable!("matched above") };
+                    let Some(Ok(Token { kind: TokenKind::Open(balanced), location: open_location })) = self.next_token() else { unreachable!("matched above") };
 
                     let kind = match balanced {
                         Balanced::Paren => {
@@ -105,45 +124,62 @@ impl<'s> Parser<'s> {
                         }
                     };
 
-                    Ok(Event::BeginNested {
-                        name: Some(value),
-                        kind,
-                    })
+                    Ok(Event::new(
+                        open_location,
+                        EventKind::BeginNested {
+                            name: Some((token.location, value)),
+                            kind,
+                        },
+                    ))
                 } else {
-                    Ok(Event::Primitive(Primitive::Identifier(value)))
+                    Ok(Event::new(
+                        token.location,
+                        EventKind::Primitive(Primitive::Identifier(value)),
+                    ))
                 }
             }
             TokenKind::Open(Balanced::Paren) => {
                 self.nested
                     .push(NestedState::Tuple(ListState::ExpectingValue));
-                Ok(Event::BeginNested {
-                    name: None,
-                    kind: Nested::Tuple,
-                })
+                Ok(Event::new(
+                    token.location,
+                    EventKind::BeginNested {
+                        name: None,
+                        kind: Nested::Tuple,
+                    },
+                ))
             }
             TokenKind::Open(Balanced::Bracket) => {
                 self.nested
                     .push(NestedState::List(ListState::ExpectingValue));
-                Ok(Event::BeginNested {
-                    name: None,
-                    kind: Nested::List,
-                })
+                Ok(Event::new(
+                    token.location,
+                    EventKind::BeginNested {
+                        name: None,
+                        kind: Nested::List,
+                    },
+                ))
             }
             TokenKind::Open(Balanced::Brace) => {
                 self.nested.push(NestedState::Map(MapState::ExpectingKey));
-                Ok(Event::BeginNested {
-                    name: None,
-                    kind: Nested::Map,
-                })
+                Ok(Event::new(
+                    token.location,
+                    EventKind::BeginNested {
+                        name: None,
+                        kind: Nested::Map,
+                    },
+                ))
             }
             TokenKind::Close(closed) if Some(closed) == allowed_close => {
                 self.nested.pop();
-                Ok(Event::EndNested)
+                Ok(Event::new(token.location, EventKind::EndNested))
             }
             TokenKind::Colon | TokenKind::Comma | TokenKind::Close(_) => {
                 Err(Error::new(token.location, ErrorKind::ExpectedValue))
             }
-            TokenKind::Comment(comment) => Ok(Event::Comment(comment)),
+            TokenKind::Comment(comment) => {
+                Ok(Event::new(token.location, EventKind::Comment(comment)))
+            }
             TokenKind::Whitespace(_) => unreachable!("disabled"),
         }
     }
@@ -153,7 +189,7 @@ impl<'s> Parser<'s> {
             ListState::ExpectingValue => {
                 let token = self.next_or_eof()?;
                 if let TokenKind::Comment(comment) = &token.kind {
-                    Ok(Event::Comment(comment))
+                    Ok(Event::new(token.location, EventKind::Comment(comment)))
                 } else {
                     *self.nested.last_mut().expect("required for this fn") =
                         NestedState::list(end, ListState::ExpectingComma);
@@ -161,16 +197,18 @@ impl<'s> Parser<'s> {
                 }
             }
             ListState::ExpectingComma => match self.next_token_parts()? {
-                (_, Some(TokenKind::Close(closed))) if closed == end => {
+                (location, Some(TokenKind::Close(closed))) if closed == end => {
                     self.nested.pop();
-                    Ok(Event::EndNested)
+                    Ok(Event::new(location, EventKind::EndNested))
                 }
                 (_, Some(TokenKind::Comma)) => {
                     *self.nested.last_mut().expect("required for this fn") =
                         NestedState::list(end, ListState::ExpectingValue);
                     self.parse_sequence(ListState::ExpectingValue, end)
                 }
-                (_, Some(TokenKind::Comment(comment))) => Ok(Event::Comment(comment)),
+                (location, Some(TokenKind::Comment(comment))) => {
+                    Ok(Event::new(location, EventKind::Comment(comment)))
+                }
                 (location, _) => Err(Error::new(
                     location,
                     ErrorKind::ExpectedCommaOrEnd(end.into()),
@@ -189,8 +227,8 @@ impl<'s> Parser<'s> {
             MapState::ExpectingKey => match self.next_token().transpose()? {
                 Some(Token {
                     kind: TokenKind::Comment(comment),
-                    ..
-                }) => Ok(Event::Comment(comment)),
+                    location,
+                }) => Ok(Event::new(location, EventKind::Comment(comment))),
                 Some(token) => {
                     *self.map_state_mut() = MapState::ExpectingColon;
                     self.parse_token(token, Some(Balanced::Brace))
@@ -205,14 +243,16 @@ impl<'s> Parser<'s> {
                     *self.map_state_mut() = MapState::ExpectingValue;
                     self.parse_map(MapState::ExpectingValue)
                 }
-                (_, Some(TokenKind::Comment(comment))) => Ok(Event::Comment(comment)),
+                (location, Some(TokenKind::Comment(comment))) => {
+                    Ok(Event::new(location, EventKind::Comment(comment)))
+                }
                 (location, _) => Err(Error::new(location, ErrorKind::ExpectedColon)),
             },
             MapState::ExpectingValue => match self.next_token().transpose()? {
                 Some(Token {
                     kind: TokenKind::Comment(comment),
-                    ..
-                }) => Ok(Event::Comment(comment)),
+                    location,
+                }) => Ok(Event::new(location, EventKind::Comment(comment))),
                 Some(token) => {
                     *self.map_state_mut() = MapState::ExpectingComma;
                     self.parse_token(token, None)
@@ -223,15 +263,17 @@ impl<'s> Parser<'s> {
                 )),
             },
             MapState::ExpectingComma => match self.next_token_parts()? {
-                (_, Some(TokenKind::Close(closed))) if closed == Balanced::Brace => {
+                (location, Some(TokenKind::Close(closed))) if closed == Balanced::Brace => {
                     self.nested.pop();
-                    Ok(Event::EndNested)
+                    Ok(Event::new(location, EventKind::EndNested))
                 }
                 (_, Some(TokenKind::Comma)) => {
                     *self.map_state_mut() = MapState::ExpectingKey;
                     self.parse_map(MapState::ExpectingKey)
                 }
-                (_, Some(TokenKind::Comment(comment))) => Ok(Event::Comment(comment)),
+                (location, Some(TokenKind::Comment(comment))) => {
+                    Ok(Event::new(location, EventKind::Comment(comment)))
+                }
                 (location, _) => Err(Error::new(
                     location,
                     ErrorKind::ExpectedCommaOrEnd(Nested::Map),
@@ -243,14 +285,19 @@ impl<'s> Parser<'s> {
     fn parse_implicit_map(&mut self, state: MapState) -> Result<Event<'s>, Error> {
         match state {
             MapState::ExpectingKey => match self.next_token_parts()? {
-                (_, Some(TokenKind::Identifier(key))) => {
+                (location, Some(TokenKind::Identifier(key))) => {
                     self.root_state = State::ImplicitMap(MapState::ExpectingColon);
-                    Ok(Event::Primitive(Primitive::Identifier(key)))
+                    Ok(Event::new(
+                        location,
+                        EventKind::Primitive(Primitive::Identifier(key)),
+                    ))
                 }
-                (_, Some(TokenKind::Comment(comment))) => Ok(Event::Comment(comment)),
-                (_, None) => {
+                (location, Some(TokenKind::Comment(comment))) => {
+                    Ok(Event::new(location, EventKind::Comment(comment)))
+                }
+                (location, None) => {
                     self.root_state = State::Finished;
-                    Ok(Event::EndNested)
+                    Ok(Event::new(location, EventKind::EndNested))
                 }
                 (location, _) => Err(Error::new(location, ErrorKind::ExpectedKey)),
             },
@@ -259,14 +306,16 @@ impl<'s> Parser<'s> {
                     self.root_state = State::ImplicitMap(MapState::ExpectingValue);
                     self.parse_implicit_map(MapState::ExpectingValue)
                 }
-                (_, Some(TokenKind::Comment(comment))) => Ok(Event::Comment(comment)),
+                (location, Some(TokenKind::Comment(comment))) => {
+                    Ok(Event::new(location, EventKind::Comment(comment)))
+                }
                 (location, _) => Err(Error::new(location, ErrorKind::ExpectedColon)),
             },
             MapState::ExpectingValue => match self.next_token().transpose()? {
                 Some(Token {
                     kind: TokenKind::Comment(comment),
-                    ..
-                }) => Ok(Event::Comment(comment)),
+                    location,
+                }) => Ok(Event::new(location, EventKind::Comment(comment))),
                 Some(token) => {
                     self.root_state = State::ImplicitMap(MapState::ExpectingComma);
                     self.parse_token(token, None)
@@ -277,22 +326,27 @@ impl<'s> Parser<'s> {
                 )),
             },
             MapState::ExpectingComma => match self.next_token_parts()? {
-                (_, Some(TokenKind::Close(closed))) if closed == Balanced::Brace => {
+                (location, Some(TokenKind::Close(closed))) if closed == Balanced::Brace => {
                     self.root_state = State::Finished;
-                    Ok(Event::EndNested)
+                    Ok(Event::new(location, EventKind::EndNested))
                 }
                 (_, Some(TokenKind::Comma)) => {
                     self.root_state = State::ImplicitMap(MapState::ExpectingKey);
                     self.parse_implicit_map(MapState::ExpectingKey)
                 }
-                (_, Some(TokenKind::Identifier(key))) => {
+                (location, Some(TokenKind::Identifier(key))) => {
                     self.root_state = State::ImplicitMap(MapState::ExpectingColon);
-                    Ok(Event::Primitive(Primitive::Identifier(key)))
+                    Ok(Event::new(
+                        location,
+                        EventKind::Primitive(Primitive::Identifier(key)),
+                    ))
                 }
-                (_, Some(TokenKind::Comment(comment))) => Ok(Event::Comment(comment)),
-                (_, None) => {
+                (location, Some(TokenKind::Comment(comment))) => {
+                    Ok(Event::new(location, EventKind::Comment(comment)))
+                }
+                (location, None) => {
                     self.root_state = State::Finished;
-                    Ok(Event::EndNested)
+                    Ok(Event::new(location, EventKind::EndNested))
                 }
                 (location, _) => Err(Error::new(location, ErrorKind::ExpectedKey)),
             },
@@ -312,41 +366,53 @@ impl<'s> Parser<'s> {
                             let TokenKind::Identifier(identifier) = token.kind
                                 else { unreachable!("just matched")};
                             match self.peek() {
-                                Some(token) if matches!(token.kind, TokenKind::Colon) => {
+                                Some(colon) if matches!(colon.kind, TokenKind::Colon) => {
                                     // Switch to parsing an implicit map
-                                    self.root_state = State::StartingImplicitMap(identifier);
-                                    Ok(Event::BeginNested {
-                                        name: None,
-                                        kind: Nested::Map,
-                                    })
+                                    self.root_state =
+                                        State::StartingImplicitMap((token.location, identifier));
+                                    Ok(Event::new(
+                                        0..0,
+                                        EventKind::BeginNested {
+                                            name: None,
+                                            kind: Nested::Map,
+                                        },
+                                    ))
                                 }
-                                Some(token)
+                                Some(open)
                                     if matches!(
-                                        token.kind,
+                                        open.kind,
                                         TokenKind::Open(Balanced::Brace | Balanced::Paren,)
                                     ) =>
                                 {
-                                    let Some(Ok(Token{ kind: TokenKind::Open(kind), ..})) = self.next_token()
+                                    let Some(Ok(Token{ kind: TokenKind::Open(kind), location: open_location})) = self.next_token()
                                         else { unreachable!("just peeked") };
                                     self.root_state = State::Finished;
-                                    Ok(Event::BeginNested {
-                                        name: Some(identifier),
-                                        kind: match kind {
-                                            Balanced::Paren => Nested::Tuple,
-                                            Balanced::Brace => Nested::Map,
-                                            Balanced::Bracket => {
-                                                unreachable!("not matched in peek")
-                                            }
+                                    Ok(Event::new(
+                                        token.location,
+                                        EventKind::BeginNested {
+                                            name: Some((open_location, identifier)),
+                                            kind: match kind {
+                                                Balanced::Paren => Nested::Tuple,
+                                                Balanced::Brace => Nested::Map,
+                                                Balanced::Bracket => {
+                                                    unreachable!("not matched in peek")
+                                                }
+                                            },
                                         },
-                                    })
+                                    ))
                                 }
                                 _ => {
                                     self.root_state = State::Finished;
-                                    Ok(Event::Primitive(Primitive::Identifier(identifier)))
+                                    Ok(Event::new(
+                                        token.location,
+                                        EventKind::Primitive(Primitive::Identifier(identifier)),
+                                    ))
                                 }
                             }
                         }
-                        TokenKind::Comment(comment) => Ok(Event::Comment(comment)),
+                        TokenKind::Comment(comment) => {
+                            Ok(Event::new(token.location, EventKind::Comment(comment)))
+                        }
                         _ => {
                             self.root_state = State::Finished;
                             self.parse_token(token, None)
@@ -354,14 +420,19 @@ impl<'s> Parser<'s> {
                     }
                 }
                 State::StartingImplicitMap(_) => {
-                    let State::StartingImplicitMap(first_key) = mem::replace(&mut self.root_state, State::ImplicitMap(MapState::ExpectingColon))
+                    let State::StartingImplicitMap((location, identifier)) = mem::replace(&mut self.root_state, State::ImplicitMap(MapState::ExpectingColon))
                         else { unreachable!("just matched") };
-                    Ok(Event::Primitive(Primitive::Identifier(first_key)))
+                    Ok(Event::new(
+                        location,
+                        EventKind::Primitive(Primitive::Identifier(identifier)),
+                    ))
                 }
                 State::ImplicitMap(state) => self.parse_implicit_map(*state),
                 State::Finished => match self.next_token()? {
                     Ok(token) => match token.kind {
-                        TokenKind::Comment(comment) => Ok(Event::Comment(comment)),
+                        TokenKind::Comment(comment) => {
+                            Ok(Event::new(token.location, EventKind::Comment(comment)))
+                        }
                         TokenKind::Whitespace(_) => unreachable!("disabled"),
                         _ => Err(Error::new(token.location, ErrorKind::TrailingData)),
                     },
@@ -382,7 +453,15 @@ impl<'s> Iterator for Parser<'s> {
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             let event = self.next_event()?;
-            if !matches!(event, Ok(Event::Comment(_))) || self.config.include_comments {
+            if self.config.include_comments
+                || !matches!(
+                    event,
+                    Ok(Event {
+                        kind: EventKind::Comment(_),
+                        ..
+                    })
+                )
+            {
                 break Some(event);
             } else {
                 // Eat the comment
@@ -413,7 +492,7 @@ impl Config {
 #[derive(Debug, Clone, Eq, PartialEq)]
 enum State<'s> {
     AtStart,
-    StartingImplicitMap(&'s str),
+    StartingImplicitMap((Range<usize>, &'s str)),
     ImplicitMap(MapState),
     Finished,
 }
@@ -435,19 +514,7 @@ impl std::error::Error for Error {}
 
 impl Display for Error {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
-        match &self.kind {
-            ErrorKind::Tokenizer(err) => Display::fmt(err, f),
-            ErrorKind::UnexpectedEof => f.write_str("unexpected end of file"),
-            ErrorKind::ExpectedValue => f.write_str("a value was expected"),
-            ErrorKind::ExpectedCommaOrEnd(nested) => {
-                write!(f, "expected `,` or {}", nested.err_display())
-            }
-            ErrorKind::ExpectedColon => f.write_str("expected `:`"),
-            ErrorKind::ExpectedKey => f.write_str("expected map key"),
-            ErrorKind::TrailingData => f.write_str(
-                "source contained extra trailing data after a value was completely read",
-            ),
-        }
+        Display::fmt(&self.kind, f)
     }
 }
 
@@ -455,7 +522,7 @@ impl From<tokenizer::Error> for Error {
     fn from(err: tokenizer::Error) -> Self {
         Self {
             location: err.location,
-            kind: ErrorKind::Tokenizer(err.kind),
+            kind: err.kind.into(),
         }
     }
 }
@@ -471,9 +538,48 @@ pub enum ErrorKind {
     TrailingData,
 }
 
+impl From<tokenizer::ErrorKind> for ErrorKind {
+    fn from(kind: tokenizer::ErrorKind) -> Self {
+        Self::Tokenizer(kind)
+    }
+}
+
+impl Display for ErrorKind {
+    fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
+        match self {
+            ErrorKind::Tokenizer(err) => Display::fmt(err, f),
+            ErrorKind::UnexpectedEof => f.write_str("unexpected end of file"),
+            ErrorKind::ExpectedValue => f.write_str("a value was expected"),
+            ErrorKind::ExpectedCommaOrEnd(nested) => {
+                write!(f, "expected `,` or {}", nested.err_display())
+            }
+            ErrorKind::ExpectedColon => f.write_str("expected `:`"),
+            ErrorKind::ExpectedKey => f.write_str("expected map key"),
+            ErrorKind::TrailingData => f.write_str(
+                "source contained extra trailing data after a value was completely read",
+            ),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Event<'s> {
+    pub location: Range<usize>,
+    pub kind: EventKind<'s>,
+}
+
+impl<'s> Event<'s> {
+    pub fn new(location: Range<usize>, kind: EventKind<'s>) -> Self {
+        Self { location, kind }
+    }
+}
+
 #[derive(Debug, PartialEq, Clone)]
-pub enum Event<'s> {
-    BeginNested { name: Option<&'s str>, kind: Nested },
+pub enum EventKind<'s> {
+    BeginNested {
+        name: Option<(Range<usize>, &'s str)>,
+        kind: Nested,
+    },
     EndNested,
     Primitive(Primitive<'s>),
     Comment(&'s str),
@@ -559,14 +665,26 @@ mod tests {
         assert_eq!(
             &events,
             &[
-                Event::BeginNested {
-                    name: None,
-                    kind: Nested::List
-                },
-                Event::Primitive(Primitive::Integer(Integer::Usize(1))),
-                Event::Primitive(Primitive::Integer(Integer::Usize(2))),
-                Event::Primitive(Primitive::Integer(Integer::Usize(3))),
-                Event::EndNested,
+                Event::new(
+                    0..1,
+                    EventKind::BeginNested {
+                        name: None,
+                        kind: Nested::List
+                    }
+                ),
+                Event::new(
+                    1..2,
+                    EventKind::Primitive(Primitive::Integer(Integer::Usize(1)))
+                ),
+                Event::new(
+                    3..4,
+                    EventKind::Primitive(Primitive::Integer(Integer::Usize(2)))
+                ),
+                Event::new(
+                    5..6,
+                    EventKind::Primitive(Primitive::Integer(Integer::Usize(3)))
+                ),
+                Event::new(6..7, EventKind::EndNested),
             ]
         );
         let events = Parser::new("[1,2,3,]", Config::default())
@@ -575,14 +693,26 @@ mod tests {
         assert_eq!(
             &events,
             &[
-                Event::BeginNested {
-                    name: None,
-                    kind: Nested::List
-                },
-                Event::Primitive(Primitive::Integer(Integer::Usize(1))),
-                Event::Primitive(Primitive::Integer(Integer::Usize(2))),
-                Event::Primitive(Primitive::Integer(Integer::Usize(3))),
-                Event::EndNested,
+                Event::new(
+                    0..1,
+                    EventKind::BeginNested {
+                        name: None,
+                        kind: Nested::List
+                    }
+                ),
+                Event::new(
+                    1..2,
+                    EventKind::Primitive(Primitive::Integer(Integer::Usize(1)))
+                ),
+                Event::new(
+                    3..4,
+                    EventKind::Primitive(Primitive::Integer(Integer::Usize(2)))
+                ),
+                Event::new(
+                    5..6,
+                    EventKind::Primitive(Primitive::Integer(Integer::Usize(3)))
+                ),
+                Event::new(7..8, EventKind::EndNested),
             ]
         );
     }
@@ -595,14 +725,26 @@ mod tests {
         assert_eq!(
             &events,
             &[
-                Event::BeginNested {
-                    name: None,
-                    kind: Nested::Tuple
-                },
-                Event::Primitive(Primitive::Integer(Integer::Usize(1))),
-                Event::Primitive(Primitive::Integer(Integer::Usize(2))),
-                Event::Primitive(Primitive::Integer(Integer::Usize(3))),
-                Event::EndNested,
+                Event::new(
+                    0..1,
+                    EventKind::BeginNested {
+                        name: None,
+                        kind: Nested::Tuple
+                    }
+                ),
+                Event::new(
+                    1..2,
+                    EventKind::Primitive(Primitive::Integer(Integer::Usize(1)))
+                ),
+                Event::new(
+                    3..4,
+                    EventKind::Primitive(Primitive::Integer(Integer::Usize(2)))
+                ),
+                Event::new(
+                    5..6,
+                    EventKind::Primitive(Primitive::Integer(Integer::Usize(3)))
+                ),
+                Event::new(6..7, EventKind::EndNested),
             ]
         );
         let events = Parser::new("(1,2,3,)", Config::default())
@@ -611,14 +753,26 @@ mod tests {
         assert_eq!(
             &events,
             &[
-                Event::BeginNested {
-                    name: None,
-                    kind: Nested::Tuple
-                },
-                Event::Primitive(Primitive::Integer(Integer::Usize(1))),
-                Event::Primitive(Primitive::Integer(Integer::Usize(2))),
-                Event::Primitive(Primitive::Integer(Integer::Usize(3))),
-                Event::EndNested,
+                Event::new(
+                    0..1,
+                    EventKind::BeginNested {
+                        name: None,
+                        kind: Nested::Tuple
+                    }
+                ),
+                Event::new(
+                    1..2,
+                    EventKind::Primitive(Primitive::Integer(Integer::Usize(1)))
+                ),
+                Event::new(
+                    3..4,
+                    EventKind::Primitive(Primitive::Integer(Integer::Usize(2)))
+                ),
+                Event::new(
+                    5..6,
+                    EventKind::Primitive(Primitive::Integer(Integer::Usize(3)))
+                ),
+                Event::new(7..8, EventKind::EndNested),
             ]
         );
     }
@@ -631,15 +785,24 @@ mod tests {
         assert_eq!(
             &events,
             &[
-                Event::BeginNested {
-                    name: None,
-                    kind: Nested::Map
-                },
-                Event::Primitive(Primitive::Identifier("a")),
-                Event::Primitive(Primitive::Integer(Integer::Usize(1))),
-                Event::Primitive(Primitive::Identifier("b")),
-                Event::Primitive(Primitive::Integer(Integer::Usize(2))),
-                Event::EndNested,
+                Event::new(
+                    0..1,
+                    EventKind::BeginNested {
+                        name: None,
+                        kind: Nested::Map
+                    }
+                ),
+                Event::new(1..2, EventKind::Primitive(Primitive::Identifier("a"))),
+                Event::new(
+                    3..4,
+                    EventKind::Primitive(Primitive::Integer(Integer::Usize(1)))
+                ),
+                Event::new(5..6, EventKind::Primitive(Primitive::Identifier("b"))),
+                Event::new(
+                    7..8,
+                    EventKind::Primitive(Primitive::Integer(Integer::Usize(2)))
+                ),
+                Event::new(8..9, EventKind::EndNested),
             ]
         );
         let events = Parser::new("{a:1,b:2,}", Config::default())
@@ -648,15 +811,24 @@ mod tests {
         assert_eq!(
             &events,
             &[
-                Event::BeginNested {
-                    name: None,
-                    kind: Nested::Map
-                },
-                Event::Primitive(Primitive::Identifier("a")),
-                Event::Primitive(Primitive::Integer(Integer::Usize(1))),
-                Event::Primitive(Primitive::Identifier("b")),
-                Event::Primitive(Primitive::Integer(Integer::Usize(2))),
-                Event::EndNested,
+                Event::new(
+                    0..1,
+                    EventKind::BeginNested {
+                        name: None,
+                        kind: Nested::Map
+                    }
+                ),
+                Event::new(1..2, EventKind::Primitive(Primitive::Identifier("a"))),
+                Event::new(
+                    3..4,
+                    EventKind::Primitive(Primitive::Integer(Integer::Usize(1)))
+                ),
+                Event::new(5..6, EventKind::Primitive(Primitive::Identifier("b"))),
+                Event::new(
+                    7..8,
+                    EventKind::Primitive(Primitive::Integer(Integer::Usize(2)))
+                ),
+                Event::new(9..10, EventKind::EndNested),
             ]
         );
     }
@@ -672,35 +844,50 @@ mod tests {
         assert_eq!(
             &events,
             &[
-                Event::Comment("/**/"),
-                Event::BeginNested {
-                    name: None,
-                    kind: Nested::Map
-                },
-                Event::Comment("/**/"),
-                Event::Primitive(Primitive::Identifier("a")),
-                Event::Comment("/**/"),
-                Event::Comment("/**/"),
-                Event::Primitive(Primitive::Integer(Integer::Usize(1))),
-                Event::Comment("/**/"),
-                Event::Comment("/**/"),
-                Event::Primitive(Primitive::Identifier("b")),
-                Event::Comment("/**/"),
-                Event::Comment("/**/"),
-                Event::BeginNested {
-                    name: None,
-                    kind: Nested::List
-                },
-                Event::Comment("/**/"),
-                Event::Primitive(Primitive::Integer(Integer::Usize(2))),
-                Event::Comment("/**/"),
-                Event::Comment("/**/"),
-                Event::Primitive(Primitive::Integer(Integer::Usize(3))),
-                Event::Comment("/**/"),
-                Event::EndNested,
-                Event::Comment("/**/"),
-                Event::EndNested,
-                Event::Comment("/**/"),
+                Event::new(0..4, EventKind::Comment("/**/")),
+                Event::new(
+                    4..5,
+                    EventKind::BeginNested {
+                        name: None,
+                        kind: Nested::Map
+                    }
+                ),
+                Event::new(5..9, EventKind::Comment("/**/")),
+                Event::new(9..10, EventKind::Primitive(Primitive::Identifier("a"))),
+                Event::new(10..14, EventKind::Comment("/**/")),
+                Event::new(15..19, EventKind::Comment("/**/")),
+                Event::new(
+                    19..20,
+                    EventKind::Primitive(Primitive::Integer(Integer::Usize(1)))
+                ),
+                Event::new(20..24, EventKind::Comment("/**/")),
+                Event::new(25..29, EventKind::Comment("/**/")),
+                Event::new(29..30, EventKind::Primitive(Primitive::Identifier("b"))),
+                Event::new(30..34, EventKind::Comment("/**/")),
+                Event::new(35..39, EventKind::Comment("/**/")),
+                Event::new(
+                    39..40,
+                    EventKind::BeginNested {
+                        name: None,
+                        kind: Nested::List
+                    }
+                ),
+                Event::new(40..44, EventKind::Comment("/**/")),
+                Event::new(
+                    44..45,
+                    EventKind::Primitive(Primitive::Integer(Integer::Usize(2)))
+                ),
+                Event::new(45..49, EventKind::Comment("/**/")),
+                Event::new(50..54, EventKind::Comment("/**/")),
+                Event::new(
+                    54..55,
+                    EventKind::Primitive(Primitive::Integer(Integer::Usize(3)))
+                ),
+                Event::new(55..59, EventKind::Comment("/**/")),
+                Event::new(59..60, EventKind::EndNested),
+                Event::new(60..64, EventKind::Comment("/**/")),
+                Event::new(64..65, EventKind::EndNested),
+                Event::new(65..69, EventKind::Comment("/**/")),
             ]
         );
     }

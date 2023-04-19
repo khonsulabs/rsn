@@ -117,6 +117,15 @@ impl Integer {
             Integer::SignedLarge(value) => value == 0,
         }
     }
+
+    pub fn as_f64(self) -> f64 {
+        match self {
+            Integer::Usize(value) => value as f64,
+            Integer::Isize(value) => value as f64,
+            Integer::UnsignedLarge(value) => value as f64,
+            Integer::SignedLarge(value) => value as f64,
+        }
+    }
 }
 
 #[cfg(feature = "integer128")]
