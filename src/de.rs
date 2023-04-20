@@ -8,7 +8,7 @@ use serde::de::{EnumAccess, MapAccess, SeqAccess, VariantAccess};
 use serde::Deserializer as _;
 
 use crate::parser::{self, Config, Event, EventKind, Name, Nested, Parser, Primitive};
-use crate::tokenizer;
+use crate::tokenizer::{self, Integer};
 
 pub struct Deserializer<'de> {
     parser: Peekable<Parser<'de>>,
@@ -99,11 +99,102 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
 
     deserialize_int_impl!(deserialize_u128, visit_u128, into_u128);
 
-    fn deserialize_any<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
+    fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: serde::de::Visitor<'de>,
     {
-        todo!("implement after serialization is implemented")
+        let event = match self.parser.next().transpose()? {
+            Some(event) => event,
+            None => return visitor.visit_unit(),
+        };
+        match event.kind {
+            EventKind::BeginNested { name, kind } => match kind {
+                // Check for Some(), and ensure that this isn't a raw identifier
+                // by checking the original token's length.
+                Nested::Tuple
+                    if name.as_deref() == Some("Some")
+                        && event.location.end - event.location.start == 4 =>
+                {
+                    let value = visitor.visit_some(&mut *self)?;
+                    let possible_close = self
+                        .parser
+                        .next()
+                        .transpose()?
+                        .expect("parser would error without EndNested");
+                    match possible_close.kind {
+                        EventKind::EndNested => Ok(value),
+                        _ => Err(Error::new(
+                            possible_close.location,
+                            ErrorKind::SomeCanOnlyContainOneValue,
+                        )),
+                    }
+                }
+                Nested::List | Nested::Tuple => {
+                    if matches!(
+                        self.parser.peek(),
+                        Some(Ok(Event {
+                            kind: EventKind::EndNested,
+                            ..
+                        }))
+                    ) {
+                        self.parser.next();
+                        visitor.visit_unit()
+                    } else {
+                        visitor.visit_seq(self)
+                    }
+                }
+                Nested::Map => visitor.visit_map(self),
+            },
+            EventKind::Primitive(primitive) => match primitive {
+                Primitive::Bool(v) => visitor.visit_bool(v),
+                Primitive::Integer(v) => match v {
+                    Integer::Usize(usize) => match usize::BITS {
+                        0..=16 => visitor.visit_u16(usize as u16),
+                        17..=32 => visitor.visit_u32(usize as u32),
+                        33..=64 => visitor.visit_u64(usize as u64),
+                        65..=128 => visitor.visit_u128(usize as u128),
+                        _ => unreachable!("unsupported pointer width"),
+                    },
+                    Integer::Isize(isize) => match usize::BITS {
+                        0..=16 => visitor.visit_i16(isize as i16),
+                        17..=32 => visitor.visit_i32(isize as i32),
+                        33..=64 => visitor.visit_i64(isize as i64),
+                        65..=128 => visitor.visit_i128(isize as i128),
+                        _ => unreachable!("unsupported pointer width"),
+                    },
+                    #[cfg(feature = "integer128")]
+                    Integer::UnsignedLarge(large) => visitor.visit_u128(large),
+                    #[cfg(not(feature = "integer128"))]
+                    Integer::UnsignedLarge(large) => visitor.visit_u64(large),
+                    #[cfg(feature = "integer128")]
+                    Integer::SignedLarge(large) => visitor.visit_i128(large),
+                    #[cfg(not(feature = "integer128"))]
+                    Integer::SignedLarge(large) => visitor.visit_i64(large),
+                },
+                Primitive::Float(v) => visitor.visit_f64(v),
+                Primitive::Char(v) => visitor.visit_char(v),
+                Primitive::String(v) => match v {
+                    Cow::Borrowed(v) => visitor.visit_borrowed_str(v),
+                    Cow::Owned(v) => visitor.visit_string(v),
+                },
+                Primitive::Identifier(v) => {
+                    // The tokenizer will have tokenized `r#None` to `None`, so
+                    // we must check the length of the original source to verify
+                    // this isn't a raw identifier.
+                    if v == "None" && event.location.end - event.location.start == 4 {
+                        visitor.visit_none()
+                    } else {
+                        visitor.visit_borrowed_str(v)
+                    }
+                }
+                Primitive::Bytes(v) => match v {
+                    Cow::Borrowed(v) => visitor.visit_borrowed_bytes(v),
+                    Cow::Owned(v) => visitor.visit_byte_buf(v),
+                },
+            },
+            EventKind::Comment(_) => unreachable!("comments are disabled"),
+            EventKind::EndNested => unreachable!("parser would error"),
+        }
     }
 
     fn deserialize_bool<V>(self, visitor: V) -> Result<V::Value, Self::Error>

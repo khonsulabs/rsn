@@ -17,3 +17,6 @@ pub fn from_str<'de, D: serde::Deserialize<'de>>(source: &'de str) -> Result<D, 
     // TODO verify eof
     D::deserialize(&mut parser)
 }
+
+#[cfg(test)]
+mod tests;

@@ -2,7 +2,7 @@ use alloc::borrow::Cow;
 use alloc::vec::Vec;
 use core::fmt::{Display, Formatter};
 use core::mem;
-use core::ops::Range;
+use core::ops::{Deref, Range};
 
 use crate::tokenizer::{self, Balanced, Integer, Token, TokenKind, Tokenizer};
 
@@ -595,6 +595,14 @@ pub enum EventKind<'s> {
 pub struct Name<'s> {
     pub location: Range<usize>,
     pub name: &'s str,
+}
+
+impl<'s> Deref for Name<'s> {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        self.name
+    }
 }
 
 impl<'s> PartialEq<str> for Name<'s> {

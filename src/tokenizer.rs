@@ -150,17 +150,56 @@ impl From<isize> for Integer {
     }
 }
 
-impl From<SignedLarge> for Integer {
-    fn from(value: SignedLarge) -> Self {
-        Self::SignedLarge(value)
-    }
+macro_rules! impl_from_primitive {
+    ($variant:ident, $target:ty, $ty:ty) => {
+        impl From<$ty> for Integer {
+            fn from(value: $ty) -> Self {
+                Self::$variant(<$target>::from(value))
+            }
+        }
+    };
 }
 
-impl From<UnsignedLarge> for Integer {
-    fn from(value: UnsignedLarge) -> Self {
-        Self::UnsignedLarge(value)
-    }
+impl_from_primitive!(Usize, usize, u8);
+impl_from_primitive!(Usize, usize, u16);
+impl_from_primitive!(Isize, isize, i8);
+impl_from_primitive!(Isize, isize, i16);
+
+macro_rules! impl_from_primitive_with_fallback {
+    ($variant:ident, $target:ty, $larger:ident, $ty:ty) => {
+        impl From<$ty> for Integer {
+            fn from(value: $ty) -> Self {
+                match <$target>::try_from(value) {
+                    Ok(value) => Self::$variant(value),
+                    Err(_) => Self::$larger(<$larger>::from(value)),
+                }
+            }
+        }
+    };
 }
+
+impl_from_primitive_with_fallback!(Usize, usize, UnsignedLarge, u32);
+impl_from_primitive_with_fallback!(Isize, isize, SignedLarge, i32);
+impl_from_primitive_with_fallback!(Usize, usize, UnsignedLarge, u64);
+impl_from_primitive_with_fallback!(Isize, isize, SignedLarge, i64);
+
+macro_rules! impl_try_from_primitive {
+    ($variant:ident, $target:ty, $larger:ident, $ty:ty) => {
+        impl TryFrom<$ty> for Integer {
+            type Error = core::num::TryFromIntError;
+
+            fn try_from(value: $ty) -> Result<Self, Self::Error> {
+                match <$target>::try_from(value) {
+                    Ok(value) => Ok(Self::$variant(value)),
+                    Err(_) => Ok(Self::$larger(<$larger>::try_from(value)?)),
+                }
+            }
+        }
+    };
+}
+
+impl_try_from_primitive!(Usize, usize, UnsignedLarge, u128);
+impl_try_from_primitive!(Isize, isize, SignedLarge, i128);
 
 #[derive(Clone, Copy, Eq, PartialEq, Debug)]
 pub enum Balanced {

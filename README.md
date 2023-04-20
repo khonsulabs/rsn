@@ -1,4 +1,4 @@
-# rsn - Rust Notation
+# Rsn - Rusty Notation
 
 **This crate is very early in development and is not ready for consumption.**
 
@@ -9,20 +9,7 @@
 [![HTML Coverage Report for `main`](https://khonsulabs.github.io/rsn/coverage/badge.svg)]($pages-base$/coverage/)
 [![Documentation for `main`](https://img.shields.io/badge/docs-main-informational)](https://khonsulabs.github.io/rsn/main/rsn/)
 
-A UTF-8 based text format that looks very similar to valid Rust code.
-
-The syntax differs from valid Rust code for:
-
-- Map literals. Rust has no syntax for map literals.
-- Enum Variants being used without the type name -- `Red` vs `Color::Red`
-  - This is technically valid Rust syntax if `use Color::*` is present.
-- Infinity and Not-A-Number floats are represented as
-  `+inf`/`-inf`/`+NaN`/`-NaN`.
-  - For compatibility with Rust syntax, support for
-    [`f64::INFINITY`](https://github.com/khonsulabs/rsn/issues/3) is being
-    considered.
-
-The rules for parsing literals should match Rust's rules as closely as possible.
+A UTF-8 based text format that looks very similar to valid Rust code. This format adheres closely to [Rust's lexical rules][rust-lexer]
 
 ## `no_std` support
 
@@ -81,3 +68,20 @@ decisions that led to this very-similar-yet-not-the-same format being invented:
   - Rust allows for raw line endings to be escaped in string literals.
   - Rust supports byte strings and byte literals, while Ron elected to use
     `base64` encoded strings for byte values.
+
+## Differences between Rust syntax and Rsn
+
+The syntax differs from valid Rust code for:
+
+- Map literals. Rust has no syntax for map literals.
+- Enum Variants being used without the type name -- `Red` vs `Color::Red`
+  - This is technically valid Rust syntax if `use Color::*` is present.
+- Infinity and Not-A-Number floats are represented as
+  `+inf`/`-inf`/`+NaN`/`-NaN`.
+  - For compatibility with Rust syntax, support for
+    [`f64::INFINITY`](https://github.com/khonsulabs/rsn/issues/3) is being
+    considered.
+
+The rules for parsing literals should match Rust's rules as closely as possible.
+
+[rust-lexer]: https://doc.rust-lang.org/reference/lexical-structure.html
