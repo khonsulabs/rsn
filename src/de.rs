@@ -3,6 +3,7 @@ use alloc::string::{String, ToString};
 use core::fmt::Display;
 use core::iter::Peekable;
 use core::ops::Range;
+use serde::Deserialize;
 
 use serde::de::{EnumAccess, MapAccess, SeqAccess, VariantAccess};
 
@@ -265,7 +266,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: serde::de::Visitor<'de>,
     {
-        match std::dbg!(self.parser.next().transpose()?) {
+        match self.parser.next().transpose()? {
             Some(Event {
                 kind: EventKind::Primitive(Primitive::Identifier(str)),
                 ..
@@ -788,6 +789,15 @@ impl Display for ErrorKind {
     }
 }
 
+impl Config {
+    pub fn deserialize<'de, T: Deserialize<'de>>(self, source: &'de str) -> Result<T, Error> {
+        let mut deserializer = Deserializer::new(source, self);
+        let result = T::deserialize(&mut deserializer)?;
+        deserializer.ensure_eof()?;
+        Ok(result)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use serde::{Deserialize, Serialize};
@@ -813,17 +823,10 @@ mod tests {
             a: u32,
             b: i32,
         }
-        let parsed = BasicNamed::deserialize(&mut crate::de::Deserializer::new(
-            r#"a: 1 b: -1"#,
-            Config::default().allow_implicit_map(true),
-        ))
-        .unwrap();
+        let config = Config::default().allow_implicit_map(true);
+        let parsed = config.deserialize::<BasicNamed>(r#"a: 1 b: -1"#).unwrap();
         assert_eq!(parsed, BasicNamed { a: 1, b: -1 });
-        let parsed = BasicNamed::deserialize(&mut crate::de::Deserializer::new(
-            r#"a: 1, b: -1,"#,
-            Config::default().allow_implicit_map(true),
-        ))
-        .unwrap();
+        let parsed = config.deserialize::<BasicNamed>(r#"a: 1, b: -1,"#).unwrap();
         assert_eq!(parsed, BasicNamed { a: 1, b: -1 });
     }
 

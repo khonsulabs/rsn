@@ -4,18 +4,18 @@ use alloc::vec::Vec;
 use core::fmt::Write;
 
 #[derive(Debug, Default)]
-pub struct Writer {
+pub struct Writer<'config> {
     output: String,
     nested: Vec<NestedState>,
-    config: Config,
+    config: Cow<'config, Config>,
 }
 
-impl Writer {
-    pub fn new(config: Config) -> Self {
+impl<'config> Writer<'config> {
+    pub fn new(config: &'config Config) -> Self {
         Self {
             output: String::new(),
             nested: Vec::new(),
-            config,
+            config: Cow::Borrowed(config),
         }
     }
 
@@ -27,7 +27,7 @@ impl Writer {
     pub fn begin_named_map(&mut self, name: &str) {
         self.prepare_to_write_value();
         self.output.push_str(name);
-        if matches!(self.config, Config::Pretty { .. }) {
+        if matches!(self.config.as_ref(), Config::Pretty { .. }) {
             self.output.push(' ');
         }
         self.output.push('{');
@@ -96,7 +96,7 @@ impl Writer {
             }
             Some(NestedState::Map(state @ MapState::AfterKey)) => {
                 *state = MapState::AfterEntry;
-                if matches!(self.config, Config::Compact) {
+                if matches!(self.config.as_ref(), Config::Compact) {
                     self.output.push(':');
                 } else {
                     self.output.push_str(": ");
@@ -106,11 +106,12 @@ impl Writer {
         }
     }
 
-    fn insert_newline(&mut self) {
+    pub fn insert_newline(&mut self) {
         if let Config::Pretty {
             indentation,
             newline,
-        } = &self.config
+            ..
+        } = self.config.as_ref()
         {
             self.output.push_str(newline);
             for _ in 0..self.nested.len() {
@@ -282,7 +283,7 @@ enum MapState {
     AfterKey,
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Default, Clone)]
 pub enum Config {
     #[default]
     Compact,

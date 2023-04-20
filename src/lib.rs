@@ -16,11 +16,7 @@ pub mod writer;
 
 #[cfg(feature = "serde")]
 pub fn from_str<'de, D: serde::Deserialize<'de>>(source: &'de str) -> Result<D, de::Error> {
-    let mut parser = de::Deserializer::new(source, parser::Config::default());
-
-    let deserialized = D::deserialize(&mut parser)?;
-    parser.ensure_eof()?;
-    Ok(deserialized)
+    parser::Config::default().deserialize(source)
 }
 
 #[cfg(feature = "serde")]
@@ -32,12 +28,7 @@ pub fn to_string<S: serde::Serialize>(value: &S) -> alloc::string::String {
 
 #[cfg(feature = "serde")]
 pub fn to_string_pretty<S: serde::Serialize>(value: &S) -> alloc::string::String {
-    let mut serializer = ser::Serializer::new(writer::Config::Pretty {
-        indentation: alloc::borrow::Cow::Borrowed("  "),
-        newline: alloc::borrow::Cow::Borrowed("\n"),
-    });
-    value.serialize(&mut serializer).expect("infallible");
-    serializer.finish()
+    ser::Config::pretty().serialize(value)
 }
 
 #[cfg(test)]
