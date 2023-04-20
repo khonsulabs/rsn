@@ -266,7 +266,7 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
     fn tokenize_positive_integer<I>(&mut self, mut value: I) -> Result<Token<'a>, Error>
     where
         I: Integral,
-        Integer: From<I> + From<I::Larger>,
+        Integer: From<I> + TryFrom<I::Larger>,
     {
         let mut has_decimal = false;
         let mut has_exponent = false;
@@ -332,9 +332,12 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
             }
 
             if !has_decimal {
+                let integer = Integer::try_from(value).map_err(|_| {
+                    Error::new(self.chars.marked_range(), ErrorKind::IntegerTooLarge)
+                })?;
                 return Ok(Token::new(
                     self.chars.marked_range(),
-                    TokenKind::Integer(Integer::from(value)),
+                    TokenKind::Integer(integer),
                 ));
             }
         }
@@ -352,7 +355,7 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
     fn tokenize_negative_integer<I>(&mut self, mut value: I) -> Result<Token<'a>, Error>
     where
         I: Integral,
-        Integer: From<I> + From<I::Larger>,
+        Integer: From<I> + TryFrom<I::Larger>,
     {
         let mut has_decimal = false;
         let mut has_exponent = false;
@@ -418,9 +421,12 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
             }
 
             if !has_decimal {
+                let integer = Integer::try_from(value).map_err(|_| {
+                    Error::new(self.chars.marked_range(), ErrorKind::IntegerTooLarge)
+                })?;
                 return Ok(Token::new(
                     self.chars.marked_range(),
-                    TokenKind::Integer(Integer::from(value)),
+                    TokenKind::Integer(integer),
                 ));
             }
         }
