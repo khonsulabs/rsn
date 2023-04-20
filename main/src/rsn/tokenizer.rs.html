@@ -2185,6 +2185,12 @@
 <a href="#2185" id="2185">2185</a>
 <a href="#2186" id="2186">2186</a>
 <a href="#2187" id="2187">2187</a>
+<a href="#2188" id="2188">2188</a>
+<a href="#2189" id="2189">2189</a>
+<a href="#2190" id="2190">2190</a>
+<a href="#2191" id="2191">2191</a>
+<a href="#2192" id="2192">2192</a>
+<a href="#2193" id="2193">2193</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>alloc::borrow::Cow;
 <span class="kw">use </span>alloc::string::String;
 <span class="kw">use </span>core::fmt::Display;
@@ -2453,7 +2459,7 @@
     <span class="kw">fn </span>tokenize_positive_integer&lt;I&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, <span class="kw-2">mut </span>value: I) -&gt; <span class="prelude-ty">Result</span>&lt;Token&lt;<span class="lifetime">&#39;a</span>&gt;, Error&gt;
     <span class="kw">where
         </span>I: Integral,
-        Integer: From&lt;I&gt; + From&lt;I::Larger&gt;,
+        Integer: From&lt;I&gt; + TryFrom&lt;I::Larger&gt;,
     {
         <span class="kw">let </span><span class="kw-2">mut </span>has_decimal = <span class="bool-val">false</span>;
         <span class="kw">let </span><span class="kw-2">mut </span>has_exponent = <span class="bool-val">false</span>;
@@ -2519,9 +2525,12 @@
             }
 
             <span class="kw">if </span>!has_decimal {
+                <span class="kw">let </span>integer = Integer::try_from(value).map_err(|<span class="kw">_</span>| {
+                    Error::new(<span class="self">self</span>.chars.marked_range(), ErrorKind::IntegerTooLarge)
+                })<span class="question-mark">?</span>;
                 <span class="kw">return </span><span class="prelude-val">Ok</span>(Token::new(
                     <span class="self">self</span>.chars.marked_range(),
-                    TokenKind::Integer(Integer::from(value)),
+                    TokenKind::Integer(integer),
                 ));
             }
         }
@@ -2539,7 +2548,7 @@
     <span class="kw">fn </span>tokenize_negative_integer&lt;I&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, <span class="kw-2">mut </span>value: I) -&gt; <span class="prelude-ty">Result</span>&lt;Token&lt;<span class="lifetime">&#39;a</span>&gt;, Error&gt;
     <span class="kw">where
         </span>I: Integral,
-        Integer: From&lt;I&gt; + From&lt;I::Larger&gt;,
+        Integer: From&lt;I&gt; + TryFrom&lt;I::Larger&gt;,
     {
         <span class="kw">let </span><span class="kw-2">mut </span>has_decimal = <span class="bool-val">false</span>;
         <span class="kw">let </span><span class="kw-2">mut </span>has_exponent = <span class="bool-val">false</span>;
@@ -2605,9 +2614,12 @@
             }
 
             <span class="kw">if </span>!has_decimal {
+                <span class="kw">let </span>integer = Integer::try_from(value).map_err(|<span class="kw">_</span>| {
+                    Error::new(<span class="self">self</span>.chars.marked_range(), ErrorKind::IntegerTooLarge)
+                })<span class="question-mark">?</span>;
                 <span class="kw">return </span><span class="prelude-val">Ok</span>(Token::new(
                     <span class="self">self</span>.chars.marked_range(),
-                    TokenKind::Integer(Integer::from(value)),
+                    TokenKind::Integer(integer),
                 ));
             }
         }
