@@ -1,0 +1,3 @@
+(function() {var implementors = {
+"rsn":[["impl&lt;'a, 'config&gt; <a class=\"trait\" href=\"https://docs.rs/serde/1.0.160/serde/ser/trait.SerializeStruct.html\" title=\"trait serde::ser::SerializeStruct\">SerializeStruct</a> for <a class=\"struct\" href=\"rsn/ser/struct.StructSerializer.html\" title=\"struct rsn::ser::StructSerializer\">StructSerializer</a>&lt;'a, 'config&gt;"]]
+};if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()
