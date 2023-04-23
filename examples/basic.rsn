@@ -1,0 +1,15 @@
+[
+    BlogPost {
+        id: 0,
+        title: "Hello, World!",
+        body: "This is a blog post.",
+        category: Custom("Welcome"),
+    },
+    BlogPost {
+        id: 1,
+        title: "I love Rust",
+        body: "Long live Ferris 🦀",
+        category: Rust,
+        previous_in_series: Some(0)
+    },
+]

@@ -477,7 +477,7 @@ impl<'s> Iterator for Parser<'s> {
     }
 }
 
-#[derive(Default, Debug)]
+#[derive(Default, Debug, Clone, Copy)]
 pub struct Config {
     pub allow_implicit_map: bool,
     pub include_comments: bool,

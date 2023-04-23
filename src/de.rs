@@ -3,9 +3,9 @@ use alloc::string::{String, ToString};
 use core::fmt::Display;
 use core::iter::Peekable;
 use core::ops::Range;
+use serde::Deserialize;
 
 use serde::de::{EnumAccess, MapAccess, SeqAccess, VariantAccess};
-use serde::Deserializer as _;
 
 use crate::parser::{self, Config, Event, EventKind, Name, Nested, Parser, Primitive};
 use crate::tokenizer::{self, Integer};
@@ -18,6 +18,14 @@ impl<'de> Deserializer<'de> {
     pub fn new(source: &'de str, config: Config) -> Self {
         Self {
             parser: Parser::new(source, config.include_comments(false)).peekable(),
+        }
+    }
+
+    pub fn ensure_eof(mut self) -> Result<(), Error> {
+        match self.parser.next() {
+            None => Ok(()),
+            Some(Ok(event)) => Err(Error::new(event.location, parser::ErrorKind::TrailingData)),
+            Some(Err(err)) => Err(err.into()),
         }
     }
 
@@ -283,6 +291,13 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
                         .map_err(|_| Error::new(location, ErrorKind::InvalidUtf8))?,
                 ),
             },
+            Some(Event {
+                kind:
+                    EventKind::BeginNested {
+                        name: Some(name), ..
+                    },
+                ..
+            }) => visitor.visit_str(name.name),
             Some(evt) => Err(Error::new(evt.location, ErrorKind::ExpectedString)),
             None => Err(Error::new(None, ErrorKind::ExpectedString)),
         }
@@ -625,21 +640,34 @@ impl<'a, 'de> VariantAccess<'de> for &'a mut Deserializer<'de> {
     type Error = Error;
 
     fn unit_variant(self) -> Result<(), Self::Error> {
-        self.handle_unit()
+        Ok(())
     }
 
     fn newtype_variant_seed<T>(self, seed: T) -> Result<T::Value, Self::Error>
     where
         T: serde::de::DeserializeSeed<'de>,
     {
-        seed.deserialize(self)
+        let result = seed.deserialize(&mut *self)?;
+        loop {
+            if let Event {
+                kind: EventKind::EndNested,
+                ..
+            } = self
+                .parser
+                .next()
+                .transpose()?
+                .expect("eof handled by parser")
+            {
+                return Ok(result);
+            }
+        }
     }
 
-    fn tuple_variant<V>(self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
+    fn tuple_variant<V>(self, _len: usize, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: serde::de::Visitor<'de>,
     {
-        self.deserialize_tuple(len, visitor)
+        visitor.visit_seq(self)
     }
 
     fn struct_variant<V>(
@@ -650,7 +678,7 @@ impl<'a, 'de> VariantAccess<'de> for &'a mut Deserializer<'de> {
     where
         V: serde::de::Visitor<'de>,
     {
-        self.deserialize_map(visitor)
+        visitor.visit_map(self)
     }
 }
 
@@ -680,6 +708,8 @@ impl serde::de::Error for Error {
         }
     }
 }
+
+impl serde::ser::StdError for Error {}
 
 impl Display for Error {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
@@ -759,8 +789,14 @@ impl Display for ErrorKind {
     }
 }
 
-#[cfg(feature = "std")]
-impl std::error::Error for Error {}
+impl Config {
+    pub fn deserialize<'de, T: Deserialize<'de>>(self, source: &'de str) -> Result<T, Error> {
+        let mut deserializer = Deserializer::new(source, self);
+        let result = T::deserialize(&mut deserializer)?;
+        deserializer.ensure_eof()?;
+        Ok(result)
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -787,17 +823,10 @@ mod tests {
             a: u32,
             b: i32,
         }
-        let parsed = BasicNamed::deserialize(&mut crate::de::Deserializer::new(
-            r#"a: 1 b: -1"#,
-            Config::default().allow_implicit_map(true),
-        ))
-        .unwrap();
+        let config = Config::default().allow_implicit_map(true);
+        let parsed = config.deserialize::<BasicNamed>(r#"a: 1 b: -1"#).unwrap();
         assert_eq!(parsed, BasicNamed { a: 1, b: -1 });
-        let parsed = BasicNamed::deserialize(&mut crate::de::Deserializer::new(
-            r#"a: 1, b: -1,"#,
-            Config::default().allow_implicit_map(true),
-        ))
-        .unwrap();
+        let parsed = config.deserialize::<BasicNamed>(r#"a: 1, b: -1,"#).unwrap();
         assert_eq!(parsed, BasicNamed { a: 1, b: -1 });
     }
 
