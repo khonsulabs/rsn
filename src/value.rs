@@ -69,10 +69,12 @@ impl<'a> Value<'a> {
     }
 
     fn parse(parser: &mut Parser<'a>) -> Result<Self, Error> {
-        let event = parser
-            .next()
-            .transpose()?
-            .ok_or_else(|| Error::new(0..0, ErrorKind::UnexpectedEof))?; // TODO need a good location for this error
+        let event = parser.next().transpose()?.ok_or_else(|| {
+            Error::new(
+                parser.current_offset()..parser.current_offset(),
+                ErrorKind::UnexpectedEof,
+            )
+        })?;
         Self::from_parser_event(event, parser)
     }
 
@@ -298,7 +300,7 @@ mod serde {
     use alloc::{slice, vec};
     use core::fmt::Display;
     use core::num::TryFromIntError;
-    use core::str;
+    use core::str::{self, Utf8Error};
 
     use serde::de::{EnumAccess, MapAccess, SeqAccess, VariantAccess};
     use serde::ser::{
@@ -698,7 +700,7 @@ mod serde {
     pub struct ValueDeserializer<'a, 'de>(pub &'a Value<'de>);
 
     macro_rules! deserialize_int {
-        ($deserialize_name:ident, $as_name:ident, $visit_name:ident) => {
+        ($deserialize_name:ident, $as_name:ident, $visit_name:ident, $expected:expr) => {
             fn $deserialize_name<V>(self, visitor: V) -> Result<V::Value, Self::Error>
             where
                 V: serde::de::Visitor<'de>,
@@ -706,7 +708,7 @@ mod serde {
                 if let Some(value) = self.0.$as_name() {
                     visitor.$visit_name(value)
                 } else {
-                    todo!("expected i8")
+                    Err(FromValueError::Expected($expected))
                 }
             }
         };
@@ -715,27 +717,27 @@ mod serde {
     impl<'a, 'de> Deserializer<'de> for ValueDeserializer<'a, 'de> {
         type Error = FromValueError;
 
-        deserialize_int!(deserialize_i8, as_i8, visit_i8);
+        deserialize_int!(deserialize_i8, as_i8, visit_i8, ExpectedKind::I8);
 
-        deserialize_int!(deserialize_i16, as_i16, visit_i16);
+        deserialize_int!(deserialize_i16, as_i16, visit_i16, ExpectedKind::I16);
 
-        deserialize_int!(deserialize_i32, as_i32, visit_i32);
+        deserialize_int!(deserialize_i32, as_i32, visit_i32, ExpectedKind::I32);
 
-        deserialize_int!(deserialize_i64, as_i64, visit_i64);
+        deserialize_int!(deserialize_i64, as_i64, visit_i64, ExpectedKind::I64);
 
-        deserialize_int!(deserialize_i128, as_i128, visit_i128);
+        deserialize_int!(deserialize_i128, as_i128, visit_i128, ExpectedKind::I128);
 
-        deserialize_int!(deserialize_u8, as_u8, visit_u8);
+        deserialize_int!(deserialize_u8, as_u8, visit_u8, ExpectedKind::U8);
 
-        deserialize_int!(deserialize_u16, as_u16, visit_u16);
+        deserialize_int!(deserialize_u16, as_u16, visit_u16, ExpectedKind::U16);
 
-        deserialize_int!(deserialize_u32, as_u32, visit_u32);
+        deserialize_int!(deserialize_u32, as_u32, visit_u32, ExpectedKind::U32);
 
-        deserialize_int!(deserialize_u64, as_u64, visit_u64);
+        deserialize_int!(deserialize_u64, as_u64, visit_u64, ExpectedKind::U64);
 
-        deserialize_int!(deserialize_u128, as_u128, visit_u128);
+        deserialize_int!(deserialize_u128, as_u128, visit_u128, ExpectedKind::U128);
 
-        deserialize_int!(deserialize_f64, as_f64, visit_f64);
+        deserialize_int!(deserialize_f64, as_f64, visit_f64, ExpectedKind::Float);
 
         fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
@@ -799,7 +801,7 @@ mod serde {
             match &self.0 {
                 Value::Integer(int) => visitor.visit_bool(!int.is_zero()),
                 Value::Bool(bool) => visitor.visit_bool(*bool),
-                _ => todo!("expected bool"),
+                _ => Err(FromValueError::Expected(ExpectedKind::Bool)),
             }
         }
 
@@ -810,7 +812,7 @@ mod serde {
             if let Some(value) = self.0.as_f64() {
                 visitor.visit_f32(value as f32)
             } else {
-                todo!("expected f32")
+                Err(FromValueError::Expected(ExpectedKind::Float))
             }
         }
 
@@ -821,7 +823,7 @@ mod serde {
             if let Value::Char(ch) = &self.0 {
                 visitor.visit_char(*ch)
             } else {
-                todo!("expected char")
+                Err(FromValueError::Expected(ExpectedKind::Char))
             }
         }
 
@@ -836,25 +838,19 @@ mod serde {
                 },
                 Value::Bytes(bytes) => match bytes {
                     Cow::Borrowed(bytes) => {
-                        if let Ok(str) = str::from_utf8(bytes) {
-                            visitor.visit_borrowed_str(str)
-                        } else {
-                            todo!("invalid utf8")
-                        }
+                        let str = str::from_utf8(bytes)?;
+                        visitor.visit_borrowed_str(str)
                     }
                     Cow::Owned(bytes) => {
-                        if let Ok(str) = str::from_utf8(bytes) {
-                            visitor.visit_str(str)
-                        } else {
-                            todo!("invalid utf8")
-                        }
+                        let str = str::from_utf8(bytes)?;
+                        visitor.visit_str(str)
                     }
                 },
                 Value::Named(name) => match &name.name {
                     Cow::Borrowed(str) => visitor.visit_borrowed_str(str),
                     Cow::Owned(str) => visitor.visit_str(str),
                 },
-                _ => todo!("expected str"),
+                _ => Err(FromValueError::Expected(ExpectedKind::String)),
             }
         }
 
@@ -878,7 +874,7 @@ mod serde {
                     Cow::Borrowed(str) => visitor.visit_borrowed_bytes(str.as_bytes()),
                     Cow::Owned(str) => visitor.visit_bytes(str.as_bytes()),
                 },
-                _ => todo!("expected bytes"),
+                _ => Err(FromValueError::Expected(ExpectedKind::Bytes)),
             }
         }
 
@@ -920,7 +916,7 @@ mod serde {
                 })
                 | Value::Tuple(_)
                 | Value::Array(_) => visitor.visit_unit(),
-                _ => todo!("expected unit"),
+                _ => Err(FromValueError::Expected(ExpectedKind::Unit)),
             }
         }
 
@@ -975,7 +971,7 @@ mod serde {
                 })
                 | Value::Tuple(list)
                 | Value::Array(list) => visitor.visit_seq(SequenceDeserializer(list.0.iter())),
-                _ => todo!("expected sequence"),
+                _ => Err(FromValueError::Expected(ExpectedKind::Sequence)),
             }
         }
 
@@ -1008,7 +1004,7 @@ mod serde {
                     ..
                 })
                 | Value::Map(map) => visitor.visit_map(MapDeserializer::new(map)),
-                _ => todo!("expected map"),
+                _ => Err(FromValueError::Expected(ExpectedKind::Map)),
             }
         }
 
@@ -1074,7 +1070,7 @@ mod serde {
 
                     Ok((variant, accessor))
                 }
-                _ => todo!("expected an enum"),
+                _ => Err(FromValueError::Expected(ExpectedKind::Enum)),
             }
         }
     }
@@ -1105,9 +1101,7 @@ mod serde {
                         seed.deserialize(ValueDeserializer(&Value::unit()))
                     }
                 }
-                EnumVariantAccessor::Map(_) => {
-                    todo!("expected newtype variant, found struct variant")
-                }
+                EnumVariantAccessor::Map(_) => Err(FromValueError::Expected(ExpectedKind::Newtype)),
             }
         }
 
@@ -1193,7 +1187,7 @@ mod serde {
         }
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, PartialEq)]
 
     pub enum ToValueError {
         Message(String),
@@ -1226,10 +1220,12 @@ mod serde {
         }
     }
 
-    #[derive(Debug)]
+    #[derive(Debug, PartialEq)]
 
     pub enum FromValueError {
         Message(String),
+        Expected(ExpectedKind),
+        InvalidUtf8,
     }
 
     impl serde::de::Error for FromValueError {
@@ -1241,12 +1237,73 @@ mod serde {
         }
     }
 
+    impl From<Utf8Error> for FromValueError {
+        fn from(_value: Utf8Error) -> Self {
+            Self::InvalidUtf8
+        }
+    }
+
     impl serde::de::StdError for FromValueError {}
 
     impl Display for FromValueError {
         fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
             match self {
                 FromValueError::Message(message) => f.write_str(message),
+                FromValueError::Expected(kind) => write!(f, "expected {kind}"),
+                FromValueError::InvalidUtf8 => {
+                    f.write_str("invalid utf8 when interpreting bytes as a string")
+                }
+            }
+        }
+    }
+
+    #[derive(Debug, PartialEq)]
+    pub enum ExpectedKind {
+        I8,
+        I16,
+        I32,
+        I64,
+        I128,
+        U8,
+        U16,
+        U32,
+        U64,
+        U128,
+        Bool,
+        Char,
+        String,
+        Bytes,
+        Float,
+        Enum,
+        Map,
+        Sequence,
+        Unit,
+        Newtype,
+    }
+
+    impl Display for ExpectedKind {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+            match self {
+                ExpectedKind::I8 => f.write_str("i8"),
+                ExpectedKind::I16 => f.write_str("i16"),
+                ExpectedKind::I32 => f.write_str("i32"),
+                ExpectedKind::I64 => f.write_str("i64"),
+                ExpectedKind::I128 => f.write_str("i128"),
+                ExpectedKind::U8 => f.write_str("u8"),
+                ExpectedKind::U16 => f.write_str("u16"),
+                ExpectedKind::U32 => f.write_str("u32"),
+                ExpectedKind::U64 => f.write_str("u64"),
+                ExpectedKind::U128 => f.write_str("u128"),
+                ExpectedKind::Bool => f.write_str("bool"),
+                ExpectedKind::Char => f.write_str("char"),
+                ExpectedKind::String => f.write_str("String"),
+                ExpectedKind::Bytes => f.write_str("Bytes"),
+                ExpectedKind::Float => f.write_str("Float"),
+                ExpectedKind::Enum => f.write_str("Enum"),
+                ExpectedKind::Map => f.write_str("Map"),
+                ExpectedKind::Sequence => f.write_str("Sequence"),
+                ExpectedKind::Unit => f.write_str("()"),
+                ExpectedKind::Newtype => f.write_str("Newtype"),
             }
         }
     }
