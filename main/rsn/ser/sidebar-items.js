@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["Infallible"],"struct":["Config","Serializer","StructSerializer"]};
+window.SIDEBAR_ITEMS = {"struct":["Config","Serializer","StructSerializer"]};

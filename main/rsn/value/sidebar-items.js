@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["Literal","StructContents"],"struct":["Annotated","Attribute","Identifier","List","Map","Type"],"type":["OwnedValue","Value"]};
+window.SIDEBAR_ITEMS = {"enum":["FromValueError","StructContents","ToValueError","Value"],"struct":["List","Map","Named"],"type":["OwnedValue"]};
