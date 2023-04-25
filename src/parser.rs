@@ -30,6 +30,10 @@ impl<'s> Parser<'s> {
         Self::new(source, config).all(|result| result.is_ok())
     }
 
+    pub const fn current_offset(&self) -> usize {
+        self.tokens.current_offset()
+    }
+
     fn peek(&mut self) -> Option<&Token<'s>> {
         if self.peeked.is_none() {
             self.peeked = self.tokens.next();

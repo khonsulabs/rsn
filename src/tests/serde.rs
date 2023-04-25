@@ -4,6 +4,9 @@ use core::fmt::Debug;
 
 use serde::{Deserialize, Serialize};
 
+use crate::value::Value;
+use crate::{dbg, println};
+
 #[derive(Serialize, Deserialize, Default, Debug, PartialEq)]
 struct StructOfEverything<'a> {
     str: Cow<'a, str>,
@@ -70,11 +73,7 @@ impl<'a> StructOfEverything<'a> {
 
 #[track_caller]
 fn roundtrip<T: Debug + Serialize + for<'de> Deserialize<'de> + PartialEq>(value: &T, check: &str) {
-    let rendered = crate::to_string(value);
-    #[cfg(feature = "std")]
-    {
-        std::dbg!(&rendered);
-    }
+    let rendered = dbg!(crate::to_string(value));
     assert_eq!(rendered, check);
     let restored: T = crate::from_str(&rendered).expect("deserialization failed");
     assert_eq!(&restored, value);
@@ -86,10 +85,7 @@ fn roundtrip_pretty<T: Debug + Serialize + for<'de> Deserialize<'de> + PartialEq
     check: &str,
 ) {
     let rendered = crate::to_string_pretty(value);
-    #[cfg(feature = "std")]
-    {
-        std::println!("{rendered}");
-    }
+    println!("{rendered}");
     assert_eq!(rendered, check);
     let restored: T = crate::from_str(&rendered).expect("deserialization failed");
     assert_eq!(&restored, value);
@@ -103,10 +99,7 @@ fn roundtrip_implicit_map<T: Debug + Serialize + for<'de> Deserialize<'de> + Par
     let rendered = crate::ser::Config::pretty()
         .implicit_map_at_root(true)
         .serialize(value);
-    #[cfg(feature = "std")]
-    {
-        std::println!("{rendered}");
-    }
+    println!("{rendered}");
     assert_eq!(rendered, check);
     let restored: T = crate::parser::Config::default()
         .allow_implicit_map(true)
@@ -176,4 +169,12 @@ fn deserialize_any() {
     assert_eq!(untagged, None);
     let untagged: Option<UntaggedEnum> = crate::from_str("Some(())").unwrap();
     assert_eq!(untagged, Some(UntaggedEnum::Unit(UnitStruct)));
+}
+
+#[test]
+fn value_from_serialize() {
+    let original = StructOfEverything::default();
+    let value = dbg!(Value::from_serialize(&original));
+    let from_value: StructOfEverything = value.to_deserialize().unwrap();
+    assert_eq!(original, from_value);
 }

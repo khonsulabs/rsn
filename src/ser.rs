@@ -1,30 +1,42 @@
 use alloc::borrow::Cow;
 use alloc::string::String;
-use core::fmt::Display;
-use serde::Serialize;
+use core::fmt::Write;
 
 use serde::ser::{
     SerializeMap, SerializeSeq, SerializeStruct, SerializeStructVariant, SerializeTuple,
     SerializeTupleStruct, SerializeTupleVariant,
 };
+use serde::Serialize;
 
 use crate::writer::{self, Writer};
 
-#[derive(Debug, Default)]
-pub struct Serializer<'config> {
-    writer: Writer<'config>,
+#[derive(Debug)]
+pub struct Serializer<'config, Output> {
+    writer: Writer<'config, Output>,
     implicit_map_at_root: bool,
 }
 
-impl<'config> Serializer<'config> {
-    pub fn new(config: &'config Config) -> Self {
+impl Default for Serializer<'static, String> {
+    fn default() -> Self {
         Self {
-            writer: Writer::new(&config.writer),
+            writer: Writer::default(),
+            implicit_map_at_root: false,
+        }
+    }
+}
+
+impl<'config, Output> Serializer<'config, Output>
+where
+    Output: Write,
+{
+    pub fn new(output: Output, config: &'config Config) -> Self {
+        Self {
+            writer: Writer::new(output, &config.writer),
             implicit_map_at_root: config.implicit_map_at_root,
         }
     }
 
-    pub fn finish(self) -> String {
+    pub fn finish(self) -> Output {
         self.writer.finish()
     }
 
@@ -33,12 +45,15 @@ impl<'config> Serializer<'config> {
     }
 }
 
-impl<'a, 'config> serde::Serializer for &'a mut Serializer<'config> {
-    type Error = Infallible;
+impl<'a, 'config, Output> serde::Serializer for &'a mut Serializer<'config, Output>
+where
+    Output: Write,
+{
+    type Error = core::fmt::Error;
     type Ok = ();
     type SerializeMap = Self;
     type SerializeSeq = Self;
-    type SerializeStruct = StructSerializer<'a, 'config>;
+    type SerializeStruct = StructSerializer<'a, 'config, Output>;
     type SerializeStructVariant = Self;
     type SerializeTuple = Self;
     type SerializeTupleStruct = Self;
@@ -46,104 +61,87 @@ impl<'a, 'config> serde::Serializer for &'a mut Serializer<'config> {
 
     fn serialize_bool(self, v: bool) -> Result<Self::Ok, Self::Error> {
         self.mark_value_seen();
-        self.writer.write_primitive(&v);
-        Ok(())
+        self.writer.write_primitive(&v)
     }
 
     fn serialize_i8(self, v: i8) -> Result<Self::Ok, Self::Error> {
         self.mark_value_seen();
-        self.writer.write_primitive(&v);
-        Ok(())
+        self.writer.write_primitive(&v)
     }
 
     fn serialize_i16(self, v: i16) -> Result<Self::Ok, Self::Error> {
         self.mark_value_seen();
-        self.writer.write_primitive(&v);
-        Ok(())
+        self.writer.write_primitive(&v)
     }
 
     fn serialize_i32(self, v: i32) -> Result<Self::Ok, Self::Error> {
         self.mark_value_seen();
-        self.writer.write_primitive(&v);
-        Ok(())
+        self.writer.write_primitive(&v)
     }
 
     fn serialize_i64(self, v: i64) -> Result<Self::Ok, Self::Error> {
         self.mark_value_seen();
-        self.writer.write_primitive(&v);
-        Ok(())
+        self.writer.write_primitive(&v)
     }
 
     fn serialize_i128(self, v: i128) -> Result<Self::Ok, Self::Error> {
         self.mark_value_seen();
-        self.writer.write_primitive(&v);
-        Ok(())
+        self.writer.write_primitive(&v)
     }
 
     fn serialize_u8(self, v: u8) -> Result<Self::Ok, Self::Error> {
         self.mark_value_seen();
-        self.writer.write_primitive(&v);
-        Ok(())
+        self.writer.write_primitive(&v)
     }
 
     fn serialize_u16(self, v: u16) -> Result<Self::Ok, Self::Error> {
         self.mark_value_seen();
-        self.writer.write_primitive(&v);
-        Ok(())
+        self.writer.write_primitive(&v)
     }
 
     fn serialize_u32(self, v: u32) -> Result<Self::Ok, Self::Error> {
         self.mark_value_seen();
-        self.writer.write_primitive(&v);
-        Ok(())
+        self.writer.write_primitive(&v)
     }
 
     fn serialize_u64(self, v: u64) -> Result<Self::Ok, Self::Error> {
         self.mark_value_seen();
-        self.writer.write_primitive(&v);
-        Ok(())
+        self.writer.write_primitive(&v)
     }
 
     fn serialize_u128(self, v: u128) -> Result<Self::Ok, Self::Error> {
         self.mark_value_seen();
-        self.writer.write_primitive(&v);
-        Ok(())
+        self.writer.write_primitive(&v)
     }
 
     fn serialize_f32(self, v: f32) -> Result<Self::Ok, Self::Error> {
         self.mark_value_seen();
-        self.writer.write_primitive(&v);
-        Ok(())
+        self.writer.write_primitive(&v)
     }
 
     fn serialize_f64(self, v: f64) -> Result<Self::Ok, Self::Error> {
         self.mark_value_seen();
-        self.writer.write_primitive(&v);
-        Ok(())
+        self.writer.write_primitive(&v)
     }
 
     fn serialize_char(self, v: char) -> Result<Self::Ok, Self::Error> {
         self.mark_value_seen();
-        self.writer.write_primitive(&v);
-        Ok(())
+        self.writer.write_primitive(&v)
     }
 
     fn serialize_str(self, v: &str) -> Result<Self::Ok, Self::Error> {
         self.mark_value_seen();
-        self.writer.write_primitive(v);
-        Ok(())
+        self.writer.write_primitive(v)
     }
 
     fn serialize_bytes(self, v: &[u8]) -> Result<Self::Ok, Self::Error> {
         self.mark_value_seen();
-        self.writer.write_primitive(v);
-        Ok(())
+        self.writer.write_primitive(v)
     }
 
     fn serialize_none(self) -> Result<Self::Ok, Self::Error> {
         self.mark_value_seen();
-        self.writer.write_raw_value("None");
-        Ok(())
+        self.writer.write_raw_value("None")
     }
 
     fn serialize_some<T: ?Sized>(self, value: &T) -> Result<Self::Ok, Self::Error>
@@ -151,22 +149,20 @@ impl<'a, 'config> serde::Serializer for &'a mut Serializer<'config> {
         T: serde::Serialize,
     {
         self.mark_value_seen();
-        self.writer.begin_named_tuple("Some");
+        self.writer.begin_named_tuple("Some")?;
         value.serialize(&mut *self)?;
-        self.writer.finish_nested();
+        self.writer.finish_nested()?;
         Ok(())
     }
 
     fn serialize_unit(self) -> Result<Self::Ok, Self::Error> {
         self.mark_value_seen();
-        self.writer.write_raw_value("()");
-        Ok(())
+        self.writer.write_raw_value("()")
     }
 
     fn serialize_unit_struct(self, name: &'static str) -> Result<Self::Ok, Self::Error> {
         self.mark_value_seen();
-        self.writer.write_raw_value(name);
-        Ok(())
+        self.writer.write_raw_value(name)
     }
 
     fn serialize_unit_variant(
@@ -176,8 +172,7 @@ impl<'a, 'config> serde::Serializer for &'a mut Serializer<'config> {
         variant: &'static str,
     ) -> Result<Self::Ok, Self::Error> {
         self.mark_value_seen();
-        self.writer.write_raw_value(variant);
-        Ok(())
+        self.writer.write_raw_value(variant)
     }
 
     fn serialize_newtype_struct<T: ?Sized>(
@@ -189,10 +184,9 @@ impl<'a, 'config> serde::Serializer for &'a mut Serializer<'config> {
         T: serde::Serialize,
     {
         self.mark_value_seen();
-        self.writer.begin_named_tuple(name);
+        self.writer.begin_named_tuple(name)?;
         value.serialize(&mut *self)?;
-        self.writer.finish_nested();
-        Ok(())
+        self.writer.finish_nested()
     }
 
     fn serialize_newtype_variant<T: ?Sized>(
@@ -206,21 +200,20 @@ impl<'a, 'config> serde::Serializer for &'a mut Serializer<'config> {
         T: serde::Serialize,
     {
         self.mark_value_seen();
-        self.writer.begin_named_tuple(variant);
+        self.writer.begin_named_tuple(variant)?;
         value.serialize(&mut *self)?;
-        self.writer.finish_nested();
-        Ok(())
+        self.writer.finish_nested()
     }
 
     fn serialize_seq(self, _len: Option<usize>) -> Result<Self::SerializeSeq, Self::Error> {
         self.mark_value_seen();
-        self.writer.begin_list();
+        self.writer.begin_list()?;
         Ok(self)
     }
 
     fn serialize_tuple(self, _len: usize) -> Result<Self::SerializeTuple, Self::Error> {
         self.mark_value_seen();
-        self.writer.begin_tuple();
+        self.writer.begin_tuple()?;
         Ok(self)
     }
 
@@ -230,7 +223,7 @@ impl<'a, 'config> serde::Serializer for &'a mut Serializer<'config> {
         _len: usize,
     ) -> Result<Self::SerializeTupleStruct, Self::Error> {
         self.mark_value_seen();
-        self.writer.begin_named_tuple(name);
+        self.writer.begin_named_tuple(name)?;
         Ok(self)
     }
 
@@ -242,13 +235,13 @@ impl<'a, 'config> serde::Serializer for &'a mut Serializer<'config> {
         _len: usize,
     ) -> Result<Self::SerializeTupleVariant, Self::Error> {
         self.mark_value_seen();
-        self.writer.begin_named_tuple(variant);
+        self.writer.begin_named_tuple(variant)?;
         Ok(self)
     }
 
     fn serialize_map(self, _len: Option<usize>) -> Result<Self::SerializeMap, Self::Error> {
         self.mark_value_seen();
-        self.writer.begin_map();
+        self.writer.begin_map()?;
         Ok(self)
     }
 
@@ -261,7 +254,7 @@ impl<'a, 'config> serde::Serializer for &'a mut Serializer<'config> {
         self.mark_value_seen();
 
         if !is_implicit_map {
-            self.writer.begin_named_map(name);
+            self.writer.begin_named_map(name)?;
         }
 
         Ok(StructSerializer {
@@ -277,13 +270,16 @@ impl<'a, 'config> serde::Serializer for &'a mut Serializer<'config> {
         variant: &'static str,
         _len: usize,
     ) -> Result<Self::SerializeStructVariant, Self::Error> {
-        self.writer.begin_named_map(variant);
+        self.writer.begin_named_map(variant)?;
         Ok(self)
     }
 }
 
-impl<'a, 'config> SerializeSeq for &'a mut Serializer<'config> {
-    type Error = Infallible;
+impl<'a, 'config, Output> SerializeSeq for &'a mut Serializer<'config, Output>
+where
+    Output: Write,
+{
+    type Error = core::fmt::Error;
     type Ok = ();
 
     fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
@@ -294,13 +290,15 @@ impl<'a, 'config> SerializeSeq for &'a mut Serializer<'config> {
     }
 
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        self.writer.finish_nested();
-        Ok(())
+        self.writer.finish_nested()
     }
 }
 
-impl<'a, 'config> SerializeTuple for &'a mut Serializer<'config> {
-    type Error = Infallible;
+impl<'a, 'config, Output> SerializeTuple for &'a mut Serializer<'config, Output>
+where
+    Output: Write,
+{
+    type Error = core::fmt::Error;
     type Ok = ();
 
     fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
@@ -311,13 +309,15 @@ impl<'a, 'config> SerializeTuple for &'a mut Serializer<'config> {
     }
 
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        self.writer.finish_nested();
-        Ok(())
+        self.writer.finish_nested()
     }
 }
 
-impl<'a, 'config> SerializeTupleStruct for &'a mut Serializer<'config> {
-    type Error = Infallible;
+impl<'a, 'config, Output> SerializeTupleStruct for &'a mut Serializer<'config, Output>
+where
+    Output: Write,
+{
+    type Error = core::fmt::Error;
     type Ok = ();
 
     fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
@@ -328,13 +328,15 @@ impl<'a, 'config> SerializeTupleStruct for &'a mut Serializer<'config> {
     }
 
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        self.writer.finish_nested();
-        Ok(())
+        self.writer.finish_nested()
     }
 }
 
-impl<'a, 'config> SerializeTupleVariant for &'a mut Serializer<'config> {
-    type Error = Infallible;
+impl<'a, 'config, Output> SerializeTupleVariant for &'a mut Serializer<'config, Output>
+where
+    Output: Write,
+{
+    type Error = core::fmt::Error;
     type Ok = ();
 
     fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
@@ -345,18 +347,20 @@ impl<'a, 'config> SerializeTupleVariant for &'a mut Serializer<'config> {
     }
 
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        self.writer.finish_nested();
-        Ok(())
+        self.writer.finish_nested()
     }
 }
 
-pub struct StructSerializer<'a, 'config> {
-    serializer: &'a mut Serializer<'config>,
+pub struct StructSerializer<'a, 'config, Output> {
+    serializer: &'a mut Serializer<'config, Output>,
     is_implicit_map: bool,
 }
 
-impl<'a, 'config> SerializeStruct for StructSerializer<'a, 'config> {
-    type Error = Infallible;
+impl<'a, 'config, Output> SerializeStruct for StructSerializer<'a, 'config, Output>
+where
+    Output: Write,
+{
+    type Error = core::fmt::Error;
     type Ok = ();
 
     fn serialize_field<T: ?Sized>(
@@ -368,12 +372,12 @@ impl<'a, 'config> SerializeStruct for StructSerializer<'a, 'config> {
         T: serde::Serialize,
     {
         if self.is_implicit_map {
-            self.serializer.writer.write_raw_value(key);
-            self.serializer.writer.write_raw_value(": ");
+            self.serializer.writer.write_raw_value(key)?;
+            self.serializer.writer.write_raw_value(": ")?;
             value.serialize(&mut *self.serializer)?;
-            self.serializer.writer.insert_newline();
+            self.serializer.writer.insert_newline()?;
         } else {
-            self.serializer.writer.write_raw_value(key);
+            self.serializer.writer.write_raw_value(key)?;
             value.serialize(&mut *self.serializer)?;
         }
         Ok(())
@@ -381,14 +385,17 @@ impl<'a, 'config> SerializeStruct for StructSerializer<'a, 'config> {
 
     fn end(self) -> Result<Self::Ok, Self::Error> {
         if !self.is_implicit_map {
-            self.serializer.writer.finish_nested();
+            self.serializer.writer.finish_nested()?;
         }
         Ok(())
     }
 }
 
-impl<'a, 'config> SerializeStructVariant for &'a mut Serializer<'config> {
-    type Error = Infallible;
+impl<'a, 'config, Output> SerializeStructVariant for &'a mut Serializer<'config, Output>
+where
+    Output: Write,
+{
+    type Error = core::fmt::Error;
     type Ok = ();
 
     fn serialize_field<T: ?Sized>(
@@ -399,18 +406,20 @@ impl<'a, 'config> SerializeStructVariant for &'a mut Serializer<'config> {
     where
         T: serde::Serialize,
     {
-        self.writer.write_raw_value(key);
+        self.writer.write_raw_value(key)?;
         value.serialize(&mut **self)
     }
 
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        self.writer.finish_nested();
-        Ok(())
+        self.writer.finish_nested()
     }
 }
 
-impl<'a, 'config> SerializeMap for &'a mut Serializer<'config> {
-    type Error = Infallible;
+impl<'a, 'config, Output> SerializeMap for &'a mut Serializer<'config, Output>
+where
+    Output: Write,
+{
+    type Error = core::fmt::Error;
     type Ok = ();
 
     fn serialize_key<T: ?Sized>(&mut self, key: &T) -> Result<(), Self::Error>
@@ -428,7 +437,7 @@ impl<'a, 'config> SerializeMap for &'a mut Serializer<'config> {
     }
 
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        self.writer.finish_nested();
+        self.writer.finish_nested()?;
         Ok(())
     }
 }
@@ -456,31 +465,11 @@ impl Config {
     }
 
     pub fn serialize<S: Serialize>(&self, value: &S) -> String {
-        let mut serializer = Serializer::new(self);
-        value.serialize(&mut serializer).expect("infallible");
+        let mut serializer = Serializer::new(String::new(), self);
+        value.serialize(&mut serializer).expect("core::fmt::Error");
         serializer.finish()
     }
 }
-
-#[derive(Debug)]
-pub enum Infallible {}
-
-impl serde::ser::Error for Infallible {
-    fn custom<T>(_msg: T) -> Self
-    where
-        T: core::fmt::Display,
-    {
-        unreachable!("rsn is infallible when serializing")
-    }
-}
-
-impl Display for Infallible {
-    fn fmt(&self, _f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        unreachable!("this type cannot be constructed")
-    }
-}
-
-impl serde::ser::StdError for Infallible {}
 
 #[test]
 fn serialization_test() {

@@ -84,29 +84,29 @@ macro_rules! fn_integer_into {
 }
 
 impl Integer {
-    fn_integer_into!(into_u8, u8);
+    fn_integer_into!(as_u8, u8);
 
-    fn_integer_into!(into_u16, u16);
+    fn_integer_into!(as_u16, u16);
 
-    fn_integer_into!(into_u32, u32);
+    fn_integer_into!(as_u32, u32);
 
-    fn_integer_into!(into_u64, u64);
+    fn_integer_into!(as_u64, u64);
 
-    fn_integer_into!(into_u128, u128);
+    fn_integer_into!(as_u128, u128);
 
-    fn_integer_into!(into_usize, usize);
+    fn_integer_into!(as_usize, usize);
 
-    fn_integer_into!(into_i8, i8);
+    fn_integer_into!(as_i8, i8);
 
-    fn_integer_into!(into_i16, i16);
+    fn_integer_into!(as_i16, i16);
 
-    fn_integer_into!(into_i32, i32);
+    fn_integer_into!(as_i32, i32);
 
-    fn_integer_into!(into_i64, i64);
+    fn_integer_into!(as_i64, i64);
 
-    fn_integer_into!(into_i128, i128);
+    fn_integer_into!(as_i128, i128);
 
-    fn_integer_into!(into_isize, isize);
+    fn_integer_into!(as_isize, isize);
 
     #[inline]
     pub const fn is_zero(self) -> bool {
