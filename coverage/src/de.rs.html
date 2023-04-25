@@ -112,7 +112,7 @@
                 
             </div>
             <div class="column has-background-white p-0">
-                <pre class="has-background-white py-0 px-2">use serde::Deserialize;</pre>
+                <pre class="has-background-white py-0 px-2"></pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -125,7 +125,7 @@
                 
             </div>
             <div class="column has-background-white p-0">
-                <pre class="has-background-white py-0 px-2"></pre>
+                <pre class="has-background-white py-0 px-2">use serde::de::{EnumAccess, MapAccess, SeqAccess, VariantAccess};</pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -138,7 +138,7 @@
                 
             </div>
             <div class="column has-background-white p-0">
-                <pre class="has-background-white py-0 px-2">use serde::de::{EnumAccess, MapAccess, SeqAccess, VariantAccess};</pre>
+                <pre class="has-background-white py-0 px-2">use serde::Deserialize;</pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -265,7 +265,7 @@
             </div>
             <div
                 class="column is-1 is-narrow p-0 has-text-centered has-text-success-light has-background-success">
-                19
+                20
             </div>
             <div class="column has-background-success-light p-0">
                 <pre class="has-background-success-light py-0 px-2">    pub fn new(source: &amp;&#x27;de str, config: Config) -&gt; Self {</pre>
@@ -278,7 +278,7 @@
             </div>
             <div
                 class="column is-1 is-narrow p-0 has-text-centered has-text-success-light has-background-success">
-                19
+                20
             </div>
             <div class="column has-background-success-light p-0">
                 <pre class="has-background-success-light py-0 px-2">        Self {</pre>
@@ -291,7 +291,7 @@
             </div>
             <div
                 class="column is-1 is-narrow p-0 has-text-centered has-text-success-light has-background-success">
-                19
+                20
             </div>
             <div class="column has-background-success-light p-0">
                 <pre class="has-background-success-light py-0 px-2">            parser: Parser::new(source, config.include_comments(false)).peekable(),</pre>
@@ -304,7 +304,7 @@
             </div>
             <div
                 class="column is-1 is-narrow p-0 has-text-centered has-text-success-light has-background-success">
-                19
+                20
             </div>
             <div class="column has-background-success-light p-0">
                 <pre class="has-background-success-light py-0 px-2">        }</pre>
@@ -317,7 +317,7 @@
             </div>
             <div
                 class="column is-1 is-narrow p-0 has-text-centered has-text-success-light has-background-success">
-                19
+                20
             </div>
             <div class="column has-background-success-light p-0">
                 <pre class="has-background-success-light py-0 px-2">    }</pre>
@@ -980,7 +980,7 @@
             </div>
             <div
                 class="column is-1 is-narrow p-0 has-text-centered has-text-success-light has-background-success">
-                115
+                116
             </div>
             <div class="column has-background-success-light p-0">
                 <pre class="has-background-success-light py-0 px-2">                    kind: EventKind::Primitive(Primitive::Integer(value)),</pre>
@@ -993,7 +993,7 @@
             </div>
             <div
                 class="column is-1 is-narrow p-0 has-text-centered has-text-success-light has-background-success">
-                115
+                116
             </div>
             <div class="column has-background-success-light p-0">
                 <pre class="has-background-success-light py-0 px-2">                    location,</pre>
@@ -1006,7 +1006,7 @@
             </div>
             <div
                 class="column is-1 is-narrow p-0 has-text-centered has-text-success-light has-background-success">
-                115
+                116
             </div>
             <div class="column has-background-success-light p-0">
                 <pre class="has-background-success-light py-0 px-2">                }) =&gt; {</pre>
@@ -1019,7 +1019,7 @@
             </div>
             <div
                 class="column is-1 is-narrow p-0 has-text-centered has-text-success-light has-background-success">
-                115
+                116
             </div>
             <div class="column has-background-success-light p-0">
                 <pre class="has-background-success-light py-0 px-2">                    visitor.$visit_name(value.$conv_name().ok_or_else(|| {</pre>
@@ -1045,7 +1045,7 @@
             </div>
             <div
                 class="column is-1 is-narrow p-0 has-text-centered has-text-success-light has-background-success">
-                115
+                116
             </div>
             <div class="column has-background-success-light p-0">
                 <pre class="has-background-success-light py-0 px-2">                    })?)</pre>
@@ -1204,7 +1204,7 @@
                 
             </div>
             <div class="column has-background-danger-light p-0">
-                <pre class="has-background-danger-light py-0 px-2">    deserialize_int_impl!(deserialize_i8, visit_i8, into_i8);</pre>
+                <pre class="has-background-danger-light py-0 px-2">    deserialize_int_impl!(deserialize_i8, visit_i8, as_i8);</pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -1230,7 +1230,7 @@
                 
             </div>
             <div class="column has-background-danger-light p-0">
-                <pre class="has-background-danger-light py-0 px-2">    deserialize_int_impl!(deserialize_i16, visit_i16, into_i16);</pre>
+                <pre class="has-background-danger-light py-0 px-2">    deserialize_int_impl!(deserialize_i16, visit_i16, as_i16);</pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -1256,7 +1256,7 @@
                 
             </div>
             <div class="column has-background-danger-light p-0">
-                <pre class="has-background-danger-light py-0 px-2">    deserialize_int_impl!(deserialize_i32, visit_i32, into_i32);</pre>
+                <pre class="has-background-danger-light py-0 px-2">    deserialize_int_impl!(deserialize_i32, visit_i32, as_i32);</pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -1282,7 +1282,7 @@
                 
             </div>
             <div class="column has-background-danger-light p-0">
-                <pre class="has-background-danger-light py-0 px-2">    deserialize_int_impl!(deserialize_i64, visit_i64, into_i64);</pre>
+                <pre class="has-background-danger-light py-0 px-2">    deserialize_int_impl!(deserialize_i64, visit_i64, as_i64);</pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -1308,7 +1308,7 @@
                 
             </div>
             <div class="column has-background-danger-light p-0">
-                <pre class="has-background-danger-light py-0 px-2">    deserialize_int_impl!(deserialize_i128, visit_i128, into_i128);</pre>
+                <pre class="has-background-danger-light py-0 px-2">    deserialize_int_impl!(deserialize_i128, visit_i128, as_i128);</pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -1334,7 +1334,7 @@
                 
             </div>
             <div class="column has-background-danger-light p-0">
-                <pre class="has-background-danger-light py-0 px-2">    deserialize_int_impl!(deserialize_u8, visit_u8, into_u8);</pre>
+                <pre class="has-background-danger-light py-0 px-2">    deserialize_int_impl!(deserialize_u8, visit_u8, as_u8);</pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -1360,7 +1360,7 @@
                 
             </div>
             <div class="column has-background-danger-light p-0">
-                <pre class="has-background-danger-light py-0 px-2">    deserialize_int_impl!(deserialize_u16, visit_u16, into_u16);</pre>
+                <pre class="has-background-danger-light py-0 px-2">    deserialize_int_impl!(deserialize_u16, visit_u16, as_u16);</pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -1386,7 +1386,7 @@
                 
             </div>
             <div class="column has-background-danger-light p-0">
-                <pre class="has-background-danger-light py-0 px-2">    deserialize_int_impl!(deserialize_u32, visit_u32, into_u32);</pre>
+                <pre class="has-background-danger-light py-0 px-2">    deserialize_int_impl!(deserialize_u32, visit_u32, as_u32);</pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -1412,7 +1412,7 @@
                 
             </div>
             <div class="column has-background-danger-light p-0">
-                <pre class="has-background-danger-light py-0 px-2">    deserialize_int_impl!(deserialize_u64, visit_u64, into_u64);</pre>
+                <pre class="has-background-danger-light py-0 px-2">    deserialize_int_impl!(deserialize_u64, visit_u64, as_u64);</pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -1438,7 +1438,7 @@
                 
             </div>
             <div class="column has-background-danger-light p-0">
-                <pre class="has-background-danger-light py-0 px-2">    deserialize_int_impl!(deserialize_u128, visit_u128, into_u128);</pre>
+                <pre class="has-background-danger-light py-0 px-2">    deserialize_int_impl!(deserialize_u128, visit_u128, as_u128);</pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -11089,7 +11089,7 @@
         </div></div>
         <footer class="footer">
             <div class="content has-text-centered">
-                <p class="heading">Date: 2023-04-23 13:52</p>
+                <p class="heading">Date: 2023-04-25 23:19</p>
             </div>
         </footer>
     </body>
