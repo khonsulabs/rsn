@@ -1,7 +1,7 @@
 use alloc::borrow::Cow;
-use alloc::fmt;
 use alloc::string::String;
 use alloc::vec::Vec;
+use core::fmt;
 use core::fmt::Write;
 
 use crate::tokenizer::Integer;
