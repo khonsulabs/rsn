@@ -1,9 +1,11 @@
 use alloc::borrow::Cow;
 use alloc::vec::Vec;
+use core::fmt::Display;
 use core::str::{self, FromStr};
 
 use crate::parser::{Config, Error, ErrorKind, Event, EventKind, Name, Nested, Parser, Primitive};
 use crate::tokenizer::Integer;
+use crate::writer::{self, Writer};
 pub type OwnedValue = Value<'static>;
 
 #[derive(Debug, Clone, PartialEq)]
@@ -152,12 +154,13 @@ impl<'a> Value<'a> {
 
     #[cfg(feature = "serde")]
     pub fn from_serialize<S: ::serde::Serialize>(value: &S) -> Self {
-        value.serialize(serde::ValueSerializer).expect("infallible")
+        value
+            .serialize(serde::ValueSerializer)
+            .expect("core::fmt::Error")
     }
 
     #[cfg(feature = "serde")]
-    pub fn to_deserialize<D: ::serde::Deserialize<'a>>(&self) -> Result<D, serde::Error> {
-        // TODO serde::Error needs to be exported
+    pub fn to_deserialize<D: ::serde::Deserialize<'a>>(&self) -> Result<D, serde::FromValueError> {
         D::deserialize(serde::ValueDeserializer(self))
     }
 
@@ -210,6 +213,25 @@ impl FromStr for Value<'static> {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Value::from_str(s, Config::default()).map(Value::into_owned)
+    }
+}
+
+impl<'a> Display for Value<'a> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let mut writer = if f.alternate() {
+            Writer::new(
+                f,
+                &writer::Config::Pretty {
+                    indentation: Cow::Borrowed("  "),
+                    newline: Cow::Borrowed("\n"),
+                },
+            )
+        } else {
+            Writer::new(f, &writer::Config::Compact)
+        };
+        writer.write_value(self)?;
+        writer.finish();
+        Ok(())
     }
 }
 
@@ -275,6 +297,7 @@ mod serde {
     use alloc::string::{String, ToString};
     use alloc::{slice, vec};
     use core::fmt::Display;
+    use core::num::TryFromIntError;
     use core::str;
 
     use serde::de::{EnumAccess, MapAccess, SeqAccess, VariantAccess};
@@ -286,14 +309,13 @@ mod serde {
 
     use super::{List, StructContents};
     use crate::parser::Nested;
-    use crate::ser::Infallible;
     use crate::tokenizer::Integer;
     use crate::value::{Map, Named, OwnedValue, Value};
 
     pub struct ValueSerializer;
 
     impl Serializer for ValueSerializer {
-        type Error = Infallible;
+        type Error = ToValueError;
         type Ok = OwnedValue;
         type SerializeMap = MapSerializer;
         type SerializeSeq = SequenceSerializer;
@@ -484,11 +506,11 @@ mod serde {
         }
 
         fn serialize_i128(self, v: i128) -> Result<Self::Ok, Self::Error> {
-            Ok(Value::Integer(Integer::try_from(v).unwrap())) // TODO switch from infallible
+            Ok(Value::Integer(Integer::try_from(v)?))
         }
 
         fn serialize_u128(self, v: u128) -> Result<Self::Ok, Self::Error> {
-            Ok(Value::Integer(Integer::try_from(v).unwrap())) // TODO switch from infallible
+            Ok(Value::Integer(Integer::try_from(v)?))
         }
     }
 
@@ -509,7 +531,7 @@ mod serde {
     }
 
     impl SerializeSeq for SequenceSerializer {
-        type Error = Infallible;
+        type Error = ToValueError;
         type Ok = OwnedValue;
 
         fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
@@ -538,7 +560,7 @@ mod serde {
     }
 
     impl SerializeTuple for SequenceSerializer {
-        type Error = Infallible;
+        type Error = ToValueError;
         type Ok = OwnedValue;
 
         fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
@@ -554,7 +576,7 @@ mod serde {
     }
 
     impl SerializeTupleStruct for SequenceSerializer {
-        type Error = Infallible;
+        type Error = ToValueError;
         type Ok = OwnedValue;
 
         fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
@@ -570,7 +592,7 @@ mod serde {
     }
 
     impl SerializeTupleVariant for SequenceSerializer {
-        type Error = Infallible;
+        type Error = ToValueError;
         type Ok = OwnedValue;
 
         fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
@@ -592,7 +614,7 @@ mod serde {
     }
 
     impl SerializeMap for MapSerializer {
-        type Error = Infallible;
+        type Error = ToValueError;
         type Ok = OwnedValue;
 
         fn serialize_key<T: ?Sized>(&mut self, key: &T) -> Result<(), Self::Error>
@@ -631,7 +653,7 @@ mod serde {
     }
 
     impl SerializeStruct for MapSerializer {
-        type Error = Infallible;
+        type Error = ToValueError;
         type Ok = OwnedValue;
 
         fn serialize_field<T: ?Sized>(
@@ -652,7 +674,7 @@ mod serde {
     }
 
     impl SerializeStructVariant for MapSerializer {
-        type Error = Infallible;
+        type Error = ToValueError;
         type Ok = OwnedValue;
 
         fn serialize_field<T: ?Sized>(
@@ -691,7 +713,7 @@ mod serde {
     }
 
     impl<'a, 'de> Deserializer<'de> for ValueDeserializer<'a, 'de> {
-        type Error = Error;
+        type Error = FromValueError;
 
         deserialize_int!(deserialize_i8, as_i8, visit_i8);
 
@@ -1030,7 +1052,7 @@ mod serde {
     }
 
     impl<'a, 'de> EnumAccess<'de> for ValueDeserializer<'a, 'de> {
-        type Error = Error;
+        type Error = FromValueError;
         type Variant = EnumVariantAccessor<'a, 'de>;
 
         fn variant_seed<V>(self, seed: V) -> Result<(V::Value, Self::Variant), Self::Error>
@@ -1064,7 +1086,7 @@ mod serde {
     }
 
     impl<'a, 'de> VariantAccess<'de> for EnumVariantAccessor<'a, 'de> {
-        type Error = Error;
+        type Error = FromValueError;
 
         fn unit_variant(self) -> Result<(), Self::Error> {
             Ok(())
@@ -1132,7 +1154,7 @@ mod serde {
     }
 
     impl<'a, 'de> MapAccess<'de> for MapDeserializer<'a, 'de> {
-        type Error = Error;
+        type Error = FromValueError;
 
         fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error>
         where
@@ -1158,7 +1180,7 @@ mod serde {
     pub struct SequenceDeserializer<'a, 'de>(slice::Iter<'a, Value<'de>>);
 
     impl<'a, 'de> SeqAccess<'de> for SequenceDeserializer<'a, 'de> {
-        type Error = Error;
+        type Error = FromValueError;
 
         fn next_element_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>, Self::Error>
         where
@@ -1173,11 +1195,18 @@ mod serde {
 
     #[derive(Debug)]
 
-    pub enum Error {
+    pub enum ToValueError {
         Message(String),
+        IntegerTooLarge(TryFromIntError),
     }
 
-    impl serde::de::Error for Error {
+    impl From<TryFromIntError> for ToValueError {
+        fn from(value: TryFromIntError) -> Self {
+            Self::IntegerTooLarge(value)
+        }
+    }
+
+    impl serde::ser::Error for ToValueError {
         fn custom<T>(msg: T) -> Self
         where
             T: Display,
@@ -1186,13 +1215,68 @@ mod serde {
         }
     }
 
-    impl serde::ser::StdError for Error {}
+    impl serde::ser::StdError for ToValueError {}
 
-    impl Display for Error {
+    impl Display for ToValueError {
         fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
             match self {
-                Error::Message(message) => f.write_str(message),
+                ToValueError::Message(message) => f.write_str(message),
+                ToValueError::IntegerTooLarge(err) => write!(f, "{err}"),
+            }
+        }
+    }
+
+    #[derive(Debug)]
+
+    pub enum FromValueError {
+        Message(String),
+    }
+
+    impl serde::de::Error for FromValueError {
+        fn custom<T>(msg: T) -> Self
+        where
+            T: Display,
+        {
+            Self::Message(msg.to_string())
+        }
+    }
+
+    impl serde::de::StdError for FromValueError {}
+
+    impl Display for FromValueError {
+        fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+            match self {
+                FromValueError::Message(message) => f.write_str(message),
             }
         }
     }
 }
+
+#[test]
+fn display() {
+    use alloc::string::ToString;
+    use alloc::{format, vec};
+
+    assert_eq!(
+        Value::Named(Named {
+            name: Cow::Borrowed("Hello"),
+            contents: StructContents::Tuple(List(vec![Value::String(Cow::Borrowed("World"))]))
+        })
+        .to_string(),
+        "Hello(\"World\")"
+    );
+
+    assert_eq!(
+        format!(
+            "{:#}",
+            Value::Named(Named {
+                name: Cow::Borrowed("Hello"),
+                contents: StructContents::Tuple(List(vec![Value::String(Cow::Borrowed("World"))]))
+            })
+        ),
+        "Hello(\n  \"World\"\n)"
+    );
+}
+
+#[cfg(feature = "serde")]
+pub use self::serde::{FromValueError, ToValueError};

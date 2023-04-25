@@ -5,38 +5,7 @@ use core::fmt::Debug;
 use serde::{Deserialize, Serialize};
 
 use crate::value::Value;
-
-macro_rules! dbg {
-    () => {{
-        #[cfg(feature = "std")]
-        {
-            ::std::dbg!()
-        }
-    }};
-    ($val:expr $(,)?) => {{
-        #[cfg(feature = "std")]
-        {
-            ::std::dbg!($val)
-        }
-    }};
-    ($($val:expr),+ $(,)?) => {{
-        #[cfg(feature = "std")]
-        ::std::dbg!($($val),+)
-    }};
-}
-
-macro_rules! println {
-    () => {{
-        #[cfg(feature = "std")]
-        {
-            ::std::prinltln!()
-        }
-    }};
-    ($($arg:tt)*) => {{
-        #[cfg(feature = "std")]
-        ::std::println!($($arg)*)
-    }};
-}
+use crate::{dbg, println};
 
 #[derive(Serialize, Deserialize, Default, Debug, PartialEq)]
 struct StructOfEverything<'a> {
