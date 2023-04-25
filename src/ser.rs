@@ -1,12 +1,12 @@
 use alloc::borrow::Cow;
 use alloc::string::String;
 use core::fmt::Display;
-use serde::Serialize;
 
 use serde::ser::{
     SerializeMap, SerializeSeq, SerializeStruct, SerializeStructVariant, SerializeTuple,
     SerializeTupleStruct, SerializeTupleVariant,
 };
+use serde::Serialize;
 
 use crate::writer::{self, Writer};
 

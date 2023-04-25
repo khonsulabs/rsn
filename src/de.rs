@@ -3,9 +3,9 @@ use alloc::string::{String, ToString};
 use core::fmt::Display;
 use core::iter::Peekable;
 use core::ops::Range;
-use serde::Deserialize;
 
 use serde::de::{EnumAccess, MapAccess, SeqAccess, VariantAccess};
+use serde::Deserialize;
 
 use crate::parser::{self, Config, Event, EventKind, Name, Nested, Parser, Primitive};
 use crate::tokenizer::{self, Integer};
@@ -87,25 +87,25 @@ macro_rules! deserialize_int_impl {
 impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
     type Error = Error;
 
-    deserialize_int_impl!(deserialize_i8, visit_i8, into_i8);
+    deserialize_int_impl!(deserialize_i8, visit_i8, as_i8);
 
-    deserialize_int_impl!(deserialize_i16, visit_i16, into_i16);
+    deserialize_int_impl!(deserialize_i16, visit_i16, as_i16);
 
-    deserialize_int_impl!(deserialize_i32, visit_i32, into_i32);
+    deserialize_int_impl!(deserialize_i32, visit_i32, as_i32);
 
-    deserialize_int_impl!(deserialize_i64, visit_i64, into_i64);
+    deserialize_int_impl!(deserialize_i64, visit_i64, as_i64);
 
-    deserialize_int_impl!(deserialize_i128, visit_i128, into_i128);
+    deserialize_int_impl!(deserialize_i128, visit_i128, as_i128);
 
-    deserialize_int_impl!(deserialize_u8, visit_u8, into_u8);
+    deserialize_int_impl!(deserialize_u8, visit_u8, as_u8);
 
-    deserialize_int_impl!(deserialize_u16, visit_u16, into_u16);
+    deserialize_int_impl!(deserialize_u16, visit_u16, as_u16);
 
-    deserialize_int_impl!(deserialize_u32, visit_u32, into_u32);
+    deserialize_int_impl!(deserialize_u32, visit_u32, as_u32);
 
-    deserialize_int_impl!(deserialize_u64, visit_u64, into_u64);
+    deserialize_int_impl!(deserialize_u64, visit_u64, as_u64);
 
-    deserialize_int_impl!(deserialize_u128, visit_u128, into_u128);
+    deserialize_int_impl!(deserialize_u128, visit_u128, as_u128);
 
     fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
