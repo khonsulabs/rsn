@@ -1763,14 +1763,14 @@
 
 <span class="attr">#[derive(Debug, Clone, PartialEq)]
 </span><span class="kw">pub struct </span>Error {
-    <span class="kw">pub </span>location: <span class="prelude-ty">Option</span>&lt;Range&lt;usize&gt;&gt;,
+    <span class="kw">pub </span>location: Range&lt;usize&gt;,
     <span class="kw">pub </span>kind: ErrorKind,
 }
 
 <span class="kw">impl </span>Error {
     <span class="kw">pub fn </span>new(location: Range&lt;usize&gt;, kind: <span class="kw">impl </span>Into&lt;ErrorKind&gt;) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{
-            location: location.into(),
+            location,
             kind: kind.into(),
         }
     }
@@ -1779,7 +1779,7 @@
 <span class="kw">impl </span>From&lt;parser::Error&gt; <span class="kw">for </span>Error {
     <span class="kw">fn </span>from(err: parser::Error) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{
-            location: <span class="prelude-val">Some</span>(err.location),
+            location: err.location,
             kind: err.kind.into(),
         }
     }
