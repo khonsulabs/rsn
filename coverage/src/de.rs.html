@@ -11838,7 +11838,7 @@
                 
             </div>
             <div class="column has-background-danger-light p-0">
-                <pre class="has-background-danger-light py-0 px-2">                let location = err.location.unwrap_or_else(|| {</pre>
+                <pre class="has-background-danger-light py-0 px-2">                let location = err</pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -11851,7 +11851,7 @@
                 
             </div>
             <div class="column has-background-danger-light p-0">
-                <pre class="has-background-danger-light py-0 px-2">                    deserializer.parser.current_offset()..deserializer.parser.current_offset()</pre>
+                <pre class="has-background-danger-light py-0 px-2">                    .location</pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -11864,7 +11864,7 @@
                 
             </div>
             <div class="column has-background-danger-light p-0">
-                <pre class="has-background-danger-light py-0 px-2">                });</pre>
+                <pre class="has-background-danger-light py-0 px-2">                    .unwrap_or_else(|| deserializer.parser.current_range());</pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -12524,7 +12524,7 @@
             </div>
             <div
                 class="column is-1 is-narrow p-0 has-text-centered has-text-success-light has-background-success">
-                582
+                583
             </div>
             <div class="column has-background-success-light p-0">
                 <pre class="has-background-success-light py-0 px-2">    fn next(&amp;mut self) -&gt; Option&lt;Self::Item&gt; {</pre>
@@ -12537,7 +12537,7 @@
             </div>
             <div
                 class="column is-1 is-narrow p-0 has-text-centered has-text-success-light has-background-success">
-                582
+                583
             </div>
             <div class="column has-background-success-light p-0">
                 <pre class="has-background-success-light py-0 px-2">        self.peeked.take().or_else(|| self.iter.next())</pre>
@@ -12550,7 +12550,7 @@
             </div>
             <div
                 class="column is-1 is-narrow p-0 has-text-centered has-text-success-light has-background-success">
-                582
+                583
             </div>
             <div class="column has-background-success-light p-0">
                 <pre class="has-background-success-light py-0 px-2">    }</pre>
@@ -13234,7 +13234,7 @@
         </div></div>
         <footer class="footer">
             <div class="content has-text-centered">
-                <p class="heading">Date: 2023-05-16 17:52</p>
+                <p class="heading">Date: 2023-05-16 18:03</p>
             </div>
         </footer>
     </body>
