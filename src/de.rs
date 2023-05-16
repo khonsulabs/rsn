@@ -780,6 +780,17 @@ impl From<parser::Error> for Error {
         }
     }
 }
+impl serde::ser::StdError for Error {}
+
+impl Display for Error {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        write!(
+            f,
+            "{} at {}..{}",
+            self.kind, self.location.start, self.location.end
+        )
+    }
+}
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct DeserializerError {
