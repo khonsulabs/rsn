@@ -423,13 +423,13 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
 
     fn deserialize_newtype_struct<V>(
         self,
-        _name: &'static str,
+        name: &'static str,
         visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
         V: serde::de::Visitor<'de>,
     {
-        self.deserialize_seq(visitor)
+        self.deserialize_tuple_struct(name, 1, visitor)
     }
 
     fn deserialize_seq<V>(self, visitor: V) -> Result<V::Value, Self::Error>
