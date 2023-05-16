@@ -27,3 +27,8 @@ fn main() {
     let pretty = rsn::to_string_pretty(&posts);
     println!("Pretty form:\n{pretty}");
 }
+
+#[test]
+fn runs() {
+    main();
+}

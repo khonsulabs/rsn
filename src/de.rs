@@ -1,7 +1,6 @@
 use alloc::borrow::Cow;
 use alloc::string::{String, ToString};
 use core::fmt::Display;
-use core::iter::Peekable;
 use core::ops::Range;
 
 use serde::de::{EnumAccess, MapAccess, SeqAccess, VariantAccess};
@@ -11,13 +10,13 @@ use crate::parser::{self, Config, Event, EventKind, Name, Nested, Parser, Primit
 use crate::tokenizer::{self, Integer};
 
 pub struct Deserializer<'de> {
-    parser: Peekable<Parser<'de>>,
+    parser: BetterPeekable<Parser<'de>>,
 }
 
 impl<'de> Deserializer<'de> {
     pub fn new(source: &'de str, config: Config) -> Self {
         Self {
-            parser: Parser::new(source, config.include_comments(false)).peekable(),
+            parser: BetterPeekable::new(Parser::new(source, config.include_comments(false))),
         }
     }
 
@@ -29,7 +28,7 @@ impl<'de> Deserializer<'de> {
         }
     }
 
-    fn handle_unit(&mut self) -> Result<(), Error> {
+    fn handle_unit(&mut self) -> Result<(), DeserializerError> {
         match self.parser.next().transpose()? {
             Some(Event {
                 kind:
@@ -56,8 +55,11 @@ impl<'de> Deserializer<'de> {
                 }
                 Ok(())
             }
-            Some(evt) => Err(Error::new(evt.location, ErrorKind::ExpectedUnit)),
-            None => Err(Error::new(None, ErrorKind::ExpectedUnit)),
+            Some(evt) => Err(DeserializerError::new(
+                evt.location,
+                ErrorKind::ExpectedUnit,
+            )),
+            None => Err(DeserializerError::new(None, ErrorKind::ExpectedUnit)),
         }
     }
 }
@@ -72,20 +74,21 @@ macro_rules! deserialize_int_impl {
                 Some(Event {
                     kind: EventKind::Primitive(Primitive::Integer(value)),
                     location,
-                }) => {
-                    visitor.$visit_name(value.$conv_name().ok_or_else(|| {
-                        Error::new(location, tokenizer::ErrorKind::IntegerTooLarge)
-                    })?)
-                }
-                Some(evt) => Err(Error::new(evt.location, ErrorKind::ExpectedInteger)),
-                None => Err(Error::new(None, ErrorKind::ExpectedInteger)),
+                }) => visitor.$visit_name(value.$conv_name().ok_or_else(|| {
+                    DeserializerError::new(location, tokenizer::ErrorKind::IntegerTooLarge)
+                })?),
+                Some(evt) => Err(DeserializerError::new(
+                    evt.location,
+                    ErrorKind::ExpectedInteger,
+                )),
+                None => Err(DeserializerError::new(None, ErrorKind::ExpectedInteger)),
             }
         }
     };
 }
 
 impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
-    type Error = Error;
+    type Error = DeserializerError;
 
     deserialize_int_impl!(deserialize_i8, visit_i8, as_i8);
 
@@ -131,7 +134,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
                         .expect("parser would error without EndNested");
                     match possible_close.kind {
                         EventKind::EndNested => Ok(value),
-                        _ => Err(Error::new(
+                        _ => Err(DeserializerError::new(
                             possible_close.location,
                             ErrorKind::SomeCanOnlyContainOneValue,
                         )),
@@ -218,8 +221,11 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
                 kind: EventKind::Primitive(Primitive::Integer(value)),
                 ..
             }) => visitor.visit_bool(!value.is_zero()),
-            Some(evt) => Err(Error::new(evt.location, ErrorKind::ExpectedInteger)),
-            None => Err(Error::new(None, ErrorKind::ExpectedInteger)),
+            Some(evt) => Err(DeserializerError::new(
+                evt.location,
+                ErrorKind::ExpectedInteger,
+            )),
+            None => Err(DeserializerError::new(None, ErrorKind::ExpectedInteger)),
         }
     }
 
@@ -243,8 +249,11 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
                 kind: EventKind::Primitive(Primitive::Integer(value)),
                 ..
             }) => visitor.visit_f64(value.as_f64()),
-            Some(evt) => Err(Error::new(evt.location, ErrorKind::ExpectedFloat)),
-            None => Err(Error::new(None, ErrorKind::ExpectedFloat)),
+            Some(evt) => Err(DeserializerError::new(
+                evt.location,
+                ErrorKind::ExpectedFloat,
+            )),
+            None => Err(DeserializerError::new(None, ErrorKind::ExpectedFloat)),
         }
     }
 
@@ -257,8 +266,11 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
                 kind: EventKind::Primitive(Primitive::Char(value)),
                 ..
             }) => visitor.visit_char(value),
-            Some(evt) => Err(Error::new(evt.location, ErrorKind::ExpectedChar)),
-            None => Err(Error::new(None, ErrorKind::ExpectedChar)),
+            Some(evt) => Err(DeserializerError::new(
+                evt.location,
+                ErrorKind::ExpectedChar,
+            )),
+            None => Err(DeserializerError::new(None, ErrorKind::ExpectedChar)),
         }
     }
 
@@ -284,11 +296,11 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
             }) => match bytes {
                 Cow::Borrowed(bytes) => visitor.visit_borrowed_str(
                     core::str::from_utf8(bytes)
-                        .map_err(|_| Error::new(location, ErrorKind::InvalidUtf8))?,
+                        .map_err(|_| DeserializerError::new(location, ErrorKind::InvalidUtf8))?,
                 ),
                 Cow::Owned(bytes) => visitor.visit_string(
                     String::from_utf8(bytes)
-                        .map_err(|_| Error::new(location, ErrorKind::InvalidUtf8))?,
+                        .map_err(|_| DeserializerError::new(location, ErrorKind::InvalidUtf8))?,
                 ),
             },
             Some(Event {
@@ -298,8 +310,11 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
                     },
                 ..
             }) => visitor.visit_str(name.name),
-            Some(evt) => Err(Error::new(evt.location, ErrorKind::ExpectedString)),
-            None => Err(Error::new(None, ErrorKind::ExpectedString)),
+            Some(evt) => Err(DeserializerError::new(
+                evt.location,
+                ErrorKind::ExpectedString,
+            )),
+            None => Err(DeserializerError::new(None, ErrorKind::ExpectedString)),
         }
     }
 
@@ -333,8 +348,11 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
                 Cow::Borrowed(bytes) => visitor.visit_borrowed_bytes(bytes),
                 Cow::Owned(bytes) => visitor.visit_byte_buf(bytes),
             },
-            Some(evt) => Err(Error::new(evt.location, ErrorKind::ExpectedBytes)),
-            None => Err(Error::new(None, ErrorKind::ExpectedBytes)),
+            Some(evt) => Err(DeserializerError::new(
+                evt.location,
+                ErrorKind::ExpectedBytes,
+            )),
+            None => Err(DeserializerError::new(None, ErrorKind::ExpectedBytes)),
         }
     }
 
@@ -368,15 +386,18 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
                         kind: EventKind::EndNested,
                         ..
                     }) => Ok(result),
-                    Some(evt) => Err(Error::new(
+                    Some(evt) => Err(DeserializerError::new(
                         evt.location,
                         ErrorKind::SomeCanOnlyContainOneValue,
                     )),
                     None => unreachable!("parser errors on early eof"),
                 }
             }
-            Some(evt) => Err(Error::new(evt.location, ErrorKind::ExpectedOption)),
-            None => Err(Error::new(None, ErrorKind::ExpectedOption)),
+            Some(evt) => Err(DeserializerError::new(
+                evt.location,
+                ErrorKind::ExpectedOption,
+            )),
+            None => Err(DeserializerError::new(None, ErrorKind::ExpectedOption)),
         }
     }
 
@@ -421,13 +442,22 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
                 location,
             }) => {
                 if !matches!(kind, Nested::Tuple | Nested::List) {
-                    return Err(Error::new(location, ErrorKind::ExpectedSequence));
+                    return Err(DeserializerError::new(
+                        location,
+                        ErrorKind::ExpectedSequence,
+                    ));
                 }
 
                 visitor.visit_seq(self)
             }
-            Some(other) => Err(Error::new(other.location, ErrorKind::ExpectedSequence)),
-            None => Err(Error::new(None, parser::ErrorKind::UnexpectedEof)),
+            Some(other) => Err(DeserializerError::new(
+                other.location,
+                ErrorKind::ExpectedSequence,
+            )),
+            None => Err(DeserializerError::new(
+                None,
+                parser::ErrorKind::UnexpectedEof,
+            )),
         }
     }
 
@@ -453,17 +483,31 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
                 location,
             }) => {
                 if name.map_or(false, |name| name != struct_name) {
-                    return Err(Error::new(location, ErrorKind::NameMismatch(struct_name)));
+                    return Err(DeserializerError::new(
+                        location,
+                        ErrorKind::NameMismatch(struct_name),
+                    ));
                 }
 
                 if kind != Nested::Tuple {
-                    return Err(Error::new(location, ErrorKind::ExpectedTupleStruct));
+                    return Err(DeserializerError::new(
+                        location,
+                        ErrorKind::ExpectedTupleStruct,
+                    ));
                 }
             }
             Some(other) => {
-                return Err(Error::new(other.location, ErrorKind::ExpectedTupleStruct));
+                return Err(DeserializerError::new(
+                    other.location,
+                    ErrorKind::ExpectedTupleStruct,
+                ));
             }
-            None => return Err(Error::new(None, parser::ErrorKind::UnexpectedEof)),
+            None => {
+                return Err(DeserializerError::new(
+                    None,
+                    parser::ErrorKind::UnexpectedEof,
+                ))
+            }
         }
 
         visitor.visit_seq(self)
@@ -479,13 +523,19 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
                 location,
             }) => {
                 if kind != Nested::Map {
-                    return Err(Error::new(location, ErrorKind::ExpectedMap));
+                    return Err(DeserializerError::new(location, ErrorKind::ExpectedMap));
                 }
 
                 visitor.visit_map(self)
             }
-            Some(other) => Err(Error::new(other.location, ErrorKind::ExpectedMap)),
-            None => Err(Error::new(None, parser::ErrorKind::UnexpectedEof)),
+            Some(other) => Err(DeserializerError::new(
+                other.location,
+                ErrorKind::ExpectedMap,
+            )),
+            None => Err(DeserializerError::new(
+                None,
+                parser::ErrorKind::UnexpectedEof,
+            )),
         }
     }
 
@@ -504,17 +554,31 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
                 location,
             }) => {
                 if name.map_or(false, |name| name != struct_name) {
-                    return Err(Error::new(location, ErrorKind::NameMismatch(struct_name)));
+                    return Err(DeserializerError::new(
+                        location,
+                        ErrorKind::NameMismatch(struct_name),
+                    ));
                 }
 
                 if kind != Nested::Map {
-                    return Err(Error::new(location, ErrorKind::ExpectedMapStruct));
+                    return Err(DeserializerError::new(
+                        location,
+                        ErrorKind::ExpectedMapStruct,
+                    ));
                 }
             }
             Some(other) => {
-                return Err(Error::new(other.location, ErrorKind::ExpectedMapStruct));
+                return Err(DeserializerError::new(
+                    other.location,
+                    ErrorKind::ExpectedMapStruct,
+                ));
             }
-            None => return Err(Error::new(None, parser::ErrorKind::UnexpectedEof)),
+            None => {
+                return Err(DeserializerError::new(
+                    None,
+                    parser::ErrorKind::UnexpectedEof,
+                ))
+            }
         }
 
         visitor.visit_map(self)
@@ -562,7 +626,12 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
                     kind: EventKind::Primitive(_) | EventKind::Comment(_),
                     ..
                 }) => {}
-                None => return Err(Error::new(None, parser::ErrorKind::UnexpectedEof)),
+                None => {
+                    return Err(DeserializerError::new(
+                        None,
+                        parser::ErrorKind::UnexpectedEof,
+                    ))
+                }
             }
 
             if depth == 0 {
@@ -575,7 +644,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
 }
 
 impl<'de> MapAccess<'de> for Deserializer<'de> {
-    type Error = Error;
+    type Error = DeserializerError;
 
     fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error>
     where
@@ -590,7 +659,10 @@ impl<'de> MapAccess<'de> for Deserializer<'de> {
                 Ok(None)
             }
             Some(_) => seed.deserialize(self).map(Some),
-            None => Err(Error::new(None, parser::ErrorKind::UnexpectedEof)),
+            None => Err(DeserializerError::new(
+                None,
+                parser::ErrorKind::UnexpectedEof,
+            )),
         }
     }
 
@@ -603,7 +675,7 @@ impl<'de> MapAccess<'de> for Deserializer<'de> {
 }
 
 impl<'de> SeqAccess<'de> for Deserializer<'de> {
-    type Error = Error;
+    type Error = DeserializerError;
 
     fn next_element_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>, Self::Error>
     where
@@ -618,13 +690,16 @@ impl<'de> SeqAccess<'de> for Deserializer<'de> {
                 Ok(None)
             }
             Some(_) => seed.deserialize(self).map(Some),
-            None => Err(Error::new(None, parser::ErrorKind::UnexpectedEof)),
+            None => Err(DeserializerError::new(
+                None,
+                parser::ErrorKind::UnexpectedEof,
+            )),
         }
     }
 }
 
 impl<'a, 'de> EnumAccess<'de> for &'a mut Deserializer<'de> {
-    type Error = Error;
+    type Error = DeserializerError;
     type Variant = Self;
 
     fn variant_seed<V>(self, seed: V) -> Result<(V::Value, Self::Variant), Self::Error>
@@ -637,7 +712,7 @@ impl<'a, 'de> EnumAccess<'de> for &'a mut Deserializer<'de> {
 }
 
 impl<'a, 'de> VariantAccess<'de> for &'a mut Deserializer<'de> {
-    type Error = Error;
+    type Error = DeserializerError;
 
     fn unit_variant(self) -> Result<(), Self::Error> {
         Ok(())
@@ -689,6 +764,30 @@ pub struct Error {
 }
 
 impl Error {
+    pub fn new(location: Range<usize>, kind: impl Into<ErrorKind>) -> Self {
+        Self {
+            location: location.into(),
+            kind: kind.into(),
+        }
+    }
+}
+
+impl From<parser::Error> for Error {
+    fn from(err: parser::Error) -> Self {
+        Self {
+            location: Some(err.location),
+            kind: err.kind.into(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct DeserializerError {
+    pub location: Option<Range<usize>>,
+    pub kind: ErrorKind,
+}
+
+impl DeserializerError {
     pub fn new(location: impl Into<Option<Range<usize>>>, kind: impl Into<ErrorKind>) -> Self {
         Self {
             location: location.into(),
@@ -697,7 +796,7 @@ impl Error {
     }
 }
 
-impl serde::de::Error for Error {
+impl serde::de::Error for DeserializerError {
     fn custom<T>(msg: T) -> Self
     where
         T: Display,
@@ -709,9 +808,9 @@ impl serde::de::Error for Error {
     }
 }
 
-impl serde::ser::StdError for Error {}
+impl serde::ser::StdError for DeserializerError {}
 
-impl Display for Error {
+impl Display for DeserializerError {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         if let Some(location) = &self.location {
             write!(f, "{} at {}..{}", self.kind, location.start, location.end)
@@ -721,7 +820,7 @@ impl Display for Error {
     }
 }
 
-impl From<parser::Error> for Error {
+impl From<parser::Error> for DeserializerError {
     fn from(err: parser::Error) -> Self {
         Self {
             location: Some(err.location),
@@ -792,9 +891,64 @@ impl Display for ErrorKind {
 impl Config {
     pub fn deserialize<'de, T: Deserialize<'de>>(self, source: &'de str) -> Result<T, Error> {
         let mut deserializer = Deserializer::new(source, self);
-        let result = T::deserialize(&mut deserializer)?;
+        let result = match T::deserialize(&mut deserializer) {
+            Ok(result) => result,
+            Err(err) => {
+                let location = err.location.unwrap_or_else(|| {
+                    deserializer.parser.current_offset()..deserializer.parser.current_offset()
+                });
+                return Err(Error::new(location, err.kind));
+            }
+        };
         deserializer.ensure_eof()?;
         Ok(result)
+    }
+}
+
+struct BetterPeekable<T>
+where
+    T: Iterator,
+{
+    iter: T,
+    peeked: Option<T::Item>,
+}
+
+impl<T> BetterPeekable<T>
+where
+    T: Iterator,
+{
+    pub fn new(iter: T) -> Self {
+        Self { iter, peeked: None }
+    }
+
+    pub fn peek(&mut self) -> Option<&T::Item> {
+        if self.peeked.is_none() {
+            self.peeked = self.next();
+        }
+
+        self.peeked.as_ref()
+    }
+}
+
+impl<T> core::ops::Deref for BetterPeekable<T>
+where
+    T: Iterator,
+{
+    type Target = T;
+
+    fn deref(&self) -> &Self::Target {
+        &self.iter
+    }
+}
+
+impl<T> Iterator for BetterPeekable<T>
+where
+    T: Iterator,
+{
+    type Item = T::Item;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.peeked.take().or_else(|| self.iter.next())
     }
 }
 
