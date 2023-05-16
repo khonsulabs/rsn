@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"enum":["ErrorKind"],"struct":["Deserializer","Error"]};
+window.SIDEBAR_ITEMS = {"enum":["ErrorKind"],"struct":["Deserializer","DeserializerError","Error"]};
