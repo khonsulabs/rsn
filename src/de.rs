@@ -759,14 +759,14 @@ impl<'a, 'de> VariantAccess<'de> for &'a mut Deserializer<'de> {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Error {
-    pub location: Option<Range<usize>>,
+    pub location: Range<usize>,
     pub kind: ErrorKind,
 }
 
 impl Error {
     pub fn new(location: Range<usize>, kind: impl Into<ErrorKind>) -> Self {
         Self {
-            location: location.into(),
+            location,
             kind: kind.into(),
         }
     }
@@ -775,7 +775,7 @@ impl Error {
 impl From<parser::Error> for Error {
     fn from(err: parser::Error) -> Self {
         Self {
-            location: Some(err.location),
+            location: err.location,
             kind: err.kind.into(),
         }
     }
