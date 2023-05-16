@@ -1013,6 +1013,32 @@
 <a href="#1013" id="1013">1013</a>
 <a href="#1014" id="1014">1014</a>
 <a href="#1015" id="1015">1015</a>
+<a href="#1016" id="1016">1016</a>
+<a href="#1017" id="1017">1017</a>
+<a href="#1018" id="1018">1018</a>
+<a href="#1019" id="1019">1019</a>
+<a href="#1020" id="1020">1020</a>
+<a href="#1021" id="1021">1021</a>
+<a href="#1022" id="1022">1022</a>
+<a href="#1023" id="1023">1023</a>
+<a href="#1024" id="1024">1024</a>
+<a href="#1025" id="1025">1025</a>
+<a href="#1026" id="1026">1026</a>
+<a href="#1027" id="1027">1027</a>
+<a href="#1028" id="1028">1028</a>
+<a href="#1029" id="1029">1029</a>
+<a href="#1030" id="1030">1030</a>
+<a href="#1031" id="1031">1031</a>
+<a href="#1032" id="1032">1032</a>
+<a href="#1033" id="1033">1033</a>
+<a href="#1034" id="1034">1034</a>
+<a href="#1035" id="1035">1035</a>
+<a href="#1036" id="1036">1036</a>
+<a href="#1037" id="1037">1037</a>
+<a href="#1038" id="1038">1038</a>
+<a href="#1039" id="1039">1039</a>
+<a href="#1040" id="1040">1040</a>
+<a href="#1041" id="1041">1041</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>alloc::borrow::Cow;
 <span class="kw">use </span>alloc::string::{String, ToString};
 <span class="kw">use </span>core::fmt::Display;
@@ -1026,12 +1052,14 @@
 
 <span class="kw">pub struct </span>Deserializer&lt;<span class="lifetime">&#39;de</span>&gt; {
     parser: BetterPeekable&lt;Parser&lt;<span class="lifetime">&#39;de</span>&gt;&gt;,
+    error_start: usize,
 }
 
 <span class="kw">impl</span>&lt;<span class="lifetime">&#39;de</span>&gt; Deserializer&lt;<span class="lifetime">&#39;de</span>&gt; {
     <span class="kw">pub fn </span>new(source: <span class="kw-2">&amp;</span><span class="lifetime">&#39;de </span>str, config: Config) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{
             parser: BetterPeekable::new(Parser::new(source, config.include_comments(<span class="bool-val">false</span>))),
+            error_start: <span class="number">0</span>,
         }
     }
 
@@ -1043,7 +1071,12 @@
         }
     }
 
+    <span class="kw">fn </span>mark_error_start(<span class="kw-2">&amp;mut </span><span class="self">self</span>) {
+        <span class="self">self</span>.error_start = <span class="self">self</span>.parser.current_offset();
+    }
+
     <span class="kw">fn </span>handle_unit(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;(), DeserializerError&gt; {
+        <span class="self">self</span>.mark_error_start();
         <span class="kw">match </span><span class="self">self</span>.parser.next().transpose()<span class="question-mark">? </span>{
             <span class="prelude-val">Some</span>(Event {
                 kind:
@@ -1085,6 +1118,7 @@
         <span class="kw">where
             </span>V: serde::de::Visitor&lt;<span class="lifetime">&#39;de</span>&gt;,
         {
+            <span class="self">self</span>.mark_error_start();
             <span class="kw">match </span><span class="self">self</span>.parser.next().transpose()<span class="question-mark">? </span>{
                 <span class="prelude-val">Some</span>(Event {
                     kind: EventKind::Primitive(Primitive::Integer(value)),
@@ -1129,6 +1163,7 @@
     <span class="kw">where
         </span>V: serde::de::Visitor&lt;<span class="lifetime">&#39;de</span>&gt;,
     {
+        <span class="self">self</span>.mark_error_start();
         <span class="kw">let </span>event = <span class="kw">match </span><span class="self">self</span>.parser.next().transpose()<span class="question-mark">? </span>{
             <span class="prelude-val">Some</span>(event) =&gt; event,
             <span class="prelude-val">None </span>=&gt; <span class="kw">return </span>visitor.visit_unit(),
@@ -1227,6 +1262,7 @@
     <span class="kw">where
         </span>V: serde::de::Visitor&lt;<span class="lifetime">&#39;de</span>&gt;,
     {
+        <span class="self">self</span>.mark_error_start();
         <span class="kw">match </span><span class="self">self</span>.parser.next().transpose()<span class="question-mark">? </span>{
             <span class="prelude-val">Some</span>(Event {
                 kind: EventKind::Primitive(Primitive::Bool(value)),
@@ -1248,6 +1284,7 @@
     <span class="kw">where
         </span>V: serde::de::Visitor&lt;<span class="lifetime">&#39;de</span>&gt;,
     {
+        <span class="self">self</span>.mark_error_start();
         <span class="self">self</span>.deserialize_f64(visitor)
     }
 
@@ -1255,6 +1292,7 @@
     <span class="kw">where
         </span>V: serde::de::Visitor&lt;<span class="lifetime">&#39;de</span>&gt;,
     {
+        <span class="self">self</span>.mark_error_start();
         <span class="kw">match </span><span class="self">self</span>.parser.next().transpose()<span class="question-mark">? </span>{
             <span class="prelude-val">Some</span>(Event {
                 kind: EventKind::Primitive(Primitive::Float(value)),
@@ -1276,6 +1314,7 @@
     <span class="kw">where
         </span>V: serde::de::Visitor&lt;<span class="lifetime">&#39;de</span>&gt;,
     {
+        <span class="self">self</span>.mark_error_start();
         <span class="kw">match </span><span class="self">self</span>.parser.next().transpose()<span class="question-mark">? </span>{
             <span class="prelude-val">Some</span>(Event {
                 kind: EventKind::Primitive(Primitive::Char(value)),
@@ -1293,6 +1332,7 @@
     <span class="kw">where
         </span>V: serde::de::Visitor&lt;<span class="lifetime">&#39;de</span>&gt;,
     {
+        <span class="self">self</span>.mark_error_start();
         <span class="kw">match </span><span class="self">self</span>.parser.next().transpose()<span class="question-mark">? </span>{
             <span class="prelude-val">Some</span>(Event {
                 kind: EventKind::Primitive(Primitive::Identifier(str)),
@@ -1337,6 +1377,7 @@
     <span class="kw">where
         </span>V: serde::de::Visitor&lt;<span class="lifetime">&#39;de</span>&gt;,
     {
+        <span class="self">self</span>.mark_error_start();
         <span class="self">self</span>.deserialize_str(visitor)
     }
 
@@ -1344,6 +1385,7 @@
     <span class="kw">where
         </span>V: serde::de::Visitor&lt;<span class="lifetime">&#39;de</span>&gt;,
     {
+        <span class="self">self</span>.mark_error_start();
         <span class="kw">match </span><span class="self">self</span>.parser.next().transpose()<span class="question-mark">? </span>{
             <span class="prelude-val">Some</span>(Event {
                 kind: EventKind::Primitive(Primitive::Identifier(str)),
@@ -1382,6 +1424,7 @@
     <span class="kw">where
         </span>V: serde::de::Visitor&lt;<span class="lifetime">&#39;de</span>&gt;,
     {
+        <span class="self">self</span>.mark_error_start();
         <span class="kw">match </span><span class="self">self</span>.parser.next().transpose()<span class="question-mark">? </span>{
             <span class="prelude-val">Some</span>(Event {
                 kind: EventKind::Primitive(Primitive::Identifier(str)),
@@ -1451,6 +1494,7 @@
     <span class="kw">where
         </span>V: serde::de::Visitor&lt;<span class="lifetime">&#39;de</span>&gt;,
     {
+        <span class="self">self</span>.mark_error_start();
         <span class="kw">match </span><span class="self">self</span>.parser.next().transpose()<span class="question-mark">? </span>{
             <span class="prelude-val">Some</span>(Event {
                 kind: EventKind::BeginNested { kind, .. },
@@ -1492,6 +1536,7 @@
     <span class="kw">where
         </span>V: serde::de::Visitor&lt;<span class="lifetime">&#39;de</span>&gt;,
     {
+        <span class="self">self</span>.mark_error_start();
         <span class="kw">match </span><span class="self">self</span>.parser.next().transpose()<span class="question-mark">? </span>{
             <span class="prelude-val">Some</span>(Event {
                 kind: EventKind::BeginNested { name, kind },
@@ -1532,6 +1577,7 @@
     <span class="kw">where
         </span>V: serde::de::Visitor&lt;<span class="lifetime">&#39;de</span>&gt;,
     {
+        <span class="self">self</span>.mark_error_start();
         <span class="kw">match </span><span class="self">self</span>.parser.next().transpose()<span class="question-mark">? </span>{
             <span class="prelude-val">Some</span>(Event {
                 kind: EventKind::BeginNested { kind, .. },
@@ -1563,6 +1609,7 @@
     <span class="kw">where
         </span>V: serde::de::Visitor&lt;<span class="lifetime">&#39;de</span>&gt;,
     {
+        <span class="self">self</span>.mark_error_start();
         <span class="kw">match </span><span class="self">self</span>.parser.next().transpose()<span class="question-mark">? </span>{
             <span class="prelude-val">Some</span>(Event {
                 kind: EventKind::BeginNested { name, kind },
@@ -1608,6 +1655,7 @@
     <span class="kw">where
         </span>V: serde::de::Visitor&lt;<span class="lifetime">&#39;de</span>&gt;,
     {
+        <span class="self">self</span>.mark_error_start();
         visitor.visit_enum(<span class="self">self</span>)
     }
 
@@ -1615,6 +1663,7 @@
     <span class="kw">where
         </span>V: serde::de::Visitor&lt;<span class="lifetime">&#39;de</span>&gt;,
     {
+        <span class="self">self</span>.mark_error_start();
         <span class="self">self</span>.deserialize_str(visitor)
     }
 
@@ -1622,6 +1671,7 @@
     <span class="kw">where
         </span>V: serde::de::Visitor&lt;<span class="lifetime">&#39;de</span>&gt;,
     {
+        <span class="self">self</span>.mark_error_start();
         <span class="kw">let </span><span class="kw-2">mut </span>depth = <span class="number">0</span>;
         <span class="kw">loop </span>{
             <span class="kw">match </span><span class="self">self</span>.parser.next().transpose()<span class="question-mark">? </span>{
@@ -1757,6 +1807,7 @@
     <span class="kw">where
         </span>V: serde::de::Visitor&lt;<span class="lifetime">&#39;de</span>&gt;,
     {
+        <span class="self">self</span>.mark_error_start();
         visitor.visit_seq(<span class="self">self</span>)
     }
 
@@ -1768,6 +1819,7 @@
     <span class="kw">where
         </span>V: serde::de::Visitor&lt;<span class="lifetime">&#39;de</span>&gt;,
     {
+        <span class="self">self</span>.mark_error_start();
         visitor.visit_map(<span class="self">self</span>)
     }
 }
@@ -1920,9 +1972,9 @@
         <span class="kw">let </span>result = <span class="kw">match </span>T::deserialize(<span class="kw-2">&amp;mut </span>deserializer) {
             <span class="prelude-val">Ok</span>(result) =&gt; result,
             <span class="prelude-val">Err</span>(err) =&gt; {
-                <span class="kw">let </span>location = err
-                    .location
-                    .unwrap_or_else(|| deserializer.parser.current_range());
+                <span class="kw">let </span>location = err.location.unwrap_or_else(|| {
+                    deserializer.error_start..deserializer.parser.current_offset()
+                });
                 <span class="kw">return </span><span class="prelude-val">Err</span>(Error::new(location, err.kind));
             }
         };
