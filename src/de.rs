@@ -11,12 +11,14 @@ use crate::tokenizer::{self, Integer};
 
 pub struct Deserializer<'de> {
     parser: BetterPeekable<Parser<'de>>,
+    error_start: usize,
 }
 
 impl<'de> Deserializer<'de> {
     pub fn new(source: &'de str, config: Config) -> Self {
         Self {
             parser: BetterPeekable::new(Parser::new(source, config.include_comments(false))),
+            error_start: 0,
         }
     }
 
@@ -28,7 +30,12 @@ impl<'de> Deserializer<'de> {
         }
     }
 
+    fn mark_error_start(&mut self) {
+        self.error_start = self.parser.current_offset();
+    }
+
     fn handle_unit(&mut self) -> Result<(), DeserializerError> {
+        self.mark_error_start();
         match self.parser.next().transpose()? {
             Some(Event {
                 kind:
@@ -70,6 +77,7 @@ macro_rules! deserialize_int_impl {
         where
             V: serde::de::Visitor<'de>,
         {
+            self.mark_error_start();
             match self.parser.next().transpose()? {
                 Some(Event {
                     kind: EventKind::Primitive(Primitive::Integer(value)),
@@ -114,6 +122,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: serde::de::Visitor<'de>,
     {
+        self.mark_error_start();
         let event = match self.parser.next().transpose()? {
             Some(event) => event,
             None => return visitor.visit_unit(),
@@ -212,6 +221,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: serde::de::Visitor<'de>,
     {
+        self.mark_error_start();
         match self.parser.next().transpose()? {
             Some(Event {
                 kind: EventKind::Primitive(Primitive::Bool(value)),
@@ -233,6 +243,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: serde::de::Visitor<'de>,
     {
+        self.mark_error_start();
         self.deserialize_f64(visitor)
     }
 
@@ -240,6 +251,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: serde::de::Visitor<'de>,
     {
+        self.mark_error_start();
         match self.parser.next().transpose()? {
             Some(Event {
                 kind: EventKind::Primitive(Primitive::Float(value)),
@@ -261,6 +273,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: serde::de::Visitor<'de>,
     {
+        self.mark_error_start();
         match self.parser.next().transpose()? {
             Some(Event {
                 kind: EventKind::Primitive(Primitive::Char(value)),
@@ -278,6 +291,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: serde::de::Visitor<'de>,
     {
+        self.mark_error_start();
         match self.parser.next().transpose()? {
             Some(Event {
                 kind: EventKind::Primitive(Primitive::Identifier(str)),
@@ -322,6 +336,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: serde::de::Visitor<'de>,
     {
+        self.mark_error_start();
         self.deserialize_str(visitor)
     }
 
@@ -329,6 +344,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: serde::de::Visitor<'de>,
     {
+        self.mark_error_start();
         match self.parser.next().transpose()? {
             Some(Event {
                 kind: EventKind::Primitive(Primitive::Identifier(str)),
@@ -367,6 +383,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: serde::de::Visitor<'de>,
     {
+        self.mark_error_start();
         match self.parser.next().transpose()? {
             Some(Event {
                 kind: EventKind::Primitive(Primitive::Identifier(str)),
@@ -436,6 +453,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: serde::de::Visitor<'de>,
     {
+        self.mark_error_start();
         match self.parser.next().transpose()? {
             Some(Event {
                 kind: EventKind::BeginNested { kind, .. },
@@ -477,6 +495,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: serde::de::Visitor<'de>,
     {
+        self.mark_error_start();
         match self.parser.next().transpose()? {
             Some(Event {
                 kind: EventKind::BeginNested { name, kind },
@@ -517,6 +536,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: serde::de::Visitor<'de>,
     {
+        self.mark_error_start();
         match self.parser.next().transpose()? {
             Some(Event {
                 kind: EventKind::BeginNested { kind, .. },
@@ -548,6 +568,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: serde::de::Visitor<'de>,
     {
+        self.mark_error_start();
         match self.parser.next().transpose()? {
             Some(Event {
                 kind: EventKind::BeginNested { name, kind },
@@ -593,6 +614,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: serde::de::Visitor<'de>,
     {
+        self.mark_error_start();
         visitor.visit_enum(self)
     }
 
@@ -600,6 +622,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: serde::de::Visitor<'de>,
     {
+        self.mark_error_start();
         self.deserialize_str(visitor)
     }
 
@@ -607,6 +630,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: serde::de::Visitor<'de>,
     {
+        self.mark_error_start();
         let mut depth = 0;
         loop {
             match self.parser.next().transpose()? {
@@ -742,6 +766,7 @@ impl<'a, 'de> VariantAccess<'de> for &'a mut Deserializer<'de> {
     where
         V: serde::de::Visitor<'de>,
     {
+        self.mark_error_start();
         visitor.visit_seq(self)
     }
 
@@ -753,6 +778,7 @@ impl<'a, 'de> VariantAccess<'de> for &'a mut Deserializer<'de> {
     where
         V: serde::de::Visitor<'de>,
     {
+        self.mark_error_start();
         visitor.visit_map(self)
     }
 }
@@ -905,9 +931,9 @@ impl Config {
         let result = match T::deserialize(&mut deserializer) {
             Ok(result) => result,
             Err(err) => {
-                let location = err
-                    .location
-                    .unwrap_or_else(|| deserializer.parser.current_range());
+                let location = err.location.unwrap_or_else(|| {
+                    deserializer.error_start..deserializer.parser.current_offset()
+                });
                 return Err(Error::new(location, err.kind));
             }
         };
