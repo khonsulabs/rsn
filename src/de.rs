@@ -11,14 +11,12 @@ use crate::tokenizer::{self, Integer};
 
 pub struct Deserializer<'de> {
     parser: BetterPeekable<Parser<'de>>,
-    error_start: usize,
 }
 
 impl<'de> Deserializer<'de> {
     pub fn new(source: &'de str, config: Config) -> Self {
         Self {
             parser: BetterPeekable::new(Parser::new(source, config.include_comments(false))),
-            error_start: 0,
         }
     }
 
@@ -30,13 +28,8 @@ impl<'de> Deserializer<'de> {
         }
     }
 
-    fn mark_error_start(&mut self) {
-        self.error_start = self.parser.current_offset();
-    }
-
     fn handle_unit(&mut self) -> Result<(), DeserializerError> {
-        self.mark_error_start();
-        match self.parser.next().transpose()? {
+        self.with_error_context(|de| match de.parser.next().transpose()? {
             Some(Event {
                 kind:
                     EventKind::BeginNested {
@@ -47,7 +40,7 @@ impl<'de> Deserializer<'de> {
             }) => {
                 let mut nests = 1;
                 while nests > 0 {
-                    match self.parser.next().transpose()? {
+                    match de.parser.next().transpose()? {
                         Some(Event {
                             kind: EventKind::BeginNested { .. },
                             ..
@@ -67,6 +60,30 @@ impl<'de> Deserializer<'de> {
                 ErrorKind::ExpectedUnit,
             )),
             None => Err(DeserializerError::new(None, ErrorKind::ExpectedUnit)),
+        })
+    }
+
+    fn with_error_context<T>(
+        &mut self,
+        f: impl FnOnce(&mut Self) -> Result<T, DeserializerError>,
+    ) -> Result<T, DeserializerError> {
+        let error_start = self.parser.current_offset();
+        self.with_error_start(error_start, f)
+    }
+
+    fn with_error_start<T>(
+        &mut self,
+        error_start: usize,
+        f: impl FnOnce(&mut Self) -> Result<T, DeserializerError>,
+    ) -> Result<T, DeserializerError> {
+        match f(&mut *self) {
+            Ok(result) => Ok(result),
+            Err(mut err) => {
+                if err.location.is_none() {
+                    err.location = Some(error_start..self.parser.current_offset());
+                }
+                Err(err)
+            }
         }
     }
 }
@@ -77,8 +94,7 @@ macro_rules! deserialize_int_impl {
         where
             V: serde::de::Visitor<'de>,
         {
-            self.mark_error_start();
-            match self.parser.next().transpose()? {
+            self.with_error_context(|de| match de.parser.next().transpose()? {
                 Some(Event {
                     kind: EventKind::Primitive(Primitive::Integer(value)),
                     location,
@@ -90,7 +106,7 @@ macro_rules! deserialize_int_impl {
                     ErrorKind::ExpectedInteger,
                 )),
                 None => Err(DeserializerError::new(None, ErrorKind::ExpectedInteger)),
-            }
+            })
         }
     };
 }
@@ -122,107 +138,107 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: serde::de::Visitor<'de>,
     {
-        self.mark_error_start();
-        let event = match self.parser.next().transpose()? {
-            Some(event) => event,
-            None => return visitor.visit_unit(),
-        };
-        match event.kind {
-            EventKind::BeginNested { name, kind } => match kind {
-                // Check for Some(), and ensure that this isn't a raw identifier
-                // by checking the original token's length.
-                Nested::Tuple
-                    if name.as_deref() == Some("Some")
-                        && event.location.end - event.location.start == 4 =>
-                {
-                    let value = visitor.visit_some(&mut *self)?;
-                    let possible_close = self
-                        .parser
-                        .next()
-                        .transpose()?
-                        .expect("parser would error without EndNested");
-                    match possible_close.kind {
-                        EventKind::EndNested => Ok(value),
-                        _ => Err(DeserializerError::new(
-                            possible_close.location,
-                            ErrorKind::SomeCanOnlyContainOneValue,
-                        )),
+        self.with_error_context(|de| {
+            let event = match de.parser.next().transpose()? {
+                Some(event) => event,
+                None => return visitor.visit_unit(),
+            };
+            match event.kind {
+                EventKind::BeginNested { name, kind } => match kind {
+                    // Check for Some(), and ensure that this isn't a raw identifier
+                    // by checking the original token's length.
+                    Nested::Tuple
+                        if name.as_deref() == Some("Some")
+                            && event.location.end - event.location.start == 4 =>
+                    {
+                        let value = visitor.visit_some(&mut *de)?;
+                        let possible_close = de
+                            .parser
+                            .next()
+                            .transpose()?
+                            .expect("parser would error without EndNested");
+                        match possible_close.kind {
+                            EventKind::EndNested => Ok(value),
+                            _ => Err(DeserializerError::new(
+                                possible_close.location,
+                                ErrorKind::SomeCanOnlyContainOneValue,
+                            )),
+                        }
                     }
-                }
-                Nested::List | Nested::Tuple => {
-                    if matches!(
-                        self.parser.peek(),
-                        Some(Ok(Event {
-                            kind: EventKind::EndNested,
-                            ..
-                        }))
-                    ) {
-                        self.parser.next();
-                        visitor.visit_unit()
-                    } else {
-                        visitor.visit_seq(self)
+                    Nested::List | Nested::Tuple => {
+                        if matches!(
+                            de.parser.peek(),
+                            Some(Ok(Event {
+                                kind: EventKind::EndNested,
+                                ..
+                            }))
+                        ) {
+                            de.parser.next();
+                            visitor.visit_unit()
+                        } else {
+                            visitor.visit_seq(de)
+                        }
                     }
-                }
-                Nested::Map => visitor.visit_map(self),
-            },
-            EventKind::Primitive(primitive) => match primitive {
-                Primitive::Bool(v) => visitor.visit_bool(v),
-                Primitive::Integer(v) => match v {
-                    Integer::Usize(usize) => match usize::BITS {
-                        0..=16 => visitor.visit_u16(usize as u16),
-                        17..=32 => visitor.visit_u32(usize as u32),
-                        33..=64 => visitor.visit_u64(usize as u64),
-                        65..=128 => visitor.visit_u128(usize as u128),
-                        _ => unreachable!("unsupported pointer width"),
+                    Nested::Map => visitor.visit_map(de),
+                },
+                EventKind::Primitive(primitive) => match primitive {
+                    Primitive::Bool(v) => visitor.visit_bool(v),
+                    Primitive::Integer(v) => match v {
+                        Integer::Usize(usize) => match usize::BITS {
+                            0..=16 => visitor.visit_u16(usize as u16),
+                            17..=32 => visitor.visit_u32(usize as u32),
+                            33..=64 => visitor.visit_u64(usize as u64),
+                            65..=128 => visitor.visit_u128(usize as u128),
+                            _ => unreachable!("unsupported pointer width"),
+                        },
+                        Integer::Isize(isize) => match usize::BITS {
+                            0..=16 => visitor.visit_i16(isize as i16),
+                            17..=32 => visitor.visit_i32(isize as i32),
+                            33..=64 => visitor.visit_i64(isize as i64),
+                            65..=128 => visitor.visit_i128(isize as i128),
+                            _ => unreachable!("unsupported pointer width"),
+                        },
+                        #[cfg(feature = "integer128")]
+                        Integer::UnsignedLarge(large) => visitor.visit_u128(large),
+                        #[cfg(not(feature = "integer128"))]
+                        Integer::UnsignedLarge(large) => visitor.visit_u64(large),
+                        #[cfg(feature = "integer128")]
+                        Integer::SignedLarge(large) => visitor.visit_i128(large),
+                        #[cfg(not(feature = "integer128"))]
+                        Integer::SignedLarge(large) => visitor.visit_i64(large),
                     },
-                    Integer::Isize(isize) => match usize::BITS {
-                        0..=16 => visitor.visit_i16(isize as i16),
-                        17..=32 => visitor.visit_i32(isize as i32),
-                        33..=64 => visitor.visit_i64(isize as i64),
-                        65..=128 => visitor.visit_i128(isize as i128),
-                        _ => unreachable!("unsupported pointer width"),
+                    Primitive::Float(v) => visitor.visit_f64(v),
+                    Primitive::Char(v) => visitor.visit_char(v),
+                    Primitive::String(v) => match v {
+                        Cow::Borrowed(v) => visitor.visit_borrowed_str(v),
+                        Cow::Owned(v) => visitor.visit_string(v),
                     },
-                    #[cfg(feature = "integer128")]
-                    Integer::UnsignedLarge(large) => visitor.visit_u128(large),
-                    #[cfg(not(feature = "integer128"))]
-                    Integer::UnsignedLarge(large) => visitor.visit_u64(large),
-                    #[cfg(feature = "integer128")]
-                    Integer::SignedLarge(large) => visitor.visit_i128(large),
-                    #[cfg(not(feature = "integer128"))]
-                    Integer::SignedLarge(large) => visitor.visit_i64(large),
-                },
-                Primitive::Float(v) => visitor.visit_f64(v),
-                Primitive::Char(v) => visitor.visit_char(v),
-                Primitive::String(v) => match v {
-                    Cow::Borrowed(v) => visitor.visit_borrowed_str(v),
-                    Cow::Owned(v) => visitor.visit_string(v),
-                },
-                Primitive::Identifier(v) => {
-                    // The tokenizer will have tokenized `r#None` to `None`, so
-                    // we must check the length of the original source to verify
-                    // this isn't a raw identifier.
-                    if v == "None" && event.location.end - event.location.start == 4 {
-                        visitor.visit_none()
-                    } else {
-                        visitor.visit_borrowed_str(v)
+                    Primitive::Identifier(v) => {
+                        // The tokenizer will have tokenized `r#None` to `None`, so
+                        // we must check the length of the original source to verify
+                        // this isn't a raw identifier.
+                        if v == "None" && event.location.end - event.location.start == 4 {
+                            visitor.visit_none()
+                        } else {
+                            visitor.visit_borrowed_str(v)
+                        }
                     }
-                }
-                Primitive::Bytes(v) => match v {
-                    Cow::Borrowed(v) => visitor.visit_borrowed_bytes(v),
-                    Cow::Owned(v) => visitor.visit_byte_buf(v),
+                    Primitive::Bytes(v) => match v {
+                        Cow::Borrowed(v) => visitor.visit_borrowed_bytes(v),
+                        Cow::Owned(v) => visitor.visit_byte_buf(v),
+                    },
                 },
-            },
-            EventKind::Comment(_) => unreachable!("comments are disabled"),
-            EventKind::EndNested => unreachable!("parser would error"),
-        }
+                EventKind::Comment(_) => unreachable!("comments are disabled"),
+                EventKind::EndNested => unreachable!("parser would error"),
+            }
+        })
     }
 
     fn deserialize_bool<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: serde::de::Visitor<'de>,
     {
-        self.mark_error_start();
-        match self.parser.next().transpose()? {
+        self.with_error_context(|de| match de.parser.next().transpose()? {
             Some(Event {
                 kind: EventKind::Primitive(Primitive::Bool(value)),
                 ..
@@ -236,23 +252,21 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
                 ErrorKind::ExpectedInteger,
             )),
             None => Err(DeserializerError::new(None, ErrorKind::ExpectedInteger)),
-        }
+        })
     }
 
     fn deserialize_f32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: serde::de::Visitor<'de>,
     {
-        self.mark_error_start();
-        self.deserialize_f64(visitor)
+        self.with_error_context(|de| de.deserialize_f64(visitor))
     }
 
     fn deserialize_f64<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: serde::de::Visitor<'de>,
     {
-        self.mark_error_start();
-        match self.parser.next().transpose()? {
+        self.with_error_context(|de| match de.parser.next().transpose()? {
             Some(Event {
                 kind: EventKind::Primitive(Primitive::Float(value)),
                 ..
@@ -266,15 +280,14 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
                 ErrorKind::ExpectedFloat,
             )),
             None => Err(DeserializerError::new(None, ErrorKind::ExpectedFloat)),
-        }
+        })
     }
 
     fn deserialize_char<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: serde::de::Visitor<'de>,
     {
-        self.mark_error_start();
-        match self.parser.next().transpose()? {
+        self.with_error_context(|de| match de.parser.next().transpose()? {
             Some(Event {
                 kind: EventKind::Primitive(Primitive::Char(value)),
                 ..
@@ -284,15 +297,14 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
                 ErrorKind::ExpectedChar,
             )),
             None => Err(DeserializerError::new(None, ErrorKind::ExpectedChar)),
-        }
+        })
     }
 
     fn deserialize_str<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: serde::de::Visitor<'de>,
     {
-        self.mark_error_start();
-        match self.parser.next().transpose()? {
+        self.with_error_context(|de| match de.parser.next().transpose()? {
             Some(Event {
                 kind: EventKind::Primitive(Primitive::Identifier(str)),
                 ..
@@ -329,23 +341,21 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
                 ErrorKind::ExpectedString,
             )),
             None => Err(DeserializerError::new(None, ErrorKind::ExpectedString)),
-        }
+        })
     }
 
     fn deserialize_string<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: serde::de::Visitor<'de>,
     {
-        self.mark_error_start();
-        self.deserialize_str(visitor)
+        self.with_error_context(|de| de.deserialize_str(visitor))
     }
 
     fn deserialize_bytes<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: serde::de::Visitor<'de>,
     {
-        self.mark_error_start();
-        match self.parser.next().transpose()? {
+        self.with_error_context(|de| match de.parser.next().transpose()? {
             Some(Event {
                 kind: EventKind::Primitive(Primitive::Identifier(str)),
                 ..
@@ -369,7 +379,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
                 ErrorKind::ExpectedBytes,
             )),
             None => Err(DeserializerError::new(None, ErrorKind::ExpectedBytes)),
-        }
+        })
     }
 
     fn deserialize_byte_buf<V>(self, visitor: V) -> Result<V::Value, Self::Error>
@@ -383,8 +393,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: serde::de::Visitor<'de>,
     {
-        self.mark_error_start();
-        match self.parser.next().transpose()? {
+        self.with_error_context(|de| match de.parser.next().transpose()? {
             Some(Event {
                 kind: EventKind::Primitive(Primitive::Identifier(str)),
                 ..
@@ -397,8 +406,8 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
                     },
                 ..
             }) if matches!(name, Some(Name { name: "Some", .. })) => {
-                let result = visitor.visit_some(&mut *self)?;
-                match self.parser.next().transpose()? {
+                let result = visitor.visit_some(&mut *de)?;
+                match de.parser.next().transpose()? {
                     Some(Event {
                         kind: EventKind::EndNested,
                         ..
@@ -415,7 +424,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
                 ErrorKind::ExpectedOption,
             )),
             None => Err(DeserializerError::new(None, ErrorKind::ExpectedOption)),
-        }
+        })
     }
 
     fn deserialize_unit<V>(self, visitor: V) -> Result<V::Value, Self::Error>
@@ -453,8 +462,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: serde::de::Visitor<'de>,
     {
-        self.mark_error_start();
-        match self.parser.next().transpose()? {
+        self.with_error_context(|de| match de.parser.next().transpose()? {
             Some(Event {
                 kind: EventKind::BeginNested { kind, .. },
                 location,
@@ -466,7 +474,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
                     ));
                 }
 
-                visitor.visit_seq(self)
+                de.with_error_context(|de| visitor.visit_seq(de))
             }
             Some(other) => Err(DeserializerError::new(
                 other.location,
@@ -476,7 +484,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
                 None,
                 parser::ErrorKind::UnexpectedEof,
             )),
-        }
+        })
     }
 
     fn deserialize_tuple<V>(self, _len: usize, visitor: V) -> Result<V::Value, Self::Error>
@@ -495,49 +503,49 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: serde::de::Visitor<'de>,
     {
-        self.mark_error_start();
-        match self.parser.next().transpose()? {
-            Some(Event {
-                kind: EventKind::BeginNested { name, kind },
-                location,
-            }) => {
-                if name.map_or(false, |name| name != struct_name) {
-                    return Err(DeserializerError::new(
-                        location,
-                        ErrorKind::NameMismatch(struct_name),
-                    ));
-                }
+        self.with_error_context(|de| {
+            match de.parser.next().transpose()? {
+                Some(Event {
+                    kind: EventKind::BeginNested { name, kind },
+                    location,
+                }) => {
+                    if name.map_or(false, |name| name != struct_name) {
+                        return Err(DeserializerError::new(
+                            location,
+                            ErrorKind::NameMismatch(struct_name),
+                        ));
+                    }
 
-                if kind != Nested::Tuple {
+                    if kind != Nested::Tuple {
+                        return Err(DeserializerError::new(
+                            location,
+                            ErrorKind::ExpectedTupleStruct,
+                        ));
+                    }
+                }
+                Some(other) => {
                     return Err(DeserializerError::new(
-                        location,
+                        other.location,
                         ErrorKind::ExpectedTupleStruct,
                     ));
                 }
+                None => {
+                    return Err(DeserializerError::new(
+                        None,
+                        parser::ErrorKind::UnexpectedEof,
+                    ))
+                }
             }
-            Some(other) => {
-                return Err(DeserializerError::new(
-                    other.location,
-                    ErrorKind::ExpectedTupleStruct,
-                ));
-            }
-            None => {
-                return Err(DeserializerError::new(
-                    None,
-                    parser::ErrorKind::UnexpectedEof,
-                ))
-            }
-        }
 
-        visitor.visit_seq(self)
+            visitor.visit_seq(de)
+        })
     }
 
     fn deserialize_map<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: serde::de::Visitor<'de>,
     {
-        self.mark_error_start();
-        match self.parser.next().transpose()? {
+        self.with_error_context(|de| match de.parser.next().transpose()? {
             Some(Event {
                 kind: EventKind::BeginNested { kind, .. },
                 location,
@@ -546,7 +554,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
                     return Err(DeserializerError::new(location, ErrorKind::ExpectedMap));
                 }
 
-                visitor.visit_map(self)
+                visitor.visit_map(de)
             }
             Some(other) => Err(DeserializerError::new(
                 other.location,
@@ -556,7 +564,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
                 None,
                 parser::ErrorKind::UnexpectedEof,
             )),
-        }
+        })
     }
 
     fn deserialize_struct<V>(
@@ -568,41 +576,42 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: serde::de::Visitor<'de>,
     {
-        self.mark_error_start();
-        match self.parser.next().transpose()? {
-            Some(Event {
-                kind: EventKind::BeginNested { name, kind },
-                location,
-            }) => {
-                if name.map_or(false, |name| name != struct_name) {
-                    return Err(DeserializerError::new(
-                        location,
-                        ErrorKind::NameMismatch(struct_name),
-                    ));
-                }
+        self.with_error_context(|de| {
+            match de.parser.next().transpose()? {
+                Some(Event {
+                    kind: EventKind::BeginNested { name, kind },
+                    location,
+                }) => {
+                    if name.map_or(false, |name| name != struct_name) {
+                        return Err(DeserializerError::new(
+                            location,
+                            ErrorKind::NameMismatch(struct_name),
+                        ));
+                    }
 
-                if kind != Nested::Map {
+                    if kind != Nested::Map {
+                        return Err(DeserializerError::new(
+                            location,
+                            ErrorKind::ExpectedMapStruct,
+                        ));
+                    }
+                }
+                Some(other) => {
                     return Err(DeserializerError::new(
-                        location,
+                        other.location,
                         ErrorKind::ExpectedMapStruct,
                     ));
                 }
+                None => {
+                    return Err(DeserializerError::new(
+                        None,
+                        parser::ErrorKind::UnexpectedEof,
+                    ))
+                }
             }
-            Some(other) => {
-                return Err(DeserializerError::new(
-                    other.location,
-                    ErrorKind::ExpectedMapStruct,
-                ));
-            }
-            None => {
-                return Err(DeserializerError::new(
-                    None,
-                    parser::ErrorKind::UnexpectedEof,
-                ))
-            }
-        }
 
-        visitor.visit_map(self)
+            visitor.visit_map(de)
+        })
     }
 
     fn deserialize_enum<V>(
@@ -614,56 +623,55 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: serde::de::Visitor<'de>,
     {
-        self.mark_error_start();
-        visitor.visit_enum(self)
+        self.with_error_context(|de| visitor.visit_enum(de))
     }
 
     fn deserialize_identifier<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: serde::de::Visitor<'de>,
     {
-        self.mark_error_start();
-        self.deserialize_str(visitor)
+        self.with_error_context(|de| de.deserialize_str(visitor))
     }
 
     fn deserialize_ignored_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: serde::de::Visitor<'de>,
     {
-        self.mark_error_start();
-        let mut depth = 0;
-        loop {
-            match self.parser.next().transpose()? {
-                Some(Event {
-                    kind: EventKind::BeginNested { .. },
-                    ..
-                }) => {
-                    depth += 1;
+        self.with_error_context(|de| {
+            let mut depth = 0;
+            loop {
+                match de.parser.next().transpose()? {
+                    Some(Event {
+                        kind: EventKind::BeginNested { .. },
+                        ..
+                    }) => {
+                        depth += 1;
+                    }
+                    Some(Event {
+                        kind: EventKind::EndNested,
+                        ..
+                    }) => {
+                        depth -= 1;
+                    }
+                    Some(Event {
+                        kind: EventKind::Primitive(_) | EventKind::Comment(_),
+                        ..
+                    }) => {}
+                    None => {
+                        return Err(DeserializerError::new(
+                            None,
+                            parser::ErrorKind::UnexpectedEof,
+                        ))
+                    }
                 }
-                Some(Event {
-                    kind: EventKind::EndNested,
-                    ..
-                }) => {
-                    depth -= 1;
-                }
-                Some(Event {
-                    kind: EventKind::Primitive(_) | EventKind::Comment(_),
-                    ..
-                }) => {}
-                None => {
-                    return Err(DeserializerError::new(
-                        None,
-                        parser::ErrorKind::UnexpectedEof,
-                    ))
+
+                if depth == 0 {
+                    break;
                 }
             }
 
-            if depth == 0 {
-                break;
-            }
-        }
-
-        visitor.visit_unit()
+            visitor.visit_unit()
+        })
     }
 }
 
@@ -674,20 +682,24 @@ impl<'de> MapAccess<'de> for Deserializer<'de> {
     where
         K: serde::de::DeserializeSeed<'de>,
     {
-        match self.parser.peek() {
+        self.with_error_context(|de| match de.parser.peek() {
             Some(Ok(Event {
                 kind: EventKind::EndNested,
                 ..
             })) => {
-                self.parser.next();
+                de.parser.next();
                 Ok(None)
             }
-            Some(_) => seed.deserialize(self).map(Some),
+            Some(Ok(evt)) => {
+                let error_start = evt.location.start;
+                de.with_error_start(error_start, |de| seed.deserialize(de).map(Some))
+            }
+            Some(_) => seed.deserialize(de).map(Some),
             None => Err(DeserializerError::new(
                 None,
                 parser::ErrorKind::UnexpectedEof,
             )),
-        }
+        })
     }
 
     fn next_value_seed<V>(&mut self, seed: V) -> Result<V::Value, Self::Error>
@@ -705,20 +717,24 @@ impl<'de> SeqAccess<'de> for Deserializer<'de> {
     where
         T: serde::de::DeserializeSeed<'de>,
     {
-        match self.parser.peek() {
+        self.with_error_context(|de| match de.parser.peek() {
             Some(Ok(Event {
                 kind: EventKind::EndNested,
                 ..
             })) => {
-                self.parser.next();
+                de.parser.next();
                 Ok(None)
             }
-            Some(_) => seed.deserialize(self).map(Some),
+            Some(Ok(evt)) => {
+                let error_start = evt.location.start;
+                de.with_error_start(error_start, |de| seed.deserialize(de).map(Some))
+            }
+            Some(_) => seed.deserialize(de).map(Some),
             None => Err(DeserializerError::new(
                 None,
                 parser::ErrorKind::UnexpectedEof,
             )),
-        }
+        })
     }
 }
 
@@ -766,8 +782,7 @@ impl<'a, 'de> VariantAccess<'de> for &'a mut Deserializer<'de> {
     where
         V: serde::de::Visitor<'de>,
     {
-        self.mark_error_start();
-        visitor.visit_seq(self)
+        self.with_error_context(|de| visitor.visit_seq(de))
     }
 
     fn struct_variant<V>(
@@ -778,8 +793,7 @@ impl<'a, 'de> VariantAccess<'de> for &'a mut Deserializer<'de> {
     where
         V: serde::de::Visitor<'de>,
     {
-        self.mark_error_start();
-        visitor.visit_map(self)
+        self.with_error_context(|de| visitor.visit_map(de))
     }
 }
 
@@ -931,9 +945,9 @@ impl Config {
         let result = match T::deserialize(&mut deserializer) {
             Ok(result) => result,
             Err(err) => {
-                let location = err.location.unwrap_or_else(|| {
-                    deserializer.error_start..deserializer.parser.current_offset()
-                });
+                let location = err
+                    .location
+                    .unwrap_or_else(|| deserializer.parser.current_range());
                 return Err(Error::new(location, err.kind));
             }
         };
@@ -1037,5 +1051,18 @@ mod tests {
         let parsed =
             crate::from_str::<Option<BasicNamed>>(r#"Some(BasicNamed{ a: 1, b: -1 })"#).unwrap();
         assert_eq!(parsed, Some(BasicNamed { a: 1, b: -1 }));
+    }
+
+    #[test]
+    fn error_locality() {
+        #[derive(Debug, Deserialize)]
+        #[serde(untagged)]
+        enum Untagged {
+            A(u64),
+        }
+
+        let source = r#"[1, "hello"]"#;
+        let err = crate::from_str::<alloc::vec::Vec<Untagged>>(source).unwrap_err();
+        assert_eq!(&source[err.location], r#""hello""#);
     }
 }
