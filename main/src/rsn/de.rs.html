@@ -1920,9 +1920,9 @@
         <span class="kw">let </span>result = <span class="kw">match </span>T::deserialize(<span class="kw-2">&amp;mut </span>deserializer) {
             <span class="prelude-val">Ok</span>(result) =&gt; result,
             <span class="prelude-val">Err</span>(err) =&gt; {
-                <span class="kw">let </span>location = err.location.unwrap_or_else(|| {
-                    deserializer.parser.current_offset()..deserializer.parser.current_offset()
-                });
+                <span class="kw">let </span>location = err
+                    .location
+                    .unwrap_or_else(|| deserializer.parser.current_range());
                 <span class="kw">return </span><span class="prelude-val">Err</span>(Error::new(location, err.kind));
             }
         };

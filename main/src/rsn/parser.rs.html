@@ -928,6 +928,23 @@
 <a href="#928" id="928">928</a>
 <a href="#929" id="929">929</a>
 <a href="#930" id="930">930</a>
+<a href="#931" id="931">931</a>
+<a href="#932" id="932">932</a>
+<a href="#933" id="933">933</a>
+<a href="#934" id="934">934</a>
+<a href="#935" id="935">935</a>
+<a href="#936" id="936">936</a>
+<a href="#937" id="937">937</a>
+<a href="#938" id="938">938</a>
+<a href="#939" id="939">939</a>
+<a href="#940" id="940">940</a>
+<a href="#941" id="941">941</a>
+<a href="#942" id="942">942</a>
+<a href="#943" id="943">943</a>
+<a href="#944" id="944">944</a>
+<a href="#945" id="945">945</a>
+<a href="#946" id="946">946</a>
+<a href="#947" id="947">947</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>alloc::borrow::Cow;
 <span class="kw">use </span>alloc::vec::Vec;
 <span class="kw">use </span>core::fmt::{Display, Formatter};
@@ -940,7 +957,7 @@
 </span><span class="kw">pub struct </span>Parser&lt;<span class="lifetime">&#39;s</span>&gt; {
     tokens: Tokenizer&lt;<span class="lifetime">&#39;s</span>, <span class="bool-val">false</span>&gt;,
     peeked: <span class="prelude-ty">Option</span>&lt;<span class="prelude-ty">Result</span>&lt;Token&lt;<span class="lifetime">&#39;s</span>&gt;, tokenizer::Error&gt;&gt;,
-    nested: Vec&lt;NestedState&gt;,
+    nested: Vec&lt;(usize, NestedState)&gt;,
     root_state: State&lt;<span class="lifetime">&#39;s</span>&gt;,
     config: Config,
 }
@@ -962,6 +979,11 @@
 
     <span class="kw">pub const fn </span>current_offset(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
         <span class="self">self</span>.tokens.current_offset()
+    }
+
+    <span class="kw">pub fn </span>current_range(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Range&lt;usize&gt; {
+        <span class="kw">let </span>start = <span class="self">self</span>.nested.last().map_or(<span class="number">0</span>, |(offset, <span class="kw">_</span>)| <span class="kw-2">*</span>offset);
+        start..<span class="self">self</span>.tokens.current_offset()
     }
 
     <span class="kw">fn </span>peek(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>Token&lt;<span class="lifetime">&#39;s</span>&gt;&gt; {
@@ -1045,12 +1067,17 @@
 
                     <span class="kw">let </span>kind = <span class="kw">match </span>balanced {
                         Balanced::Paren =&gt; {
-                            <span class="self">self</span>.nested
-                                .push(NestedState::Tuple(ListState::ExpectingValue));
+                            <span class="self">self</span>.nested.push((
+                                open_location.start,
+                                NestedState::Tuple(ListState::ExpectingValue),
+                            ));
                             Nested::Tuple
                         }
                         Balanced::Brace =&gt; {
-                            <span class="self">self</span>.nested.push(NestedState::Map(MapState::ExpectingKey));
+                            <span class="self">self</span>.nested.push((
+                                open_location.start,
+                                NestedState::Map(MapState::ExpectingKey),
+                            ));
                             Nested::Map
                         }
                         Balanced::Bracket =&gt; {
@@ -1076,8 +1103,10 @@
                 }
             }
             TokenKind::Open(Balanced::Paren) =&gt; {
-                <span class="self">self</span>.nested
-                    .push(NestedState::Tuple(ListState::ExpectingValue));
+                <span class="self">self</span>.nested.push((
+                    token.location.start,
+                    NestedState::Tuple(ListState::ExpectingValue),
+                ));
                 <span class="prelude-val">Ok</span>(Event::new(
                     token.location,
                     EventKind::BeginNested {
@@ -1087,8 +1116,10 @@
                 ))
             }
             TokenKind::Open(Balanced::Bracket) =&gt; {
-                <span class="self">self</span>.nested
-                    .push(NestedState::List(ListState::ExpectingValue));
+                <span class="self">self</span>.nested.push((
+                    token.location.start,
+                    NestedState::List(ListState::ExpectingValue),
+                ));
                 <span class="prelude-val">Ok</span>(Event::new(
                     token.location,
                     EventKind::BeginNested {
@@ -1098,7 +1129,10 @@
                 ))
             }
             TokenKind::Open(Balanced::Brace) =&gt; {
-                <span class="self">self</span>.nested.push(NestedState::Map(MapState::ExpectingKey));
+                <span class="self">self</span>.nested.push((
+                    token.location.start,
+                    NestedState::Map(MapState::ExpectingKey),
+                ));
                 <span class="prelude-val">Ok</span>(Event::new(
                     token.location,
                     EventKind::BeginNested {
@@ -1128,7 +1162,7 @@
                 <span class="kw">if let </span>TokenKind::Comment(comment) = <span class="kw-2">&amp;</span>token.kind {
                     <span class="prelude-val">Ok</span>(Event::new(token.location, EventKind::Comment(comment)))
                 } <span class="kw">else </span>{
-                    <span class="kw-2">*</span><span class="self">self</span>.nested.last_mut().expect(<span class="string">&quot;required for this fn&quot;</span>) =
+                    <span class="self">self</span>.nested.last_mut().expect(<span class="string">&quot;required for this fn&quot;</span>).<span class="number">1 </span>=
                         NestedState::list(end, ListState::ExpectingComma);
                     <span class="self">self</span>.parse_token(token, <span class="prelude-val">Some</span>(end))
                 }
@@ -1139,7 +1173,7 @@
                     <span class="prelude-val">Ok</span>(Event::new(location, EventKind::EndNested))
                 }
                 (<span class="kw">_</span>, <span class="prelude-val">Some</span>(TokenKind::Comma)) =&gt; {
-                    <span class="kw-2">*</span><span class="self">self</span>.nested.last_mut().expect(<span class="string">&quot;required for this fn&quot;</span>) =
+                    <span class="self">self</span>.nested.last_mut().expect(<span class="string">&quot;required for this fn&quot;</span>).<span class="number">1 </span>=
                         NestedState::list(end, ListState::ExpectingValue);
                     <span class="self">self</span>.parse_sequence(ListState::ExpectingValue, end)
                 }
@@ -1155,7 +1189,7 @@
     }
 
     <span class="kw">fn </span>map_state_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>MapState {
-        <span class="kw">let </span><span class="prelude-val">Some</span>(NestedState::Map(map_state)) = <span class="self">self</span>.nested.last_mut() <span class="kw">else </span>{ <span class="macro">unreachable!</span>(<span class="string">&quot;not a map state&quot;</span>) };
+        <span class="kw">let </span><span class="prelude-val">Some</span>((<span class="kw">_</span>,NestedState::Map(map_state))) = <span class="self">self</span>.nested.last_mut() <span class="kw">else </span>{ <span class="macro">unreachable!</span>(<span class="string">&quot;not a map state&quot;</span>) };
         map_state
     }
 
@@ -1380,9 +1414,9 @@
                 },
             },
 
-            <span class="prelude-val">Some</span>(NestedState::Tuple(list)) =&gt; <span class="self">self</span>.parse_sequence(<span class="kw-2">*</span>list, Balanced::Paren),
-            <span class="prelude-val">Some</span>(NestedState::List(list)) =&gt; <span class="self">self</span>.parse_sequence(<span class="kw-2">*</span>list, Balanced::Bracket),
-            <span class="prelude-val">Some</span>(NestedState::Map(map)) =&gt; <span class="self">self</span>.parse_map(<span class="kw-2">*</span>map),
+            <span class="prelude-val">Some</span>((<span class="kw">_</span>, NestedState::Tuple(list))) =&gt; <span class="self">self</span>.parse_sequence(<span class="kw-2">*</span>list, Balanced::Paren),
+            <span class="prelude-val">Some</span>((<span class="kw">_</span>, NestedState::List(list))) =&gt; <span class="self">self</span>.parse_sequence(<span class="kw-2">*</span>list, Balanced::Bracket),
+            <span class="prelude-val">Some</span>((<span class="kw">_</span>, NestedState::Map(map))) =&gt; <span class="self">self</span>.parse_map(<span class="kw-2">*</span>map),
         })
     }
 }
