@@ -1438,13 +1438,13 @@
 
     <span class="kw">fn </span>deserialize_newtype_struct&lt;V&gt;(
         <span class="self">self</span>,
-        _name: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str,
+        name: <span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str,
         visitor: V,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;V::Value, <span class="self">Self</span>::Error&gt;
     <span class="kw">where
         </span>V: serde::de::Visitor&lt;<span class="lifetime">&#39;de</span>&gt;,
     {
-        <span class="self">self</span>.deserialize_seq(visitor)
+        <span class="self">self</span>.deserialize_tuple_struct(name, <span class="number">1</span>, visitor)
     }
 
     <span class="kw">fn </span>deserialize_seq&lt;V&gt;(<span class="self">self</span>, visitor: V) -&gt; <span class="prelude-ty">Result</span>&lt;V::Value, <span class="self">Self</span>::Error&gt;
