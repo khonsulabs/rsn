@@ -148,6 +148,15 @@ impl<'s> Parser<'s> {
                             kind,
                         },
                     ))
+                } else if matches!(
+                    self.peek(),
+                    Some(Token {
+                        kind: TokenKind::Open(Balanced::Bracket),
+                        ..
+                    })
+                ) {
+                    let location = self.peek().expect("just matched").location.clone();
+                    return Err(Error::new(location, ErrorKind::ExpectedMapOrTuple));
                 } else {
                     Ok(Event::new(
                         token.location,
@@ -562,6 +571,7 @@ pub enum ErrorKind {
     ExpectedColon,
     ExpectedValue,
     ExpectedCommaOrEnd(Nested),
+    ExpectedMapOrTuple,
     TrailingData,
 }
 
@@ -585,6 +595,9 @@ impl Display for ErrorKind {
             ErrorKind::TrailingData => f.write_str(
                 "source contained extra trailing data after a value was completely read",
             ),
+            ErrorKind::ExpectedMapOrTuple => {
+                f.write_str("[ is not valid for a named value, expected { or (")
+            }
         }
     }
 }
@@ -943,5 +956,14 @@ mod tests {
                 Event::new(65..69, EventKind::Comment("/**/")),
             ]
         );
+    }
+
+    #[test]
+    fn array_named_error() {
+        let err = Parser::new("Foo[]", Config::default())
+            .next()
+            .unwrap()
+            .unwrap_err();
+        assert_eq!(err, Error::new(3..4, ErrorKind::ExpectedMapOrTuple));
     }
 }
