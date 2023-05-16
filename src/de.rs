@@ -905,9 +905,9 @@ impl Config {
         let result = match T::deserialize(&mut deserializer) {
             Ok(result) => result,
             Err(err) => {
-                let location = err.location.unwrap_or_else(|| {
-                    deserializer.parser.current_offset()..deserializer.parser.current_offset()
-                });
+                let location = err
+                    .location
+                    .unwrap_or_else(|| deserializer.parser.current_range());
                 return Err(Error::new(location, err.kind));
             }
         };

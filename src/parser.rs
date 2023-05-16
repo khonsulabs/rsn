@@ -10,7 +10,7 @@ use crate::tokenizer::{self, Balanced, Integer, Token, TokenKind, Tokenizer};
 pub struct Parser<'s> {
     tokens: Tokenizer<'s, false>,
     peeked: Option<Result<Token<'s>, tokenizer::Error>>,
-    nested: Vec<NestedState>,
+    nested: Vec<(usize, NestedState)>,
     root_state: State<'s>,
     config: Config,
 }
@@ -32,6 +32,11 @@ impl<'s> Parser<'s> {
 
     pub const fn current_offset(&self) -> usize {
         self.tokens.current_offset()
+    }
+
+    pub fn current_range(&self) -> Range<usize> {
+        let start = self.nested.last().map_or(0, |(offset, _)| *offset);
+        start..self.tokens.current_offset()
     }
 
     fn peek(&mut self) -> Option<&Token<'s>> {
@@ -115,12 +120,17 @@ impl<'s> Parser<'s> {
 
                     let kind = match balanced {
                         Balanced::Paren => {
-                            self.nested
-                                .push(NestedState::Tuple(ListState::ExpectingValue));
+                            self.nested.push((
+                                open_location.start,
+                                NestedState::Tuple(ListState::ExpectingValue),
+                            ));
                             Nested::Tuple
                         }
                         Balanced::Brace => {
-                            self.nested.push(NestedState::Map(MapState::ExpectingKey));
+                            self.nested.push((
+                                open_location.start,
+                                NestedState::Map(MapState::ExpectingKey),
+                            ));
                             Nested::Map
                         }
                         Balanced::Bracket => {
@@ -146,8 +156,10 @@ impl<'s> Parser<'s> {
                 }
             }
             TokenKind::Open(Balanced::Paren) => {
-                self.nested
-                    .push(NestedState::Tuple(ListState::ExpectingValue));
+                self.nested.push((
+                    token.location.start,
+                    NestedState::Tuple(ListState::ExpectingValue),
+                ));
                 Ok(Event::new(
                     token.location,
                     EventKind::BeginNested {
@@ -157,8 +169,10 @@ impl<'s> Parser<'s> {
                 ))
             }
             TokenKind::Open(Balanced::Bracket) => {
-                self.nested
-                    .push(NestedState::List(ListState::ExpectingValue));
+                self.nested.push((
+                    token.location.start,
+                    NestedState::List(ListState::ExpectingValue),
+                ));
                 Ok(Event::new(
                     token.location,
                     EventKind::BeginNested {
@@ -168,7 +182,10 @@ impl<'s> Parser<'s> {
                 ))
             }
             TokenKind::Open(Balanced::Brace) => {
-                self.nested.push(NestedState::Map(MapState::ExpectingKey));
+                self.nested.push((
+                    token.location.start,
+                    NestedState::Map(MapState::ExpectingKey),
+                ));
                 Ok(Event::new(
                     token.location,
                     EventKind::BeginNested {
@@ -198,7 +215,7 @@ impl<'s> Parser<'s> {
                 if let TokenKind::Comment(comment) = &token.kind {
                     Ok(Event::new(token.location, EventKind::Comment(comment)))
                 } else {
-                    *self.nested.last_mut().expect("required for this fn") =
+                    self.nested.last_mut().expect("required for this fn").1 =
                         NestedState::list(end, ListState::ExpectingComma);
                     self.parse_token(token, Some(end))
                 }
@@ -209,7 +226,7 @@ impl<'s> Parser<'s> {
                     Ok(Event::new(location, EventKind::EndNested))
                 }
                 (_, Some(TokenKind::Comma)) => {
-                    *self.nested.last_mut().expect("required for this fn") =
+                    self.nested.last_mut().expect("required for this fn").1 =
                         NestedState::list(end, ListState::ExpectingValue);
                     self.parse_sequence(ListState::ExpectingValue, end)
                 }
@@ -225,7 +242,7 @@ impl<'s> Parser<'s> {
     }
 
     fn map_state_mut(&mut self) -> &mut MapState {
-        let Some(NestedState::Map(map_state)) = self.nested.last_mut() else { unreachable!("not a map state") };
+        let Some((_,NestedState::Map(map_state))) = self.nested.last_mut() else { unreachable!("not a map state") };
         map_state
     }
 
@@ -450,9 +467,9 @@ impl<'s> Parser<'s> {
                 },
             },
 
-            Some(NestedState::Tuple(list)) => self.parse_sequence(*list, Balanced::Paren),
-            Some(NestedState::List(list)) => self.parse_sequence(*list, Balanced::Bracket),
-            Some(NestedState::Map(map)) => self.parse_map(*map),
+            Some((_, NestedState::Tuple(list))) => self.parse_sequence(*list, Balanced::Paren),
+            Some((_, NestedState::List(list))) => self.parse_sequence(*list, Balanced::Bracket),
+            Some((_, NestedState::Map(map))) => self.parse_map(*map),
         })
     }
 }
