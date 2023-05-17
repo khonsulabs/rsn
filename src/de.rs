@@ -727,19 +727,16 @@ impl<'a, 'de> SeqAccess<'de> for SequenceDeserializer<'a, 'de> {
     where
         T: serde::de::DeserializeSeed<'de>,
     {
-        std::println!("Next element seed");
         self.de.with_error_context(|de| match de.parser.peek() {
             Some(Ok(Event {
                 kind: EventKind::EndNested,
                 ..
             })) => {
-                std::println!("Ending nested");
                 de.parser.next();
                 self.ended = true;
                 Ok(None)
             }
             Some(Ok(evt)) => {
-                std::println!("{evt:?}");
                 let error_start = evt.location.start;
                 de.with_error_start(error_start, |de| seed.deserialize(de).map(Some))
             }
