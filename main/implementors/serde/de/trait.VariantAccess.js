@@ -1,3 +1,3 @@
 (function() {var implementors = {
-"rsn":[["impl&lt;'a, 'de&gt; <a class=\"trait\" href=\"https://docs.rs/serde/1.0.163/serde/de/trait.VariantAccess.html\" title=\"trait serde::de::VariantAccess\">VariantAccess</a>&lt;'de&gt; for &amp;'a mut <a class=\"struct\" href=\"rsn/de/struct.Deserializer.html\" title=\"struct rsn::de::Deserializer\">Deserializer</a>&lt;'de&gt;"]]
+"rsn":[["impl&lt;'a, 'de&gt; <a class=\"trait\" href=\"https://docs.rs/serde/1.0.163/serde/de/trait.VariantAccess.html\" title=\"trait serde::de::VariantAccess\">VariantAccess</a>&lt;'de&gt; for <a class=\"enum\" href=\"rsn/de/enum.EnumVariantAccessor.html\" title=\"enum rsn::de::EnumVariantAccessor\">EnumVariantAccessor</a>&lt;'a, 'de&gt;"]]
 };if (window.register_implementors) {window.register_implementors(implementors);} else {window.pending_implementors = implementors;}})()
