@@ -1073,25 +1073,47 @@ impl<'a, 'de> VariantAccess<'de> for EnumVariantAccessor<'a, 'de> {
         T: serde::de::DeserializeSeed<'de>,
     {
         if let EnumVariantAccessor::Nested(deserializer) = self {
-            let nested_event = deserializer
-                .parser
-                .next()
-                .expect("variant access matched Nested")?;
-            deserializer.with_error_start(nested_event.location.start, |de| {
+            let newtype_struct;
+            let start;
+            if let Some(Ok(Event {
+                kind:
+                    EventKind::BeginNested {
+                        name,
+                        kind: Nested::Map,
+                    },
+                location,
+            })) = &mut deserializer.parser.peeked
+            {
+                *name = None;
+                newtype_struct = true;
+                start = location.start;
+            } else {
+                let nested_event = deserializer
+                    .parser
+                    .next()
+                    .expect("variant access matched Nested")?;
+                newtype_struct = false;
+                start = nested_event.location.start;
+            };
+            deserializer.with_error_start(start, |de| {
                 let result = seed.deserialize(&mut *de)?;
-                loop {
-                    if let Event {
-                        kind: EventKind::EndNested,
-                        ..
-                    } = de
-                        .parser
-                        .next()
-                        .transpose()?
-                        .expect("eof handled by parser")
-                    {
-                        return Ok(result);
+                // map parser already removed closing }
+                if !newtype_struct {
+                    loop {
+                        if let Event {
+                            kind: EventKind::EndNested,
+                            ..
+                        } = de
+                            .parser
+                            .next()
+                            .transpose()?
+                            .expect("eof handled by parser")
+                        {
+                            break;
+                        }
                     }
                 }
+                Ok(result)
             })
         } else {
             Err(DeserializerError::new(None, ErrorKind::ExpectedTupleStruct))

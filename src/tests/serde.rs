@@ -138,9 +138,22 @@ enum UntaggedEnum {
 }
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
+enum TaggedEnum {
+    Tuple(bool, bool),
+    Struct { a: u64 },
+    NewtypeStruct(SimpleStruct),
+    NewtypeTuple(SimpleTuple),
+    NewtypeBool(bool),
+    Unit,
+}
+
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
 struct SimpleStruct {
     a: u64,
 }
+
+#[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
+struct SimpleTuple(u64, bool);
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
 struct NewtypeBool(bool);
@@ -169,6 +182,27 @@ fn deserialize_any() {
     assert_eq!(untagged, None);
     let untagged: Option<UntaggedEnum> = crate::from_str("Some(())").unwrap();
     assert_eq!(untagged, Some(UntaggedEnum::Unit(UnitStruct)));
+}
+
+#[test]
+fn deserialize_tagged() {
+    let tagged: TaggedEnum = crate::from_str("Tuple (true, false)").unwrap();
+    assert_eq!(tagged, TaggedEnum::Tuple(true, false));
+    let tagged: TaggedEnum = crate::from_str("Struct {a: 1}").unwrap();
+    assert_eq!(tagged, TaggedEnum::Struct { a: 1 });
+
+    let tagged: TaggedEnum = crate::from_str("NewtypeStruct {a: 1}").unwrap();
+    assert_eq!(tagged, TaggedEnum::NewtypeStruct(SimpleStruct { a: 1 }));
+    let tagged: TaggedEnum = crate::from_str("NewtypeStruct({a: 1})").unwrap();
+    assert_eq!(tagged, TaggedEnum::NewtypeStruct(SimpleStruct { a: 1 }));
+    let tagged: TaggedEnum = crate::from_str("NewtypeTuple(1, false)").unwrap();
+    assert_eq!(tagged, TaggedEnum::NewtypeTuple(SimpleTuple(1, false)));
+    let tagged: TaggedEnum = crate::from_str("NewtypeTuple((1, false))").unwrap();
+    assert_eq!(tagged, TaggedEnum::NewtypeTuple(SimpleTuple(1, false)));
+    let tagged: TaggedEnum = crate::from_str("NewtypeBool(true)").unwrap();
+    assert_eq!(tagged, TaggedEnum::NewtypeBool(true));
+    let tagged: TaggedEnum = crate::from_str("Unit").unwrap();
+    assert_eq!(tagged, TaggedEnum::Unit);
 }
 
 #[test]
