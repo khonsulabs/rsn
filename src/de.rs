@@ -754,25 +754,26 @@ impl<'a, 'de> Drop for SequenceDeserializer<'a, 'de> {
         if !self.ended {
             let mut levels = 1;
             loop {
-                match self.de.parser.peek() {
-                    Some(Ok(Event {
+                if matches!(self.de.parser.peek(), None | Some(Err(_))) {
+                    break;
+                }
+
+                match self.de.parser.next().expect("just peeked") {
+                    Ok(Event {
                         kind: EventKind::EndNested,
                         ..
-                    })) => {
-                        let _ = self.de.parser.next();
+                    }) => {
                         levels -= 1;
                         if levels == 0 {
                             break;
                         }
                     }
-                    Some(Ok(Event {
+                    Ok(Event {
                         kind: EventKind::BeginNested { .. },
                         ..
-                    })) => {
-                        let _ = self.de.parser.next();
+                    }) => {
                         levels += 1;
                     }
-                    Some(Err(_)) => break,
                     _ => {}
                 }
             }
@@ -1429,6 +1430,10 @@ mod tests {
         );
         assert_eq!(
             crate::from_str::<BasicEnums>(r#"Tuple(1,2)"#).unwrap(),
+            BasicEnums::Tuple(1, 2)
+        );
+        assert_eq!(
+            crate::from_str::<BasicEnums>(r#"Tuple(1,2,3)"#).unwrap(),
             BasicEnums::Tuple(1, 2)
         );
     }
