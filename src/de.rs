@@ -11,12 +11,20 @@ use crate::tokenizer::{self, Integer};
 
 pub struct Deserializer<'de> {
     parser: BetterPeekable<Parser<'de>>,
+    in_newtype_struct_variant: Option<NewtypeState>,
+}
+
+#[derive(Clone, Copy, Eq, PartialEq)]
+enum NewtypeState {
+    StructVariant,
+    TupleVariant,
 }
 
 impl<'de> Deserializer<'de> {
     pub fn new(source: &'de str, config: Config) -> Self {
         Self {
             parser: BetterPeekable::new(Parser::new(source, config.include_comments(false))),
+            in_newtype_struct_variant: None,
         }
     }
 
@@ -86,7 +94,19 @@ impl<'de> Deserializer<'de> {
             }
         }
     }
+
+    fn set_newtype_state(&mut self, state: NewtypeState) -> NewtypeStateModification {
+        let old_state = self.in_newtype_struct_variant.replace(state);
+        NewtypeStateModification(old_state)
+    }
+
+    fn finish_newtype(&mut self, modification: NewtypeStateModification) -> Option<NewtypeState> {
+        core::mem::replace(&mut self.in_newtype_struct_variant, modification.0)
+    }
 }
+
+#[must_use]
+struct NewtypeStateModification(Option<NewtypeState>);
 
 macro_rules! deserialize_int_impl {
     ($de_name:ident, $visit_name:ident, $conv_name:ident) => {
@@ -176,7 +196,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
                             de.parser.next();
                             visitor.visit_unit()
                         } else {
-                            visitor.visit_seq(SequenceDeserializer::new(de))
+                            visitor.visit_seq(SequenceDeserializer::new(de, true))
                         }
                     }
                     Nested::Map => visitor.visit_map(de),
@@ -474,7 +494,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
                     ));
                 }
 
-                de.with_error_context(|de| visitor.visit_seq(SequenceDeserializer::new(de)))
+                de.with_error_context(|de| visitor.visit_seq(SequenceDeserializer::new(de, true)))
             }
             Some(other) => Err(DeserializerError::new(
                 other.location,
@@ -503,41 +523,66 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: serde::de::Visitor<'de>,
     {
+        let is_parsing_newtype_tuple = matches!(
+            self.in_newtype_struct_variant,
+            Some(NewtypeState::TupleVariant)
+        );
+        let next_token_is_nested_tuple = matches!(
+            self.parser.peek(),
+            Some(Ok(Event {
+                kind: EventKind::BeginNested {
+                    kind: Nested::Tuple,
+                    ..
+                },
+                ..
+            }))
+        );
         self.with_error_context(|de| {
-            match de.parser.next().transpose()? {
-                Some(Event {
-                    kind: EventKind::BeginNested { name, kind },
-                    location,
-                }) => {
-                    if name.map_or(false, |name| name != struct_name) {
-                        return Err(DeserializerError::new(
-                            location,
-                            ErrorKind::NameMismatch(struct_name),
-                        ));
-                    }
+            if is_parsing_newtype_tuple {
+                if next_token_is_nested_tuple {
+                    // We have a multi-nested newtype situation here, and to enable
+                    // parsing the `)` easily, we need to "take over" by erasing the
+                    // current newtype state.
+                    // de.in_newtype_struct_variant = None;
+                    de.parser.next();
+                    return visitor.visit_seq(SequenceDeserializer::new(de, true));
+                }
+            } else {
+                match de.parser.next().transpose()? {
+                    Some(Event {
+                        kind: EventKind::BeginNested { name, kind },
+                        location,
+                    }) => {
+                        if name.map_or(false, |name| name != struct_name) {
+                            return Err(DeserializerError::new(
+                                location,
+                                ErrorKind::NameMismatch(struct_name),
+                            ));
+                        }
 
-                    if kind != Nested::Tuple {
+                        if kind != Nested::Tuple {
+                            return Err(DeserializerError::new(
+                                location,
+                                ErrorKind::ExpectedTupleStruct,
+                            ));
+                        }
+                    }
+                    Some(other) => {
                         return Err(DeserializerError::new(
-                            location,
+                            other.location,
                             ErrorKind::ExpectedTupleStruct,
                         ));
                     }
-                }
-                Some(other) => {
-                    return Err(DeserializerError::new(
-                        other.location,
-                        ErrorKind::ExpectedTupleStruct,
-                    ));
-                }
-                None => {
-                    return Err(DeserializerError::new(
-                        None,
-                        parser::ErrorKind::UnexpectedEof,
-                    ))
+                    None => {
+                        return Err(DeserializerError::new(
+                            None,
+                            parser::ErrorKind::UnexpectedEof,
+                        ))
+                    }
                 }
             }
 
-            visitor.visit_seq(SequenceDeserializer::new(de))
+            visitor.visit_seq(SequenceDeserializer::new(de, true))
         })
     }
 
@@ -582,7 +627,12 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
                     kind: EventKind::BeginNested { name, kind },
                     location,
                 }) => {
-                    if name.map_or(false, |name| name != struct_name) {
+                    if name.map_or(false, |name| name != struct_name)
+                        && !matches!(
+                            de.in_newtype_struct_variant,
+                            Some(NewtypeState::StructVariant)
+                        )
+                    {
                         return Err(DeserializerError::new(
                             location,
                             ErrorKind::NameMismatch(struct_name),
@@ -715,8 +765,11 @@ pub struct SequenceDeserializer<'a, 'de> {
     ended: bool,
 }
 impl<'a, 'de> SequenceDeserializer<'a, 'de> {
-    fn new(de: &'a mut Deserializer<'de>) -> Self {
-        Self { de, ended: false }
+    fn new(de: &'a mut Deserializer<'de>, close_nest: bool) -> Self {
+        Self {
+            ended: !close_nest,
+            de,
+        }
     }
 }
 
@@ -1073,48 +1126,37 @@ impl<'a, 'de> VariantAccess<'de> for EnumVariantAccessor<'a, 'de> {
         T: serde::de::DeserializeSeed<'de>,
     {
         if let EnumVariantAccessor::Nested(deserializer) = self {
-            let newtype_struct;
-            let start;
-            if let Some(Ok(Event {
-                kind:
-                    EventKind::BeginNested {
-                        name,
-                        kind: Nested::Map,
-                    },
-                location,
-            })) = &mut deserializer.parser.peeked
-            {
-                *name = None;
-                newtype_struct = true;
-                start = location.start;
-            } else {
-                let nested_event = deserializer
-                    .parser
-                    .next()
-                    .expect("variant access matched Nested")?;
-                newtype_struct = false;
-                start = nested_event.location.start;
-            };
-            deserializer.with_error_start(start, |de| {
-                let result = seed.deserialize(&mut *de)?;
-                // map parser already removed closing }
-                if !newtype_struct {
-                    loop {
-                        if let Event {
-                            kind: EventKind::EndNested,
+            let modification = match deserializer.parser.peek() {
+                Some(Ok(Event {
+                    kind:
+                        EventKind::BeginNested {
+                            kind: Nested::Tuple,
                             ..
-                        } = de
-                            .parser
-                            .next()
-                            .transpose()?
-                            .expect("eof handled by parser")
-                        {
-                            break;
-                        }
-                    }
+                        },
+                    ..
+                })) => {
+                    let _begin = deserializer.parser.next();
+                    Some(deserializer.set_newtype_state(NewtypeState::TupleVariant))
                 }
-                Ok(result)
-            })
+                Some(Ok(Event {
+                    kind:
+                        EventKind::BeginNested {
+                            kind: Nested::Map, ..
+                        },
+                    ..
+                })) => Some(deserializer.set_newtype_state(NewtypeState::StructVariant)),
+                _ => None,
+            };
+            let result = deserializer.with_error_context(|de| seed.deserialize(&mut *de))?;
+            if let Some(modification) = modification {
+                if deserializer.finish_newtype(modification) == Some(NewtypeState::TupleVariant) {
+                    // SequenceDeserializer has a loop in its drop to eat the
+                    // remaining events until the end
+                    drop(SequenceDeserializer::new(&mut *deserializer, true));
+                }
+            }
+
+            Ok(result)
         } else {
             Err(DeserializerError::new(None, ErrorKind::ExpectedTupleStruct))
         }
@@ -1130,7 +1172,7 @@ impl<'a, 'de> VariantAccess<'de> for EnumVariantAccessor<'a, 'de> {
                 .next()
                 .expect("variant access matched Nested")?;
             deserializer.with_error_start(nested_event.location.start, |de| {
-                visitor.visit_seq(SequenceDeserializer::new(de))
+                visitor.visit_seq(SequenceDeserializer::new(de, true))
             })
         } else {
             Err(DeserializerError::new(None, ErrorKind::ExpectedTupleStruct))
