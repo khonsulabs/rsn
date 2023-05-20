@@ -11,7 +11,7 @@ use crate::tokenizer::{self, Integer};
 
 pub struct Deserializer<'de> {
     parser: BetterPeekable<Parser<'de>>,
-    in_newtype_struct_variant: Option<NewtypeState>,
+    newtype_state: Option<NewtypeState>,
 }
 
 #[derive(Clone, Copy, Eq, PartialEq)]
@@ -24,7 +24,7 @@ impl<'de> Deserializer<'de> {
     pub fn new(source: &'de str, config: Config) -> Self {
         Self {
             parser: BetterPeekable::new(Parser::new(source, config.include_comments(false))),
-            in_newtype_struct_variant: None,
+            newtype_state: None,
         }
     }
 
@@ -96,12 +96,12 @@ impl<'de> Deserializer<'de> {
     }
 
     fn set_newtype_state(&mut self, state: NewtypeState) -> NewtypeStateModification {
-        let old_state = self.in_newtype_struct_variant.replace(state);
+        let old_state = self.newtype_state.replace(state);
         NewtypeStateModification(old_state)
     }
 
     fn finish_newtype(&mut self, modification: NewtypeStateModification) -> Option<NewtypeState> {
-        core::mem::replace(&mut self.in_newtype_struct_variant, modification.0)
+        core::mem::replace(&mut self.newtype_state, modification.0)
     }
 }
 
@@ -196,7 +196,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
                             de.parser.next();
                             visitor.visit_unit()
                         } else {
-                            visitor.visit_seq(SequenceDeserializer::new(de, true))
+                            visitor.visit_seq(SequenceDeserializer::new(de))
                         }
                     }
                     Nested::Map => visitor.visit_map(de),
@@ -494,7 +494,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
                     ));
                 }
 
-                de.with_error_context(|de| visitor.visit_seq(SequenceDeserializer::new(de, true)))
+                de.with_error_context(|de| visitor.visit_seq(SequenceDeserializer::new(de)))
             }
             Some(other) => Err(DeserializerError::new(
                 other.location,
@@ -523,10 +523,8 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: serde::de::Visitor<'de>,
     {
-        let is_parsing_newtype_tuple = matches!(
-            self.in_newtype_struct_variant,
-            Some(NewtypeState::TupleVariant)
-        );
+        let is_parsing_newtype_tuple =
+            matches!(self.newtype_state, Some(NewtypeState::TupleVariant));
         let next_token_is_nested_tuple = matches!(
             self.parser.peek(),
             Some(Ok(Event {
@@ -543,9 +541,8 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
                     // We have a multi-nested newtype situation here, and to enable
                     // parsing the `)` easily, we need to "take over" by erasing the
                     // current newtype state.
-                    // de.in_newtype_struct_variant = None;
                     de.parser.next();
-                    return visitor.visit_seq(SequenceDeserializer::new(de, true));
+                    return visitor.visit_seq(SequenceDeserializer::new(de));
                 }
             } else {
                 match de.parser.next().transpose()? {
@@ -582,7 +579,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
                 }
             }
 
-            visitor.visit_seq(SequenceDeserializer::new(de, true))
+            visitor.visit_seq(SequenceDeserializer::new(de))
         })
     }
 
@@ -628,10 +625,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
                     location,
                 }) => {
                     if name.map_or(false, |name| name != struct_name)
-                        && !matches!(
-                            de.in_newtype_struct_variant,
-                            Some(NewtypeState::StructVariant)
-                        )
+                        && !matches!(de.newtype_state, Some(NewtypeState::StructVariant))
                     {
                         return Err(DeserializerError::new(
                             location,
@@ -765,11 +759,8 @@ pub struct SequenceDeserializer<'a, 'de> {
     ended: bool,
 }
 impl<'a, 'de> SequenceDeserializer<'a, 'de> {
-    fn new(de: &'a mut Deserializer<'de>, close_nest: bool) -> Self {
-        Self {
-            ended: !close_nest,
-            de,
-        }
+    fn new(de: &'a mut Deserializer<'de>) -> Self {
+        Self { de, ended: false }
     }
 }
 
@@ -1152,7 +1143,7 @@ impl<'a, 'de> VariantAccess<'de> for EnumVariantAccessor<'a, 'de> {
                 if deserializer.finish_newtype(modification) == Some(NewtypeState::TupleVariant) {
                     // SequenceDeserializer has a loop in its drop to eat the
                     // remaining events until the end
-                    drop(SequenceDeserializer::new(&mut *deserializer, true));
+                    drop(SequenceDeserializer::new(&mut *deserializer));
                 }
             }
 
@@ -1172,7 +1163,7 @@ impl<'a, 'de> VariantAccess<'de> for EnumVariantAccessor<'a, 'de> {
                 .next()
                 .expect("variant access matched Nested")?;
             deserializer.with_error_start(nested_event.location.start, |de| {
-                visitor.visit_seq(SequenceDeserializer::new(de, true))
+                visitor.visit_seq(SequenceDeserializer::new(de))
             })
         } else {
             Err(DeserializerError::new(None, ErrorKind::ExpectedTupleStruct))
