@@ -413,19 +413,23 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
     where
         V: serde::de::Visitor<'de>,
     {
-        self.with_error_context(|de| match de.parser.next().transpose()? {
-            Some(Event {
+        self.with_error_context(|de| match de.parser.peek() {
+            Some(Ok(Event {
                 kind: EventKind::Primitive(Primitive::Identifier(str)),
                 ..
-            }) if str == "None" => visitor.visit_none(),
-            Some(Event {
+            })) if *str == "None" => {
+                de.parser.next();
+                visitor.visit_none()
+            }
+            Some(Ok(Event {
                 kind:
                     EventKind::BeginNested {
                         name,
                         kind: Nested::Tuple,
                     },
                 ..
-            }) if matches!(name, Some(Name { name: "Some", .. })) => {
+            })) if matches!(name, Some(Name { name: "Some", .. })) => {
+                de.parser.next();
                 let result = visitor.visit_some(&mut *de)?;
                 match de.parser.next().transpose()? {
                     Some(Event {
@@ -439,11 +443,8 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
                     None => unreachable!("parser errors on early eof"),
                 }
             }
-            Some(evt) => Err(DeserializerError::new(
-                evt.location,
-                ErrorKind::ExpectedOption,
-            )),
             None => Err(DeserializerError::new(None, ErrorKind::ExpectedOption)),
+            _ => visitor.visit_some(de),
         })
     }
 
@@ -1445,6 +1446,9 @@ mod tests {
 
         let parsed =
             crate::from_str::<Option<BasicNamed>>(r#"Some(BasicNamed{ a: 1, b: -1 })"#).unwrap();
+        assert_eq!(parsed, Some(BasicNamed { a: 1, b: -1 }));
+
+        let parsed = crate::from_str::<Option<BasicNamed>>(r#"BasicNamed{ a: 1, b: -1 }"#).unwrap();
         assert_eq!(parsed, Some(BasicNamed { a: 1, b: -1 }));
     }
 
