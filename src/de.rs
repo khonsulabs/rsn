@@ -3,7 +3,7 @@ use alloc::string::{String, ToString};
 use core::fmt::Display;
 use core::ops::Range;
 
-use serde::de::{EnumAccess, MapAccess, SeqAccess, VariantAccess};
+use serde::de::{DeserializeOwned, EnumAccess, MapAccess, SeqAccess, VariantAccess};
 use serde::Deserialize;
 
 use crate::parser::{self, Config, Event, EventKind, Name, Nested, Parser, Primitive};
@@ -1349,6 +1349,38 @@ impl Config {
         };
         deserializer.ensure_eof()?;
         Ok(result)
+    }
+
+    pub fn deserialize_slice<'de, T: Deserialize<'de>>(
+        self,
+        source: &'de [u8],
+    ) -> Result<T, Error> {
+        let source = match alloc::str::from_utf8(source) {
+            Ok(source) => source,
+            Err(error) => {
+                let end = error
+                    .error_len()
+                    .map(|l| l + error.valid_up_to())
+                    .unwrap_or(source.len());
+                return Err(Error::new(
+                    (error.valid_up_to() + 1)..end,
+                    ErrorKind::InvalidUtf8,
+                ));
+            }
+        };
+        self.deserialize(source)
+    }
+
+    #[cfg(feature = "std")]
+    pub fn deserialize_reader<T: DeserializeOwned, R: std::io::Read>(
+        self,
+        mut reader: R,
+    ) -> Result<T, Error> {
+        let mut source = alloc::vec::Vec::new();
+        reader
+            .read_to_end(&mut source)
+            .map_err(|e| Error::new(0..0, ErrorKind::Message(e.to_string())))?;
+        self.deserialize_slice(&source)
     }
 }
 
