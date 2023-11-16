@@ -967,6 +967,24 @@
 <a href="#967" id="967">967</a>
 <a href="#968" id="968">968</a>
 <a href="#969" id="969">969</a>
+<a href="#970" id="970">970</a>
+<a href="#971" id="971">971</a>
+<a href="#972" id="972">972</a>
+<a href="#973" id="973">973</a>
+<a href="#974" id="974">974</a>
+<a href="#975" id="975">975</a>
+<a href="#976" id="976">976</a>
+<a href="#977" id="977">977</a>
+<a href="#978" id="978">978</a>
+<a href="#979" id="979">979</a>
+<a href="#980" id="980">980</a>
+<a href="#981" id="981">981</a>
+<a href="#982" id="982">982</a>
+<a href="#983" id="983">983</a>
+<a href="#984" id="984">984</a>
+<a href="#985" id="985">985</a>
+<a href="#986" id="986">986</a>
+<a href="#987" id="987">987</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>alloc::borrow::Cow;
 <span class="kw">use </span>alloc::vec::Vec;
 <span class="kw">use </span>core::fmt::{Display, Formatter};
@@ -1085,7 +1103,13 @@
                         ..
                     })
                 ) {
-                    <span class="kw">let </span><span class="prelude-val">Some</span>(<span class="prelude-val">Ok</span>(Token { kind: TokenKind::Open(balanced), location: open_location })) = <span class="self">self</span>.next_token() <span class="kw">else </span>{ <span class="macro">unreachable!</span>(<span class="string">&quot;matched above&quot;</span>) };
+                    <span class="kw">let </span><span class="prelude-val">Some</span>(<span class="prelude-val">Ok</span>(Token {
+                        kind: TokenKind::Open(balanced),
+                        location: open_location,
+                    })) = <span class="self">self</span>.next_token()
+                    <span class="kw">else </span>{
+                        <span class="macro">unreachable!</span>(<span class="string">&quot;matched above&quot;</span>)
+                    };
 
                     <span class="kw">let </span>kind = <span class="kw">match </span>balanced {
                         Balanced::Paren =&gt; {
@@ -1220,7 +1244,9 @@
     }
 
     <span class="kw">fn </span>map_state_mut(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;mut </span>MapState {
-        <span class="kw">let </span><span class="prelude-val">Some</span>((<span class="kw">_</span>,NestedState::Map(map_state))) = <span class="self">self</span>.nested.last_mut() <span class="kw">else </span>{ <span class="macro">unreachable!</span>(<span class="string">&quot;not a map state&quot;</span>) };
+        <span class="kw">let </span><span class="prelude-val">Some</span>((<span class="kw">_</span>, NestedState::Map(map_state))) = <span class="self">self</span>.nested.last_mut() <span class="kw">else </span>{
+            <span class="macro">unreachable!</span>(<span class="string">&quot;not a map state&quot;</span>)
+        };
         map_state
     }
 
@@ -1265,7 +1291,7 @@
                 )),
             },
             MapState::ExpectingComma =&gt; <span class="kw">match </span><span class="self">self</span>.next_token_parts()<span class="question-mark">? </span>{
-                (location, <span class="prelude-val">Some</span>(TokenKind::Close(closed))) <span class="kw">if </span>closed == Balanced::Brace =&gt; {
+                (location, <span class="prelude-val">Some</span>(TokenKind::Close(Balanced::Brace))) =&gt; {
                     <span class="self">self</span>.nested.pop();
                     <span class="prelude-val">Ok</span>(Event::new(location, EventKind::EndNested))
                 }
@@ -1328,7 +1354,7 @@
                 )),
             },
             MapState::ExpectingComma =&gt; <span class="kw">match </span><span class="self">self</span>.next_token_parts()<span class="question-mark">? </span>{
-                (location, <span class="prelude-val">Some</span>(TokenKind::Close(closed))) <span class="kw">if </span>closed == Balanced::Brace =&gt; {
+                (location, <span class="prelude-val">Some</span>(TokenKind::Close(Balanced::Brace))) =&gt; {
                     <span class="self">self</span>.root_state = State::Finished;
                     <span class="prelude-val">Ok</span>(Event::new(location, EventKind::EndNested))
                 }
@@ -1365,8 +1391,9 @@
                     };
                     <span class="kw">match </span><span class="kw-2">&amp;</span>token.kind {
                         TokenKind::Identifier(<span class="kw">_</span>) <span class="kw">if </span><span class="self">self</span>.config.allow_implicit_map =&gt; {
-                            <span class="kw">let </span>TokenKind::Identifier(identifier) = token.kind
-                                <span class="kw">else </span>{ <span class="macro">unreachable!</span>(<span class="string">&quot;just matched&quot;</span>)};
+                            <span class="kw">let </span>TokenKind::Identifier(identifier) = token.kind <span class="kw">else </span>{
+                                <span class="macro">unreachable!</span>(<span class="string">&quot;just matched&quot;</span>)
+                            };
                             <span class="kw">match </span><span class="self">self</span>.peek() {
                                 <span class="prelude-val">Some</span>(colon) <span class="kw">if </span><span class="macro">matches!</span>(colon.kind, TokenKind::Colon) =&gt; {
                                     <span class="comment">// Switch to parsing an implicit map
@@ -1386,8 +1413,13 @@
                                         TokenKind::Open(Balanced::Brace | Balanced::Paren,)
                                     ) =&gt;
                                 {
-                                    <span class="kw">let </span><span class="prelude-val">Some</span>(<span class="prelude-val">Ok</span>(Token{ kind: TokenKind::Open(kind), location: open_location})) = <span class="self">self</span>.next_token()
-                                        <span class="kw">else </span>{ <span class="macro">unreachable!</span>(<span class="string">&quot;just peeked&quot;</span>) };
+                                    <span class="kw">let </span><span class="prelude-val">Some</span>(<span class="prelude-val">Ok</span>(Token {
+                                        kind: TokenKind::Open(kind),
+                                        location: open_location,
+                                    })) = <span class="self">self</span>.next_token()
+                                    <span class="kw">else </span>{
+                                        <span class="macro">unreachable!</span>(<span class="string">&quot;just peeked&quot;</span>)
+                                    };
                                     <span class="self">self</span>.root_state = State::Finished;
                                     <span class="prelude-val">Ok</span>(Event::new(
                                         token.location,
@@ -1425,8 +1457,12 @@
                     }
                 }
                 State::StartingImplicitMap(<span class="kw">_</span>) =&gt; {
-                    <span class="kw">let </span>State::StartingImplicitMap((location, identifier)) = mem::replace(<span class="kw-2">&amp;mut </span><span class="self">self</span>.root_state, State::ImplicitMap(MapState::ExpectingColon))
-                        <span class="kw">else </span>{ <span class="macro">unreachable!</span>(<span class="string">&quot;just matched&quot;</span>) };
+                    <span class="kw">let </span>State::StartingImplicitMap((location, identifier)) = mem::replace(
+                        <span class="kw-2">&amp;mut </span><span class="self">self</span>.root_state,
+                        State::ImplicitMap(MapState::ExpectingColon),
+                    ) <span class="kw">else </span>{
+                        <span class="macro">unreachable!</span>(<span class="string">&quot;just matched&quot;</span>)
+                    };
                     <span class="prelude-val">Ok</span>(Event::new(
                         location,
                         EventKind::Primitive(Primitive::Identifier(identifier)),

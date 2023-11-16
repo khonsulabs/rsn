@@ -2189,9 +2189,6 @@
 <a href="#2189" id="2189">2189</a>
 <a href="#2190" id="2190">2190</a>
 <a href="#2191" id="2191">2191</a>
-<a href="#2192" id="2192">2192</a>
-<a href="#2193" id="2193">2193</a>
-<a href="#2194" id="2194">2194</a>
 </pre></div><pre class="rust"><code><span class="kw">use </span>alloc::borrow::Cow;
 <span class="kw">use </span>alloc::string::String;
 <span class="kw">use </span>core::fmt::Display;
@@ -2643,11 +2640,8 @@
         <span class="self">self</span>.scratch.clear();
         <span class="kw">let </span>already_read_chars = <span class="self">self</span>.chars.marked_str();
         <span class="kw">if </span>had_underscores {
-            <span class="self">self</span>.scratch.extend(
-                already_read_chars
-                    .chars()
-                    .filter_map(|ch| (ch != <span class="string">&#39;_&#39;</span>).then_some(ch)),
-            );
+            <span class="self">self</span>.scratch
+                .extend(already_read_chars.chars().filter(|ch| ch != <span class="kw-2">&amp;</span><span class="string">&#39;_&#39;</span>));
         } <span class="kw">else </span>{
             <span class="self">self</span>.scratch.push_str(already_read_chars);
         }
