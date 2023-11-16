@@ -1351,7 +1351,7 @@ impl Config {
         Ok(result)
     }
 
-    pub fn deserialize_slice<'de, T: Deserialize<'de>>(
+    pub fn deserialize_from_slice<'de, T: Deserialize<'de>>(
         self,
         source: &'de [u8],
     ) -> Result<T, Error> {
@@ -1372,7 +1372,7 @@ impl Config {
     }
 
     #[cfg(feature = "std")]
-    pub fn deserialize_reader<T: DeserializeOwned, R: std::io::Read>(
+    pub fn deserialize_from_reader<T: DeserializeOwned, R: std::io::Read>(
         self,
         mut reader: R,
     ) -> Result<T, Error> {
@@ -1380,7 +1380,7 @@ impl Config {
         reader
             .read_to_end(&mut source)
             .map_err(|e| Error::new(0..0, ErrorKind::Message(e.to_string())))?;
-        self.deserialize_slice(&source)
+        self.deserialize_from_slice(&source)
     }
 }
 

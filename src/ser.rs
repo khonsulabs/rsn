@@ -502,7 +502,7 @@ mod serialize_writer {
         }
     }
     impl Config {
-        pub fn serialize_writer<S: Serialize, W: std::io::Write>(
+        pub fn serialize_to_writer<S: Serialize, W: std::io::Write>(
             &self,
             value: &S,
             writer: W,
