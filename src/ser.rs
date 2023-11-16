@@ -469,6 +469,56 @@ impl Config {
         value.serialize(&mut serializer).expect("core::fmt::Error");
         serializer.finish()
     }
+
+    pub fn serialize_to_vec<S: Serialize>(&self, value: &S) -> alloc::vec::Vec<u8> {
+        self.serialize(value).into_bytes()
+    }
+}
+
+#[cfg(feature = "std")]
+mod serialize_writer {
+    use super::*;
+    struct Writer<T> {
+        writer: T,
+        written: usize,
+        error: Option<std::io::Error>,
+    }
+    impl<T: std::io::Write> Write for Writer<T> {
+        fn write_str(&mut self, s: &str) -> core::fmt::Result {
+            match self.writer.write(s.as_bytes()) {
+                Ok(written) => {
+                    self.written += written;
+                    Ok(())
+                }
+                Err(error) => {
+                    assert!(
+                        self.error.is_none(),
+                        "should not have continued on write error"
+                    );
+                    self.error = Some(error);
+                    Err(core::fmt::Error)
+                }
+            }
+        }
+    }
+    impl Config {
+        pub fn serialize_to_writer<S: Serialize, W: std::io::Write>(
+            &self,
+            value: &S,
+            writer: W,
+        ) -> std::io::Result<usize> {
+            let mut writer = Writer {
+                writer,
+                written: 0,
+                error: None,
+            };
+            let mut serializer = Serializer::new(&mut writer, self);
+            value
+                .serialize(&mut serializer)
+                .map_err(|_| writer.error.expect("should store error on error"))?;
+            Ok(writer.written)
+        }
+    }
 }
 
 #[test]
