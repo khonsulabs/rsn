@@ -116,7 +116,13 @@ impl<'s> Parser<'s> {
                         ..
                     })
                 ) {
-                    let Some(Ok(Token { kind: TokenKind::Open(balanced), location: open_location })) = self.next_token() else { unreachable!("matched above") };
+                    let Some(Ok(Token {
+                        kind: TokenKind::Open(balanced),
+                        location: open_location,
+                    })) = self.next_token()
+                    else {
+                        unreachable!("matched above")
+                    };
 
                     let kind = match balanced {
                         Balanced::Paren => {
@@ -251,7 +257,9 @@ impl<'s> Parser<'s> {
     }
 
     fn map_state_mut(&mut self) -> &mut MapState {
-        let Some((_,NestedState::Map(map_state))) = self.nested.last_mut() else { unreachable!("not a map state") };
+        let Some((_, NestedState::Map(map_state))) = self.nested.last_mut() else {
+            unreachable!("not a map state")
+        };
         map_state
     }
 
@@ -296,7 +304,7 @@ impl<'s> Parser<'s> {
                 )),
             },
             MapState::ExpectingComma => match self.next_token_parts()? {
-                (location, Some(TokenKind::Close(closed))) if closed == Balanced::Brace => {
+                (location, Some(TokenKind::Close(Balanced::Brace))) => {
                     self.nested.pop();
                     Ok(Event::new(location, EventKind::EndNested))
                 }
@@ -359,7 +367,7 @@ impl<'s> Parser<'s> {
                 )),
             },
             MapState::ExpectingComma => match self.next_token_parts()? {
-                (location, Some(TokenKind::Close(closed))) if closed == Balanced::Brace => {
+                (location, Some(TokenKind::Close(Balanced::Brace))) => {
                     self.root_state = State::Finished;
                     Ok(Event::new(location, EventKind::EndNested))
                 }
@@ -396,8 +404,9 @@ impl<'s> Parser<'s> {
                     };
                     match &token.kind {
                         TokenKind::Identifier(_) if self.config.allow_implicit_map => {
-                            let TokenKind::Identifier(identifier) = token.kind
-                                else { unreachable!("just matched")};
+                            let TokenKind::Identifier(identifier) = token.kind else {
+                                unreachable!("just matched")
+                            };
                             match self.peek() {
                                 Some(colon) if matches!(colon.kind, TokenKind::Colon) => {
                                     // Switch to parsing an implicit map
@@ -417,8 +426,13 @@ impl<'s> Parser<'s> {
                                         TokenKind::Open(Balanced::Brace | Balanced::Paren,)
                                     ) =>
                                 {
-                                    let Some(Ok(Token{ kind: TokenKind::Open(kind), location: open_location})) = self.next_token()
-                                        else { unreachable!("just peeked") };
+                                    let Some(Ok(Token {
+                                        kind: TokenKind::Open(kind),
+                                        location: open_location,
+                                    })) = self.next_token()
+                                    else {
+                                        unreachable!("just peeked")
+                                    };
                                     self.root_state = State::Finished;
                                     Ok(Event::new(
                                         token.location,
@@ -456,8 +470,12 @@ impl<'s> Parser<'s> {
                     }
                 }
                 State::StartingImplicitMap(_) => {
-                    let State::StartingImplicitMap((location, identifier)) = mem::replace(&mut self.root_state, State::ImplicitMap(MapState::ExpectingColon))
-                        else { unreachable!("just matched") };
+                    let State::StartingImplicitMap((location, identifier)) = mem::replace(
+                        &mut self.root_state,
+                        State::ImplicitMap(MapState::ExpectingColon),
+                    ) else {
+                        unreachable!("just matched")
+                    };
                     Ok(Event::new(
                         location,
                         EventKind::Primitive(Primitive::Identifier(identifier)),

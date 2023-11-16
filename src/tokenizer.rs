@@ -449,11 +449,8 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
         self.scratch.clear();
         let already_read_chars = self.chars.marked_str();
         if had_underscores {
-            self.scratch.extend(
-                already_read_chars
-                    .chars()
-                    .filter_map(|ch| (ch != '_').then_some(ch)),
-            );
+            self.scratch
+                .extend(already_read_chars.chars().filter(|ch| ch != &'_'));
         } else {
             self.scratch.push_str(already_read_chars);
         }

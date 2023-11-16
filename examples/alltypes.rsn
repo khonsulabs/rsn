@@ -1,0 +1,22 @@
+ExampleStruct {
+  integers: [42, 0xFF, 0o77, 0b101],
+  floats: [42., 3.14, 1e10],
+  bools: [true, false],
+  chars: ['a', '\''],
+  string: "Hello, World!",
+  raw_string: r#"I said, "Hello, World!""#,
+  bytes: [b'a', b'\''],
+  byte_string: b"Hello, World!",
+  raw_byte_string: br#"I said, "Hello, World!""#,
+  named_map: StructLike {
+    field: 42,
+  },
+  named_tuple: TupleLike(42),
+  r#raw_identifiers: true,
+  array: [1, 2, 3],
+  tuple: (1, 2, 3),
+  map: {
+    "a": 1,
+    "b": 2,
+  },
+}

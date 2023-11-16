@@ -424,11 +424,11 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
             Some(Ok(Event {
                 kind:
                     EventKind::BeginNested {
-                        name,
+                        name: Some(Name { name: "Some", .. }),
                         kind: Nested::Tuple,
                     },
                 ..
-            })) if matches!(name, Some(Name { name: "Some", .. })) => {
+            })) => {
                 de.parser.next();
                 let result = visitor.visit_some(&mut *de)?;
                 match de.parser.next().transpose()? {

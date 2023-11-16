@@ -1,12 +1,13 @@
 # Rsn - Rusty Notation
 
-**This crate is very early in development and is not ready for consumption.**
+**This crate is very early in development. Please report any issues [on our
+GitHub](https://github.com/khonsulabs/rsn).**
 
 ![rsn forbids unsafe code](https://img.shields.io/badge/unsafe-forbid-success)
 ![rsn is considered alpha](https://img.shields.io/badge/status-alpha-orange)
 [![crate version](https://img.shields.io/crates/v/rsn.svg)](https://crates.io/crates/rsn)
 [![Live Build Status](https://img.shields.io/github/actions/workflow/status/khonsulabs/rsn/rust.yml?branch=main)](https://github.com/khonsulabs/rsn/actions?query=workflow:Tests)
-[![HTML Coverage Report for `main`](https://khonsulabs.github.io/rsn/coverage/badge.svg)]($pages-base$/coverage/)
+[![HTML Coverage Report for `main`](https://khonsulabs.github.io/rsn/coverage/badge.svg)](https://khonsulabs.github.io/rsn/coverage/)
 [![Documentation for `main`](https://img.shields.io/badge/docs-main-informational)](https://khonsulabs.github.io/rsn/main/rsn/)
 
 A UTF-8 based text format that looks very similar to valid Rust code. This format adheres closely to [Rust's lexical rules][rust-lexer]
@@ -17,15 +18,40 @@ This crate supports `no_std` targets that support the `alloc` crate.
 
 ## Data Types
 
+```rsn
+ExampleStruct {
+  integers: [42, 0xFF, 0o77, 0b101],
+  floats: [42., 3.14, 1e10],
+  bools: [true, false],
+  chars: ['a', '\''],
+  string: "Hello, World!",
+  raw_string: r#"I said, "Hello, World!""#,
+  bytes: [b'a', b'\''],
+  byte_string: b"Hello, World!",
+  raw_byte_string: br#"I said, "Hello, World!""#,
+  named_map: StructLike {
+    field: 42,
+  },
+  named_tuple: TupleLike(42),
+  r#raw_identifiers: true,
+  array: [1, 2, 3],
+  tuple: (1, 2, 3),
+  map: {
+    "a": 1,
+    "b": 2,
+  },
+}
+```
+
 - Integers (`42`, `0xFF`, `0o77`, `0b101`)
-- Floats (`42.`, `3.14`, `)
+- Floats (`42.`, `3.14`)
 - Bool (`true`, `false`)
 - Character (`'a'`, `'\''`)
 - Byte (`b'a'`, `b'\''`)
 - String (`"hello, world"`)
 - Raw Strings (`r#"They said, "Hello World!""#`)
 - Byte Strings (`b"hello, world"`)
-- Struct
+- Named
   - Ident or Raw Ident (`r#foo`)
   - Map or Tuple
 - Map
