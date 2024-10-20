@@ -524,15 +524,7 @@
 <a href="#523" id="523">523</a>
 <a href="#524" id="524">524</a>
 <a href="#525" id="525">525</a>
-<a href="#526" id="526">526</a>
-<a href="#527" id="527">527</a>
-<a href="#528" id="528">528</a>
-<a href="#529" id="529">529</a>
-<a href="#530" id="530">530</a>
-<a href="#531" id="531">531</a>
-<a href="#532" id="532">532</a>
-<a href="#533" id="533">533</a>
-<a href="#534" id="534">534</a></pre></div><pre class="rust"><code><span class="kw">use </span>alloc::borrow::Cow;
+<a href="#526" id="526">526</a></pre></div><pre class="rust"><code><span class="kw">use </span>alloc::borrow::Cow;
 <span class="kw">use </span>alloc::string::String;
 <span class="kw">use </span>core::fmt::Write;
 
@@ -678,9 +670,9 @@
         <span class="self">self</span>.writer.write_raw_value(<span class="string">"None"</span>)
     }
 
-    <span class="kw">fn </span>serialize_some&lt;T: <span class="question-mark">?</span>Sized&gt;(<span class="self">self</span>, value: <span class="kw-2">&amp;</span>T) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>::Ok, <span class="self">Self</span>::Error&gt;
+    <span class="kw">fn </span>serialize_some&lt;T&gt;(<span class="self">self</span>, value: <span class="kw-2">&amp;</span>T) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>::Ok, <span class="self">Self</span>::Error&gt;
     <span class="kw">where
-        </span>T: serde::Serialize,
+        </span>T: serde::Serialize + <span class="question-mark">?</span>Sized,
     {
         <span class="self">self</span>.mark_value_seen();
         <span class="self">self</span>.writer.begin_named_tuple(<span class="string">"Some"</span>)<span class="question-mark">?</span>;
@@ -709,13 +701,13 @@
         <span class="self">self</span>.writer.write_raw_value(variant)
     }
 
-    <span class="kw">fn </span>serialize_newtype_struct&lt;T: <span class="question-mark">?</span>Sized&gt;(
+    <span class="kw">fn </span>serialize_newtype_struct&lt;T&gt;(
         <span class="self">self</span>,
         name: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>str,
         value: <span class="kw-2">&amp;</span>T,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>::Ok, <span class="self">Self</span>::Error&gt;
     <span class="kw">where
-        </span>T: serde::Serialize,
+        </span>T: serde::Serialize + <span class="question-mark">?</span>Sized,
     {
         <span class="self">self</span>.mark_value_seen();
         <span class="self">self</span>.writer.begin_named_tuple(name)<span class="question-mark">?</span>;
@@ -723,7 +715,7 @@
         <span class="self">self</span>.writer.finish_nested()
     }
 
-    <span class="kw">fn </span>serialize_newtype_variant&lt;T: <span class="question-mark">?</span>Sized&gt;(
+    <span class="kw">fn </span>serialize_newtype_variant&lt;T&gt;(
         <span class="self">self</span>,
         _name: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>str,
         _variant_index: u32,
@@ -731,7 +723,7 @@
         value: <span class="kw-2">&amp;</span>T,
     ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>::Ok, <span class="self">Self</span>::Error&gt;
     <span class="kw">where
-        </span>T: serde::Serialize,
+        </span>T: serde::Serialize + <span class="question-mark">?</span>Sized,
     {
         <span class="self">self</span>.mark_value_seen();
         <span class="self">self</span>.writer.begin_named_tuple(variant)<span class="question-mark">?</span>;
@@ -816,9 +808,9 @@
     <span class="kw">type </span>Error = core::fmt::Error;
     <span class="kw">type </span><span class="prelude-val">Ok </span>= ();
 
-    <span class="kw">fn </span>serialize_element&lt;T: <span class="question-mark">?</span>Sized&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, value: <span class="kw-2">&amp;</span>T) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="self">Self</span>::Error&gt;
+    <span class="kw">fn </span>serialize_element&lt;T&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, value: <span class="kw-2">&amp;</span>T) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="self">Self</span>::Error&gt;
     <span class="kw">where
-        </span>T: serde::Serialize,
+        </span>T: serde::Serialize + <span class="question-mark">?</span>Sized,
     {
         value.serialize(<span class="kw-2">&amp;mut **</span><span class="self">self</span>)
     }
@@ -835,9 +827,9 @@
     <span class="kw">type </span>Error = core::fmt::Error;
     <span class="kw">type </span><span class="prelude-val">Ok </span>= ();
 
-    <span class="kw">fn </span>serialize_element&lt;T: <span class="question-mark">?</span>Sized&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, value: <span class="kw-2">&amp;</span>T) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="self">Self</span>::Error&gt;
+    <span class="kw">fn </span>serialize_element&lt;T&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, value: <span class="kw-2">&amp;</span>T) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="self">Self</span>::Error&gt;
     <span class="kw">where
-        </span>T: serde::Serialize,
+        </span>T: serde::Serialize + <span class="question-mark">?</span>Sized,
     {
         value.serialize(<span class="kw-2">&amp;mut **</span><span class="self">self</span>)
     }
@@ -854,9 +846,9 @@
     <span class="kw">type </span>Error = core::fmt::Error;
     <span class="kw">type </span><span class="prelude-val">Ok </span>= ();
 
-    <span class="kw">fn </span>serialize_field&lt;T: <span class="question-mark">?</span>Sized&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, value: <span class="kw-2">&amp;</span>T) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="self">Self</span>::Error&gt;
+    <span class="kw">fn </span>serialize_field&lt;T&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, value: <span class="kw-2">&amp;</span>T) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="self">Self</span>::Error&gt;
     <span class="kw">where
-        </span>T: serde::Serialize,
+        </span>T: serde::Serialize + <span class="question-mark">?</span>Sized,
     {
         value.serialize(<span class="kw-2">&amp;mut **</span><span class="self">self</span>)
     }
@@ -873,9 +865,9 @@
     <span class="kw">type </span>Error = core::fmt::Error;
     <span class="kw">type </span><span class="prelude-val">Ok </span>= ();
 
-    <span class="kw">fn </span>serialize_field&lt;T: <span class="question-mark">?</span>Sized&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, value: <span class="kw-2">&amp;</span>T) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="self">Self</span>::Error&gt;
+    <span class="kw">fn </span>serialize_field&lt;T&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, value: <span class="kw-2">&amp;</span>T) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="self">Self</span>::Error&gt;
     <span class="kw">where
-        </span>T: serde::Serialize,
+        </span>T: serde::Serialize + <span class="question-mark">?</span>Sized,
     {
         value.serialize(<span class="kw-2">&amp;mut **</span><span class="self">self</span>)
     }
@@ -897,13 +889,9 @@
     <span class="kw">type </span>Error = core::fmt::Error;
     <span class="kw">type </span><span class="prelude-val">Ok </span>= ();
 
-    <span class="kw">fn </span>serialize_field&lt;T: <span class="question-mark">?</span>Sized&gt;(
-        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
-        key: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>str,
-        value: <span class="kw-2">&amp;</span>T,
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="self">Self</span>::Error&gt;
+    <span class="kw">fn </span>serialize_field&lt;T&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, key: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>str, value: <span class="kw-2">&amp;</span>T) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="self">Self</span>::Error&gt;
     <span class="kw">where
-        </span>T: serde::Serialize,
+        </span>T: serde::Serialize + <span class="question-mark">?</span>Sized,
     {
         <span class="kw">if </span><span class="self">self</span>.is_implicit_map {
             <span class="self">self</span>.serializer.writer.write_raw_value(key)<span class="question-mark">?</span>;
@@ -932,13 +920,9 @@
     <span class="kw">type </span>Error = core::fmt::Error;
     <span class="kw">type </span><span class="prelude-val">Ok </span>= ();
 
-    <span class="kw">fn </span>serialize_field&lt;T: <span class="question-mark">?</span>Sized&gt;(
-        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
-        key: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>str,
-        value: <span class="kw-2">&amp;</span>T,
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="self">Self</span>::Error&gt;
+    <span class="kw">fn </span>serialize_field&lt;T&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, key: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>str, value: <span class="kw-2">&amp;</span>T) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="self">Self</span>::Error&gt;
     <span class="kw">where
-        </span>T: serde::Serialize,
+        </span>T: serde::Serialize + <span class="question-mark">?</span>Sized,
     {
         <span class="self">self</span>.writer.write_raw_value(key)<span class="question-mark">?</span>;
         value.serialize(<span class="kw-2">&amp;mut **</span><span class="self">self</span>)
@@ -956,16 +940,16 @@
     <span class="kw">type </span>Error = core::fmt::Error;
     <span class="kw">type </span><span class="prelude-val">Ok </span>= ();
 
-    <span class="kw">fn </span>serialize_key&lt;T: <span class="question-mark">?</span>Sized&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, key: <span class="kw-2">&amp;</span>T) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="self">Self</span>::Error&gt;
+    <span class="kw">fn </span>serialize_key&lt;T&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, key: <span class="kw-2">&amp;</span>T) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="self">Self</span>::Error&gt;
     <span class="kw">where
-        </span>T: serde::Serialize,
+        </span>T: serde::Serialize + <span class="question-mark">?</span>Sized,
     {
         key.serialize(<span class="kw-2">&amp;mut **</span><span class="self">self</span>)
     }
 
-    <span class="kw">fn </span>serialize_value&lt;T: <span class="question-mark">?</span>Sized&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, value: <span class="kw-2">&amp;</span>T) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="self">Self</span>::Error&gt;
+    <span class="kw">fn </span>serialize_value&lt;T&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, value: <span class="kw-2">&amp;</span>T) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="self">Self</span>::Error&gt;
     <span class="kw">where
-        </span>T: serde::Serialize,
+        </span>T: serde::Serialize + <span class="question-mark">?</span>Sized,
     {
         value.serialize(<span class="kw-2">&amp;mut **</span><span class="self">self</span>)
     }
