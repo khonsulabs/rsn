@@ -27,7 +27,9 @@ pub enum Value<'a> {
 macro_rules! as_integer {
     ($name:ident, $ty:ty) => {
         pub fn $name(&self) -> Option<$ty> {
-            let Self::Integer(value) = self else { return None };
+            let Self::Integer(value) = self else {
+                return None;
+            };
 
             value.$name()
         }
@@ -387,9 +389,9 @@ mod serde {
             Ok(Value::Identifier(Cow::Borrowed("None")))
         }
 
-        fn serialize_some<T: ?Sized>(self, value: &T) -> Result<Self::Ok, Self::Error>
+        fn serialize_some<T>(self, value: &T) -> Result<Self::Ok, Self::Error>
         where
-            T: serde::Serialize,
+            T: serde::Serialize + ?Sized,
         {
             Ok(Value::Named(Named {
                 name: Cow::Borrowed("Some"),
@@ -414,13 +416,13 @@ mod serde {
             Ok(Value::Identifier(Cow::Owned(variant.to_string())))
         }
 
-        fn serialize_newtype_struct<T: ?Sized>(
+        fn serialize_newtype_struct<T>(
             self,
             name: &'static str,
             value: &T,
         ) -> Result<Self::Ok, Self::Error>
         where
-            T: serde::Serialize,
+            T: serde::Serialize + ?Sized,
         {
             Ok(Value::Named(Named {
                 name: Cow::Owned(name.to_string()),
@@ -428,7 +430,7 @@ mod serde {
             }))
         }
 
-        fn serialize_newtype_variant<T: ?Sized>(
+        fn serialize_newtype_variant<T>(
             self,
             _name: &'static str,
             _variant_index: u32,
@@ -436,7 +438,7 @@ mod serde {
             value: &T,
         ) -> Result<Self::Ok, Self::Error>
         where
-            T: serde::Serialize,
+            T: serde::Serialize + ?Sized,
         {
             Ok(Value::Named(Named {
                 name: Cow::Owned(variant.to_string()),
@@ -536,9 +538,9 @@ mod serde {
         type Error = ToValueError;
         type Ok = OwnedValue;
 
-        fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
+        fn serialize_element<T>(&mut self, value: &T) -> Result<(), Self::Error>
         where
-            T: serde::Serialize,
+            T: serde::Serialize + ?Sized,
         {
             self.contents.0.push(value.serialize(ValueSerializer)?);
             Ok(())
@@ -565,9 +567,9 @@ mod serde {
         type Error = ToValueError;
         type Ok = OwnedValue;
 
-        fn serialize_element<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
+        fn serialize_element<T>(&mut self, value: &T) -> Result<(), Self::Error>
         where
-            T: serde::Serialize,
+            T: serde::Serialize + ?Sized,
         {
             SerializeSeq::serialize_element(self, value)
         }
@@ -581,9 +583,9 @@ mod serde {
         type Error = ToValueError;
         type Ok = OwnedValue;
 
-        fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
+        fn serialize_field<T>(&mut self, value: &T) -> Result<(), Self::Error>
         where
-            T: serde::Serialize,
+            T: serde::Serialize + ?Sized,
         {
             SerializeSeq::serialize_element(self, value)
         }
@@ -597,9 +599,9 @@ mod serde {
         type Error = ToValueError;
         type Ok = OwnedValue;
 
-        fn serialize_field<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
+        fn serialize_field<T>(&mut self, value: &T) -> Result<(), Self::Error>
         where
-            T: serde::Serialize,
+            T: serde::Serialize + ?Sized,
         {
             SerializeSeq::serialize_element(self, value)
         }
@@ -619,9 +621,9 @@ mod serde {
         type Error = ToValueError;
         type Ok = OwnedValue;
 
-        fn serialize_key<T: ?Sized>(&mut self, key: &T) -> Result<(), Self::Error>
+        fn serialize_key<T>(&mut self, key: &T) -> Result<(), Self::Error>
         where
-            T: serde::Serialize,
+            T: serde::Serialize + ?Sized,
         {
             self.contents.0.push((
                 key.serialize(ValueSerializer)?,
@@ -630,9 +632,9 @@ mod serde {
             Ok(())
         }
 
-        fn serialize_value<T: ?Sized>(&mut self, value: &T) -> Result<(), Self::Error>
+        fn serialize_value<T>(&mut self, value: &T) -> Result<(), Self::Error>
         where
-            T: serde::Serialize,
+            T: serde::Serialize + ?Sized,
         {
             self.contents
                 .0
@@ -658,13 +660,9 @@ mod serde {
         type Error = ToValueError;
         type Ok = OwnedValue;
 
-        fn serialize_field<T: ?Sized>(
-            &mut self,
-            key: &'static str,
-            value: &T,
-        ) -> Result<(), Self::Error>
+        fn serialize_field<T>(&mut self, key: &'static str, value: &T) -> Result<(), Self::Error>
         where
-            T: serde::Serialize,
+            T: serde::Serialize + ?Sized,
         {
             SerializeMap::serialize_key(self, key)?;
             SerializeMap::serialize_value(self, value)
@@ -679,13 +677,9 @@ mod serde {
         type Error = ToValueError;
         type Ok = OwnedValue;
 
-        fn serialize_field<T: ?Sized>(
-            &mut self,
-            key: &'static str,
-            value: &T,
-        ) -> Result<(), Self::Error>
+        fn serialize_field<T>(&mut self, key: &'static str, value: &T) -> Result<(), Self::Error>
         where
-            T: serde::Serialize,
+            T: serde::Serialize + ?Sized,
         {
             SerializeMap::serialize_key(self, key)?;
             SerializeMap::serialize_value(self, value)
