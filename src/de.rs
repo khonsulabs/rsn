@@ -1461,6 +1461,14 @@ mod tests {
         assert_eq!(parsed, BasicNamed { a: 1, b: -1 });
         let parsed = config.deserialize::<BasicNamed>(r#"a: 1, b: -1,"#).unwrap();
         assert_eq!(parsed, BasicNamed { a: 1, b: -1 });
+        let parsed = config
+            .deserialize::<BasicNamed>(r#"{a: 1, b: -1}"#)
+            .unwrap();
+        assert_eq!(parsed, BasicNamed { a: 1, b: -1 });
+        let parsed = config
+            .deserialize::<BasicNamed>(r#"BasicNamed{a: 1, b: -1}"#)
+            .unwrap();
+        assert_eq!(parsed, BasicNamed { a: 1, b: -1 });
     }
 
     #[test]
@@ -1489,7 +1497,7 @@ mod tests {
         #[derive(Debug, Deserialize)]
         #[serde(untagged)]
         enum Untagged {
-            A(u64),
+            A(#[allow(unused)] u64),
         }
 
         let source = r#"[1, "hello"]"#;
