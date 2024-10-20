@@ -403,65 +403,32 @@ impl<'s> Parser<'s> {
                         Err(err) => return Some(Err(err.into())),
                     };
                     match &token.kind {
-                        TokenKind::Identifier(_) if self.config.allow_implicit_map => {
+                        TokenKind::Comment(comment) => {
+                            Ok(Event::new(token.location, EventKind::Comment(comment)))
+                        }
+                        TokenKind::Identifier(_)
+                            if self.config.allow_implicit_map
+                                && matches!(
+                                    self.peek(),
+                                    Some(Token {
+                                        kind: TokenKind::Colon,
+                                        ..
+                                    })
+                                ) =>
+                        {
                             let TokenKind::Identifier(identifier) = token.kind else {
                                 unreachable!("just matched")
                             };
-                            match self.peek() {
-                                Some(colon) if matches!(colon.kind, TokenKind::Colon) => {
-                                    // Switch to parsing an implicit map
-                                    self.root_state =
-                                        State::StartingImplicitMap((token.location, identifier));
-                                    Ok(Event::new(
-                                        0..0,
-                                        EventKind::BeginNested {
-                                            name: None,
-                                            kind: Nested::Map,
-                                        },
-                                    ))
-                                }
-                                Some(open)
-                                    if matches!(
-                                        open.kind,
-                                        TokenKind::Open(Balanced::Brace | Balanced::Paren,)
-                                    ) =>
-                                {
-                                    let Some(Ok(Token {
-                                        kind: TokenKind::Open(kind),
-                                        location: open_location,
-                                    })) = self.next_token()
-                                    else {
-                                        unreachable!("just peeked")
-                                    };
-                                    self.root_state = State::Finished;
-                                    Ok(Event::new(
-                                        token.location,
-                                        EventKind::BeginNested {
-                                            name: Some(Name {
-                                                location: open_location,
-                                                name: identifier,
-                                            }),
-                                            kind: match kind {
-                                                Balanced::Paren => Nested::Tuple,
-                                                Balanced::Brace => Nested::Map,
-                                                Balanced::Bracket => {
-                                                    unreachable!("not matched in peek")
-                                                }
-                                            },
-                                        },
-                                    ))
-                                }
-                                _ => {
-                                    self.root_state = State::Finished;
-                                    Ok(Event::new(
-                                        token.location,
-                                        EventKind::Primitive(Primitive::Identifier(identifier)),
-                                    ))
-                                }
-                            }
-                        }
-                        TokenKind::Comment(comment) => {
-                            Ok(Event::new(token.location, EventKind::Comment(comment)))
+                            // Switch to parsing an implicit map
+                            self.root_state =
+                                State::StartingImplicitMap((token.location, identifier));
+                            Ok(Event::new(
+                                0..0,
+                                EventKind::BeginNested {
+                                    name: None,
+                                    kind: Nested::Map,
+                                },
+                            ))
                         }
                         _ => {
                             self.root_state = State::Finished;
