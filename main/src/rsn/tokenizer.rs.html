@@ -1,4 +1,5 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/tokenizer.rs`."><title>tokenizer.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-9ee3a5e31a2afa3e.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="rsn" data-themes="" data-resource-suffix="" data-rustdoc-version="1.76.0-nightly (6b771f6b5 2023-11-15)" data-channel="nightly" data-search-js="search-8fbf244ebcf71464.js" data-settings-js="settings-74424d7eec62a23e.js" ><script src="../../static.files/storage-fec3eaa3851e447d.js"></script><script defer src="../../static.files/src-script-3280b574d94e47b4.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-f06f02fd918e3bb3.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-5d8b3c7633ad77ba.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/tokenizer.rs`."><title>tokenizer.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-a5dc3bae.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="rsn" data-themes="" data-resource-suffix="" data-rustdoc-version="1.84.0-nightly (da935398d 2024-10-19)" data-channel="nightly" data-search-js="search-c5a66128.js" data-settings-js="settings-0f613d39.js" ><script src="../../static.files/storage-59e33391.js"></script><script defer src="../../static.files/src-script-56102188.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-5f194d8c.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-893ab5e7.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-6580c154.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1><div class="sub-heading">rsn/</div>tokenizer.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers">
+<a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -2188,8 +2189,7 @@
 <a href="#2188" id="2188">2188</a>
 <a href="#2189" id="2189">2189</a>
 <a href="#2190" id="2190">2190</a>
-<a href="#2191" id="2191">2191</a>
-</pre></div><pre class="rust"><code><span class="kw">use </span>alloc::borrow::Cow;
+<a href="#2191" id="2191">2191</a></pre></div><pre class="rust"><code><span class="kw">use </span>alloc::borrow::Cow;
 <span class="kw">use </span>alloc::string::String;
 <span class="kw">use </span>core::fmt::Display;
 <span class="kw">use </span>core::mem;
@@ -2202,19 +2202,19 @@
 <span class="kw">mod </span>char_iterator;
 
 <span class="attr">#[derive(Clone, Eq, PartialEq, Debug)]
-</span><span class="kw">pub struct </span>Token&lt;<span class="lifetime">&#39;a</span>&gt; {
+</span><span class="kw">pub struct </span>Token&lt;<span class="lifetime">'a</span>&gt; {
     <span class="kw">pub </span>location: Range&lt;usize&gt;,
-    <span class="kw">pub </span>kind: TokenKind&lt;<span class="lifetime">&#39;a</span>&gt;,
+    <span class="kw">pub </span>kind: TokenKind&lt;<span class="lifetime">'a</span>&gt;,
 }
 
-<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; Token&lt;<span class="lifetime">&#39;a</span>&gt; {
-    <span class="kw">pub const fn </span>new(location: Range&lt;usize&gt;, kind: TokenKind&lt;<span class="lifetime">&#39;a</span>&gt;) -&gt; <span class="self">Self </span>{
+<span class="kw">impl</span>&lt;<span class="lifetime">'a</span>&gt; Token&lt;<span class="lifetime">'a</span>&gt; {
+    <span class="kw">pub const fn </span>new(location: Range&lt;usize&gt;, kind: TokenKind&lt;<span class="lifetime">'a</span>&gt;) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{ location, kind }
     }
 }
 
 <span class="attr">#[derive(Clone, Debug)]
-</span><span class="kw">pub enum </span>TokenKind&lt;<span class="lifetime">&#39;a</span>&gt; {
+</span><span class="kw">pub enum </span>TokenKind&lt;<span class="lifetime">'a</span>&gt; {
     Integer(Integer),
     Float(f64),
     Bool(bool),
@@ -2222,18 +2222,18 @@
     Colon,
     Comma,
     Byte(u8),
-    String(Cow&lt;<span class="lifetime">&#39;a</span>, str&gt;),
-    Bytes(Cow&lt;<span class="lifetime">&#39;a</span>, [u8]&gt;),
-    Identifier(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>str),
+    String(Cow&lt;<span class="lifetime">'a</span>, str&gt;),
+    Bytes(Cow&lt;<span class="lifetime">'a</span>, [u8]&gt;),
+    Identifier(<span class="kw-2">&amp;</span><span class="lifetime">'a </span>str),
     Open(Balanced),
     Close(Balanced),
-    Comment(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>str),
-    Whitespace(<span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>str),
+    Comment(<span class="kw-2">&amp;</span><span class="lifetime">'a </span>str),
+    Whitespace(<span class="kw-2">&amp;</span><span class="lifetime">'a </span>str),
 }
 
-<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; Eq <span class="kw">for </span>TokenKind&lt;<span class="lifetime">&#39;a</span>&gt; {}
+<span class="kw">impl</span>&lt;<span class="lifetime">'a</span>&gt; Eq <span class="kw">for </span>TokenKind&lt;<span class="lifetime">'a</span>&gt; {}
 
-<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; PartialEq <span class="kw">for </span>TokenKind&lt;<span class="lifetime">&#39;a</span>&gt; {
+<span class="kw">impl</span>&lt;<span class="lifetime">'a</span>&gt; PartialEq <span class="kw">for </span>TokenKind&lt;<span class="lifetime">'a</span>&gt; {
     <span class="kw">fn </span>eq(<span class="kw-2">&amp;</span><span class="self">self</span>, other: <span class="kw-2">&amp;</span><span class="self">Self</span>) -&gt; bool {
         <span class="kw">match </span>(<span class="self">self</span>, other) {
             (<span class="self">Self</span>::Integer(l0), <span class="self">Self</span>::Integer(r0)) =&gt; l0 == r0,
@@ -2260,7 +2260,7 @@
     SignedLarge(SignedLarge),
 }
 
-<span class="macro">macro_rules! </span>fn_integer_into {
+<span class="macro">macro_rules!</span> fn_integer_into {
     (<span class="macro-nonterminal">$name</span>:ident, <span class="macro-nonterminal">$</span><span class="kw">type</span>:<span class="macro-nonterminal">ty</span>) =&gt; {
         <span class="attr">#[inline]
         </span><span class="kw">pub fn </span><span class="macro-nonterminal">$name</span>(<span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="macro-nonterminal">$</span><span class="kw">type</span>&gt; {
@@ -2319,14 +2319,14 @@
     }
 }
 
-<span class="attr">#[cfg(feature = <span class="string">&quot;integer128&quot;</span>)]
+<span class="attr">#[cfg(feature = <span class="string">"integer128"</span>)]
 </span><span class="kw">type </span>SignedLarge = i128;
-<span class="attr">#[cfg(feature = <span class="string">&quot;integer128&quot;</span>)]
+<span class="attr">#[cfg(feature = <span class="string">"integer128"</span>)]
 </span><span class="kw">type </span>UnsignedLarge = u128;
 
-<span class="attr">#[cfg(not(feature = <span class="string">&quot;integer128&quot;</span>))]
+<span class="attr">#[cfg(not(feature = <span class="string">"integer128"</span>))]
 </span><span class="kw">type </span>SignedLarge = i64;
-<span class="attr">#[cfg(not(feature = <span class="string">&quot;integer128&quot;</span>))]
+<span class="attr">#[cfg(not(feature = <span class="string">"integer128"</span>))]
 </span><span class="kw">type </span>UnsignedLarge = u64;
 
 <span class="kw">impl </span>From&lt;usize&gt; <span class="kw">for </span>Integer {
@@ -2341,7 +2341,7 @@
     }
 }
 
-<span class="macro">macro_rules! </span>impl_from_primitive {
+<span class="macro">macro_rules!</span> impl_from_primitive {
     (<span class="macro-nonterminal">$variant</span>:ident, <span class="macro-nonterminal">$target</span>:ty, <span class="macro-nonterminal">$ty</span>:ty) =&gt; {
         <span class="kw">impl </span>From&lt;<span class="macro-nonterminal">$ty</span>&gt; <span class="kw">for </span>Integer {
             <span class="kw">fn </span>from(value: <span class="macro-nonterminal">$ty</span>) -&gt; <span class="self">Self </span>{
@@ -2356,7 +2356,7 @@
 <span class="macro">impl_from_primitive!</span>(Isize, isize, i8);
 <span class="macro">impl_from_primitive!</span>(Isize, isize, i16);
 
-<span class="macro">macro_rules! </span>impl_from_primitive_with_fallback {
+<span class="macro">macro_rules!</span> impl_from_primitive_with_fallback {
     (<span class="macro-nonterminal">$variant</span>:ident, <span class="macro-nonterminal">$target</span>:ty, <span class="macro-nonterminal">$larger</span>:ident, <span class="macro-nonterminal">$ty</span>:ty) =&gt; {
         <span class="kw">impl </span>From&lt;<span class="macro-nonterminal">$ty</span>&gt; <span class="kw">for </span>Integer {
             <span class="kw">fn </span>from(value: <span class="macro-nonterminal">$ty</span>) -&gt; <span class="self">Self </span>{
@@ -2374,7 +2374,7 @@
 <span class="macro">impl_from_primitive_with_fallback!</span>(Usize, usize, UnsignedLarge, u64);
 <span class="macro">impl_from_primitive_with_fallback!</span>(Isize, isize, SignedLarge, i64);
 
-<span class="macro">macro_rules! </span>impl_try_from_primitive {
+<span class="macro">macro_rules!</span> impl_try_from_primitive {
     (<span class="macro-nonterminal">$variant</span>:ident, <span class="macro-nonterminal">$target</span>:ty, <span class="macro-nonterminal">$larger</span>:ident, <span class="macro-nonterminal">$ty</span>:ty) =&gt; {
         <span class="kw">impl </span>TryFrom&lt;<span class="macro-nonterminal">$ty</span>&gt; <span class="kw">for </span>Integer {
             <span class="kw">type </span>Error = core::num::TryFromIntError;
@@ -2400,25 +2400,25 @@
 }
 
 <span class="attr">#[derive(Debug, Clone)]
-</span><span class="kw">pub struct </span>Tokenizer&lt;<span class="lifetime">&#39;a</span>, <span class="kw">const </span>INCLUDE_ALL: bool&gt; {
-    chars: CharIterator&lt;<span class="lifetime">&#39;a</span>&gt;,
+</span><span class="kw">pub struct </span>Tokenizer&lt;<span class="lifetime">'a</span>, <span class="kw">const </span>INCLUDE_ALL: bool&gt; {
+    chars: CharIterator&lt;<span class="lifetime">'a</span>&gt;,
     scratch: String,
 }
 
-<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; Tokenizer&lt;<span class="lifetime">&#39;a</span>, <span class="bool-val">false</span>&gt; {
-    <span class="kw">pub fn </span>minified(source: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>str) -&gt; <span class="self">Self </span>{
+<span class="kw">impl</span>&lt;<span class="lifetime">'a</span>&gt; Tokenizer&lt;<span class="lifetime">'a</span>, <span class="bool-val">false</span>&gt; {
+    <span class="kw">pub fn </span>minified(source: <span class="kw-2">&amp;</span><span class="lifetime">'a </span>str) -&gt; <span class="self">Self </span>{
         <span class="self">Self</span>::new(source)
     }
 }
 
-<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>&gt; Tokenizer&lt;<span class="lifetime">&#39;a</span>, <span class="bool-val">true</span>&gt; {
-    <span class="kw">pub fn </span>full(source: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>str) -&gt; <span class="self">Self </span>{
+<span class="kw">impl</span>&lt;<span class="lifetime">'a</span>&gt; Tokenizer&lt;<span class="lifetime">'a</span>, <span class="bool-val">true</span>&gt; {
+    <span class="kw">pub fn </span>full(source: <span class="kw-2">&amp;</span><span class="lifetime">'a </span>str) -&gt; <span class="self">Self </span>{
         <span class="self">Self</span>::new(source)
     }
 }
 
-<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, <span class="kw">const </span>INCLUDE_ALL: bool&gt; Tokenizer&lt;<span class="lifetime">&#39;a</span>, INCLUDE_ALL&gt; {
-    <span class="kw">fn </span>new(source: <span class="kw-2">&amp;</span><span class="lifetime">&#39;a </span>str) -&gt; <span class="self">Self </span>{
+<span class="kw">impl</span>&lt;<span class="lifetime">'a</span>, <span class="kw">const </span>INCLUDE_ALL: bool&gt; Tokenizer&lt;<span class="lifetime">'a</span>, INCLUDE_ALL&gt; {
+    <span class="kw">fn </span>new(source: <span class="kw-2">&amp;</span><span class="lifetime">'a </span>str) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{
             chars: CharIterator::new(source),
             scratch: String::new(),
@@ -2454,7 +2454,7 @@
         Error::new(range, kind)
     }
 
-    <span class="kw">fn </span>tokenize_positive_integer&lt;I&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, <span class="kw-2">mut </span>value: I) -&gt; <span class="prelude-ty">Result</span>&lt;Token&lt;<span class="lifetime">&#39;a</span>&gt;, Error&gt;
+    <span class="kw">fn </span>tokenize_positive_integer&lt;I&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, <span class="kw-2">mut </span>value: I) -&gt; <span class="prelude-ty">Result</span>&lt;Token&lt;<span class="lifetime">'a</span>&gt;, Error&gt;
     <span class="kw">where
         </span>I: Integral,
         Integer: From&lt;I&gt; + TryFrom&lt;I::Larger&gt;,
@@ -2475,16 +2475,16 @@
                     overflowing = <span class="bool-val">true</span>;
                     <span class="kw">break</span>;
                 }
-            } <span class="kw">else if </span>ch == <span class="string">&#39;.&#39; </span>{
+            } <span class="kw">else if </span>ch == <span class="string">'.' </span>{
                 has_decimal = <span class="bool-val">true</span>;
                 <span class="self">self</span>.chars.next();
                 <span class="kw">break</span>;
-            } <span class="kw">else if </span>ch == <span class="string">&#39;e&#39; </span>|| ch == <span class="string">&#39;E&#39; </span>{
+            } <span class="kw">else if </span>ch == <span class="string">'e' </span>|| ch == <span class="string">'E' </span>{
                 has_decimal = <span class="bool-val">true</span>;
                 has_exponent = <span class="bool-val">true</span>;
                 <span class="self">self</span>.chars.next();
                 <span class="kw">break</span>;
-            } <span class="kw">else if </span>ch == <span class="string">&#39;_&#39; </span>{
+            } <span class="kw">else if </span>ch == <span class="string">'_' </span>{
                 <span class="self">self</span>.chars.next();
                 had_underscores = <span class="bool-val">true</span>;
             } <span class="kw">else </span>{
@@ -2505,16 +2505,16 @@
                     } <span class="kw">else </span>{
                         <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="self">self</span>.error(ErrorKind::IntegerTooLarge));
                     }
-                } <span class="kw">else if </span>ch == <span class="string">&#39;.&#39; </span>{
+                } <span class="kw">else if </span>ch == <span class="string">'.' </span>{
                     has_decimal = <span class="bool-val">true</span>;
                     <span class="self">self</span>.chars.next();
                     <span class="kw">break</span>;
-                } <span class="kw">else if </span>ch == <span class="string">&#39;e&#39; </span>|| ch == <span class="string">&#39;E&#39; </span>{
+                } <span class="kw">else if </span>ch == <span class="string">'e' </span>|| ch == <span class="string">'E' </span>{
                     has_decimal = <span class="bool-val">true</span>;
                     has_exponent = <span class="bool-val">true</span>;
                     <span class="self">self</span>.chars.next();
                     <span class="kw">break</span>;
-                } <span class="kw">else if </span>ch == <span class="string">&#39;_&#39; </span>{
+                } <span class="kw">else if </span>ch == <span class="string">'_' </span>{
                     <span class="self">self</span>.chars.next();
                     had_underscores = <span class="bool-val">true</span>;
                 } <span class="kw">else </span>{
@@ -2543,7 +2543,7 @@
         }
     }
 
-    <span class="kw">fn </span>tokenize_negative_integer&lt;I&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, <span class="kw-2">mut </span>value: I) -&gt; <span class="prelude-ty">Result</span>&lt;Token&lt;<span class="lifetime">&#39;a</span>&gt;, Error&gt;
+    <span class="kw">fn </span>tokenize_negative_integer&lt;I&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, <span class="kw-2">mut </span>value: I) -&gt; <span class="prelude-ty">Result</span>&lt;Token&lt;<span class="lifetime">'a</span>&gt;, Error&gt;
     <span class="kw">where
         </span>I: Integral,
         Integer: From&lt;I&gt; + TryFrom&lt;I::Larger&gt;,
@@ -2564,16 +2564,16 @@
                     overflowing = <span class="bool-val">true</span>;
                     <span class="kw">break</span>;
                 }
-            } <span class="kw">else if </span>ch == <span class="string">&#39;.&#39; </span>{
+            } <span class="kw">else if </span>ch == <span class="string">'.' </span>{
                 has_decimal = <span class="bool-val">true</span>;
                 <span class="self">self</span>.chars.next();
                 <span class="kw">break</span>;
-            } <span class="kw">else if </span>ch == <span class="string">&#39;e&#39; </span>|| ch == <span class="string">&#39;E&#39; </span>{
+            } <span class="kw">else if </span>ch == <span class="string">'e' </span>|| ch == <span class="string">'E' </span>{
                 has_decimal = <span class="bool-val">true</span>;
                 has_exponent = <span class="bool-val">true</span>;
                 <span class="self">self</span>.chars.next();
                 <span class="kw">break</span>;
-            } <span class="kw">else if </span>ch == <span class="string">&#39;_&#39; </span>{
+            } <span class="kw">else if </span>ch == <span class="string">'_' </span>{
                 had_underscores = <span class="bool-val">true</span>;
                 <span class="self">self</span>.chars.next();
             } <span class="kw">else </span>{
@@ -2594,16 +2594,16 @@
                     } <span class="kw">else </span>{
                         <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="self">self</span>.error(ErrorKind::IntegerTooLarge));
                     }
-                } <span class="kw">else if </span>ch == <span class="string">&#39;.&#39; </span>{
+                } <span class="kw">else if </span>ch == <span class="string">'.' </span>{
                     has_decimal = <span class="bool-val">true</span>;
                     <span class="self">self</span>.chars.next();
                     <span class="kw">break</span>;
-                } <span class="kw">else if </span>ch == <span class="string">&#39;e&#39; </span>|| ch == <span class="string">&#39;E&#39; </span>{
+                } <span class="kw">else if </span>ch == <span class="string">'e' </span>|| ch == <span class="string">'E' </span>{
                     has_decimal = <span class="bool-val">true</span>;
                     has_exponent = <span class="bool-val">true</span>;
                     <span class="self">self</span>.chars.next();
                     <span class="kw">break</span>;
-                } <span class="kw">else if </span>ch == <span class="string">&#39;_&#39; </span>{
+                } <span class="kw">else if </span>ch == <span class="string">'_' </span>{
                     had_underscores = <span class="bool-val">true</span>;
                     <span class="self">self</span>.chars.next();
                 } <span class="kw">else </span>{
@@ -2636,12 +2636,12 @@
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         had_underscores: bool,
         <span class="kw-2">mut </span>has_exponent: bool,
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;Token&lt;<span class="lifetime">&#39;a</span>&gt;, Error&gt; {
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;Token&lt;<span class="lifetime">'a</span>&gt;, Error&gt; {
         <span class="self">self</span>.scratch.clear();
         <span class="kw">let </span>already_read_chars = <span class="self">self</span>.chars.marked_str();
         <span class="kw">if </span>had_underscores {
             <span class="self">self</span>.scratch
-                .extend(already_read_chars.chars().filter(|ch| ch != <span class="kw-2">&amp;</span><span class="string">&#39;_&#39;</span>));
+                .extend(already_read_chars.chars().filter(|ch| ch != <span class="kw-2">&amp;</span><span class="string">'_'</span>));
         } <span class="kw">else </span>{
             <span class="self">self</span>.scratch.push_str(already_read_chars);
         }
@@ -2652,7 +2652,7 @@
                 <span class="kw">if </span>ch.is_ascii_digit() {
                     <span class="self">self</span>.scratch.push(ch);
                     <span class="self">self</span>.chars.next();
-                } <span class="kw">else if </span>!has_exponent &amp;&amp; ch == <span class="string">&#39;e&#39; </span>|| ch == <span class="string">&#39;E&#39; </span>{
+                } <span class="kw">else if </span>!has_exponent &amp;&amp; ch == <span class="string">'e' </span>|| ch == <span class="string">'E' </span>{
                     <span class="self">self</span>.scratch.push(ch);
                     has_exponent = <span class="bool-val">true</span>;
                     <span class="self">self</span>.chars.next();
@@ -2667,7 +2667,7 @@
         <span class="kw">if </span>has_exponent {
             <span class="comment">// Handle the exponent sign
             </span><span class="kw">if let </span><span class="prelude-val">Some</span>(ch) = <span class="self">self</span>.chars.peek() {
-                <span class="kw">if </span>ch == <span class="string">&#39;+&#39; </span>|| ch == <span class="string">&#39;-&#39; </span>{
+                <span class="kw">if </span>ch == <span class="string">'+' </span>|| ch == <span class="string">'-' </span>{
                     <span class="self">self</span>.scratch.push(ch);
                     <span class="self">self</span>.chars.next();
                 }
@@ -2679,7 +2679,7 @@
             <span class="kw">while let </span><span class="prelude-val">Some</span>(ch) = <span class="self">self</span>.chars.peek() {
                 <span class="kw">let </span>is_digit = ch.is_ascii_digit();
 
-                <span class="kw">if </span>is_digit || ch == <span class="string">&#39;_&#39; </span>{
+                <span class="kw">if </span>is_digit || ch == <span class="string">'_' </span>{
                     has_exponent_digit |= is_digit;
                     <span class="self">self</span>.scratch.push(ch);
                     <span class="self">self</span>.chars.next();
@@ -2710,7 +2710,7 @@
         negative: bool,
         value: usize,
         first_hex_value: u32,
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;Token&lt;<span class="lifetime">&#39;a</span>&gt;, Error&gt; {
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;Token&lt;<span class="lifetime">'a</span>&gt;, Error&gt; {
         <span class="macro">assert!</span>(BITS == <span class="number">1 </span>|| BITS == <span class="number">3 </span>|| BITS == <span class="number">4</span>);
         <span class="kw">let </span>max = <span class="number">2_u8</span>.pow(BITS);
         <span class="kw">let </span><span class="kw-2">mut </span>value = value <span class="kw">as </span>UnsignedLarge;
@@ -2730,7 +2730,7 @@
                         <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="self">self</span>.error(ErrorKind::IntegerTooLarge));
                     }
                 }
-                <span class="prelude-val">Err</span>(<span class="string">&#39;_&#39;</span>) =&gt; {
+                <span class="prelude-val">Err</span>(<span class="string">'_'</span>) =&gt; {
                     <span class="self">self</span>.chars.next();
                 }
                 <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; <span class="kw">break</span>,
@@ -2751,7 +2751,7 @@
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         signed: bool,
         negative: bool,
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;Token&lt;<span class="lifetime">&#39;a</span>&gt;, Error&gt; {
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;Token&lt;<span class="lifetime">'a</span>&gt;, Error&gt; {
         <span class="macro">assert!</span>(RADIX == <span class="number">1 </span>|| RADIX == <span class="number">3 </span>|| RADIX == <span class="number">4</span>);
         <span class="kw">let </span>max = <span class="number">2_u32</span>.pow(RADIX);
         <span class="kw">let </span><span class="kw-2">mut </span>value = <span class="number">0usize</span>;
@@ -2777,7 +2777,7 @@
                         );
                     }
                 }
-                <span class="prelude-val">Err</span>(<span class="string">&#39;_&#39;</span>) =&gt; {
+                <span class="prelude-val">Err</span>(<span class="string">'_'</span>) =&gt; {
                     <span class="self">self</span>.chars.next();
                 }
                 <span class="prelude-val">Err</span>(<span class="kw">_</span>) =&gt; <span class="kw">break</span>,
@@ -2802,17 +2802,17 @@
         <span class="kw-2">&amp;mut </span><span class="self">self</span>,
         signed: bool,
         negative: bool,
-    ) -&gt; <span class="prelude-ty">Result</span>&lt;Token&lt;<span class="lifetime">&#39;a</span>&gt;, Error&gt; {
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;Token&lt;<span class="lifetime">'a</span>&gt;, Error&gt; {
         <span class="kw">match </span><span class="self">self</span>.chars.peek() {
-            <span class="prelude-val">Some</span>(<span class="string">&#39;x&#39;</span>) | <span class="prelude-val">Some</span>(<span class="string">&#39;X&#39;</span>) =&gt; {
+            <span class="prelude-val">Some</span>(<span class="string">'x'</span>) | <span class="prelude-val">Some</span>(<span class="string">'X'</span>) =&gt; {
                 <span class="self">self</span>.chars.next();
                 <span class="kw">return </span><span class="self">self</span>.tokenize_radix_number::&lt;<span class="number">4</span>&gt;(signed, negative);
             }
-            <span class="prelude-val">Some</span>(<span class="string">&#39;b&#39;</span>) | <span class="prelude-val">Some</span>(<span class="string">&#39;B&#39;</span>) =&gt; {
+            <span class="prelude-val">Some</span>(<span class="string">'b'</span>) | <span class="prelude-val">Some</span>(<span class="string">'B'</span>) =&gt; {
                 <span class="self">self</span>.chars.next();
                 <span class="kw">return </span><span class="self">self</span>.tokenize_radix_number::&lt;<span class="number">1</span>&gt;(signed, negative);
             }
-            <span class="prelude-val">Some</span>(<span class="string">&#39;o&#39;</span>) | <span class="prelude-val">Some</span>(<span class="string">&#39;O&#39;</span>) =&gt; {
+            <span class="prelude-val">Some</span>(<span class="string">'o'</span>) | <span class="prelude-val">Some</span>(<span class="string">'O'</span>) =&gt; {
                 <span class="self">self</span>.chars.next();
                 <span class="kw">return </span><span class="self">self</span>.tokenize_radix_number::&lt;<span class="number">3</span>&gt;(signed, negative);
             }
@@ -2826,20 +2826,20 @@
         }
     }
 
-    <span class="kw">fn </span>tokenize_number(<span class="kw-2">&amp;mut </span><span class="self">self</span>, start_char: u8) -&gt; <span class="prelude-ty">Result</span>&lt;Token&lt;<span class="lifetime">&#39;a</span>&gt;, Error&gt; {
-        <span class="kw">let </span>negative = start_char == <span class="string">b&#39;-&#39;</span>;
-        <span class="kw">let </span>signed = negative || start_char == <span class="string">b&#39;+&#39;</span>;
+    <span class="kw">fn </span>tokenize_number(<span class="kw-2">&amp;mut </span><span class="self">self</span>, start_char: u8) -&gt; <span class="prelude-ty">Result</span>&lt;Token&lt;<span class="lifetime">'a</span>&gt;, Error&gt; {
+        <span class="kw">let </span>negative = start_char == <span class="string">b'-'</span>;
+        <span class="kw">let </span>signed = negative || start_char == <span class="string">b'+'</span>;
         <span class="comment">// Check for inf/NaN
-        </span><span class="kw">if </span>signed &amp;&amp; <span class="macro">matches!</span>(<span class="self">self</span>.chars.peek(), <span class="prelude-val">Some</span>(<span class="string">&#39;i&#39; </span>| <span class="string">&#39;N&#39;</span>)) {
-            <span class="comment">// We pass in &#39;i&#39;, but it doesn&#39;t matter as long as we provide a
+        </span><span class="kw">if </span>signed &amp;&amp; <span class="macro">matches!</span>(<span class="self">self</span>.chars.peek(), <span class="prelude-val">Some</span>(<span class="string">'i' </span>| <span class="string">'N'</span>)) {
+            <span class="comment">// We pass in 'i', but it doesn't matter as long as we provide a
             // xid_start character -- identifiers are always borrowed, so the
             // char is never passed to the output.
-            </span><span class="kw">return </span><span class="self">self</span>.tokenize_identifier(<span class="prelude-val">Some</span>(<span class="string">&#39;i&#39;</span>));
+            </span><span class="kw">return </span><span class="self">self</span>.tokenize_identifier(<span class="prelude-val">Some</span>(<span class="string">'i'</span>));
         }
 
         <span class="kw">if </span>signed {
             <span class="kw">let </span>next_char = <span class="self">self</span>.next_or_eof()<span class="question-mark">?</span>;
-            <span class="kw">if </span>next_char == <span class="string">&#39;0&#39; </span>{
+            <span class="kw">if </span>next_char == <span class="string">'0' </span>{
                 <span class="self">self</span>.tokenize_leading_zero_number(signed, negative)
             } <span class="kw">else if let </span><span class="prelude-val">Some</span>(value) = next_char.to_digit(<span class="number">10</span>) {
                 <span class="kw">let </span>value = value <span class="kw">as </span>isize;
@@ -2851,20 +2851,20 @@
             } <span class="kw">else </span>{
                 <span class="prelude-val">Err</span>(<span class="self">self</span>.error(ErrorKind::ExpectedDigit))
             }
-        } <span class="kw">else if </span>start_char == <span class="string">b&#39;0&#39; </span>{
+        } <span class="kw">else if </span>start_char == <span class="string">b'0' </span>{
             <span class="self">self</span>.tokenize_leading_zero_number(signed, negative)
         } <span class="kw">else </span>{
-            <span class="kw">let </span>value = (start_char - <span class="string">b&#39;0&#39;</span>) <span class="kw">as </span>usize;
+            <span class="kw">let </span>value = (start_char - <span class="string">b'0'</span>) <span class="kw">as </span>usize;
             <span class="self">self</span>.tokenize_positive_integer(value)
         }
     }
 
-    <span class="kw">fn </span>tokenize_char(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;Token&lt;<span class="lifetime">&#39;a</span>&gt;, Error&gt; {
+    <span class="kw">fn </span>tokenize_char(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;Token&lt;<span class="lifetime">'a</span>&gt;, Error&gt; {
         <span class="kw">let </span>ch = <span class="kw">match </span><span class="self">self</span>.next_or_eof()<span class="question-mark">? </span>{
-            <span class="string">&#39;\\&#39; </span>=&gt; <span class="self">self
+            <span class="string">'\\' </span>=&gt; <span class="self">self
                 </span>.tokenize_escaped_char::&lt;<span class="bool-val">false</span>, <span class="bool-val">true</span>&gt;()<span class="question-mark">?
-                </span>.expect(<span class="string">&quot;underscore disallowed&quot;</span>),
-            ch @ (<span class="string">&#39;\n&#39; </span>| <span class="string">&#39;\r&#39; </span>| <span class="string">&#39;\t&#39;</span>) =&gt; {
+                </span>.expect(<span class="string">"underscore disallowed"</span>),
+            ch @ (<span class="string">'\n' </span>| <span class="string">'\r' </span>| <span class="string">'\t'</span>) =&gt; {
                 <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="self">self</span>.error_at_last_char(ErrorKind::Unexpected(ch)))
             }
             ch =&gt; ch,
@@ -2872,7 +2872,7 @@
 
         <span class="comment">// Handle the trailing quote
         </span><span class="kw">match </span><span class="self">self</span>.next_or_eof()<span class="question-mark">? </span>{
-            <span class="string">&#39;\&#39;&#39; </span>=&gt; <span class="prelude-val">Ok</span>(Token::new(
+            <span class="string">'\'' </span>=&gt; <span class="prelude-val">Ok</span>(Token::new(
                 <span class="self">self</span>.chars.marked_range(),
                 TokenKind::Character(ch),
             )),
@@ -2880,26 +2880,26 @@
         }
     }
 
-    <span class="kw">fn </span>tokenize_byte(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;Token&lt;<span class="lifetime">&#39;a</span>&gt;, Error&gt; {
+    <span class="kw">fn </span>tokenize_byte(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;Token&lt;<span class="lifetime">'a</span>&gt;, Error&gt; {
         <span class="kw">let </span>ch = <span class="kw">match </span><span class="self">self</span>.next_or_eof()<span class="question-mark">? </span>{
-            <span class="string">&#39;\\&#39; </span>=&gt; <span class="self">self
+            <span class="string">'\\' </span>=&gt; <span class="self">self
                 </span>.tokenize_escaped_char::&lt;<span class="bool-val">false</span>, <span class="bool-val">false</span>&gt;()<span class="question-mark">?
-                </span>.expect(<span class="string">&quot;underscore disallowed&quot;</span>),
-            ch <span class="kw">if </span>ch.is_ascii() &amp;&amp; !<span class="macro">matches!</span>(ch, <span class="string">&#39;\n&#39; </span>| <span class="string">&#39;\r&#39; </span>| <span class="string">&#39;\t&#39;</span>) =&gt; ch,
+                </span>.expect(<span class="string">"underscore disallowed"</span>),
+            ch <span class="kw">if </span>ch.is_ascii() &amp;&amp; !<span class="macro">matches!</span>(ch, <span class="string">'\n' </span>| <span class="string">'\r' </span>| <span class="string">'\t'</span>) =&gt; ch,
             ch =&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="self">self</span>.error_at_last_char(ErrorKind::Unexpected(ch))),
         } <span class="kw">as </span>u8;
 
         <span class="comment">// Handle the trailing quote
         </span><span class="kw">match </span><span class="self">self</span>.next_or_eof()<span class="question-mark">? </span>{
-            <span class="string">&#39;\&#39;&#39; </span>=&gt; <span class="prelude-val">Ok</span>(Token::new(<span class="self">self</span>.chars.marked_range(), TokenKind::Byte(ch))),
+            <span class="string">'\'' </span>=&gt; <span class="prelude-val">Ok</span>(Token::new(<span class="self">self</span>.chars.marked_range(), TokenKind::Byte(ch))),
             other =&gt; <span class="prelude-val">Err</span>(<span class="self">self</span>.error_at_last_char(ErrorKind::Unexpected(other))),
         }
     }
 
-    <span class="kw">fn </span>tokenize_string(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;Token&lt;<span class="lifetime">&#39;a</span>&gt;, Error&gt; {
+    <span class="kw">fn </span>tokenize_string(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;Token&lt;<span class="lifetime">'a</span>&gt;, Error&gt; {
         <span class="kw">loop </span>{
             <span class="kw">match </span><span class="self">self</span>.next_or_eof()<span class="question-mark">? </span>{
-                <span class="string">&#39;&quot;&#39; </span>=&gt; {
+                <span class="string">'"' </span>=&gt; {
                     <span class="comment">// This string had no escapes, we can borrow.
                     </span><span class="kw">let </span>range = <span class="self">self</span>.chars.marked_range();
                     <span class="kw">let </span>contents = <span class="kw-2">&amp;</span><span class="self">self</span>.chars.source[range.start + <span class="number">1</span>..range.end - <span class="number">1</span>];
@@ -2908,17 +2908,17 @@
                         TokenKind::String(Cow::Borrowed(contents)),
                     ));
                 }
-                <span class="string">&#39;\\&#39; </span>=&gt; <span class="kw">break</span>,
-                <span class="string">&#39;\r&#39; </span>=&gt; {
+                <span class="string">'\\' </span>=&gt; <span class="kw">break</span>,
+                <span class="string">'\r' </span>=&gt; {
                     <span class="self">self</span>.forbid_isolated_cr()<span class="question-mark">?</span>;
                 }
                 <span class="kw">_ </span>=&gt; {}
             }
         }
 
-        <span class="comment">// We&#39;ve encountered an escape sequence, which requires us to use our
+        <span class="comment">// We've encountered an escape sequence, which requires us to use our
         // scratch buffer to decode the escape sequences. First, we need to copy
-        // everything over that wasn&#39;t escaped.
+        // everything over that wasn't escaped.
         </span><span class="self">self</span>.scratch.clear();
         <span class="kw">let </span>starting_range = <span class="self">self</span>.chars.marked_range();
         <span class="self">self</span>.scratch
@@ -2932,16 +2932,16 @@
             <span class="comment">// and then we resume a loop looking for the next escape sequence.
             </span><span class="kw">loop </span>{
                 <span class="kw">match </span><span class="self">self</span>.next_or_eof()<span class="question-mark">? </span>{
-                    <span class="string">&#39;&quot;&#39; </span>=&gt; {
+                    <span class="string">'"' </span>=&gt; {
                         <span class="kw">return </span><span class="prelude-val">Ok</span>(Token::new(
                             <span class="self">self</span>.chars.marked_range(),
                             TokenKind::String(Cow::Owned(<span class="self">self</span>.scratch.clone())),
                         ));
                     }
-                    <span class="string">&#39;\\&#39; </span>=&gt; <span class="kw">break</span>,
-                    <span class="string">&#39;\r&#39; </span>=&gt; {
+                    <span class="string">'\\' </span>=&gt; <span class="kw">break</span>,
+                    <span class="string">'\r' </span>=&gt; {
                         <span class="self">self</span>.forbid_isolated_cr()<span class="question-mark">?</span>;
-                        <span class="self">self</span>.scratch.push(<span class="string">&#39;\r&#39;</span>);
+                        <span class="self">self</span>.scratch.push(<span class="string">'\r'</span>);
                     }
                     ch =&gt; {
                         <span class="self">self</span>.scratch.push(ch);
@@ -2956,13 +2956,13 @@
     ) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="prelude-ty">Option</span>&lt;char&gt;, Error&gt; {
         <span class="comment">// Now we need to handle the current escape sequnce
         </span><span class="kw">match </span><span class="self">self</span>.next_or_eof()<span class="question-mark">? </span>{
-            ch @ (<span class="string">&#39;&quot;&#39; </span>| <span class="string">&#39;\&#39;&#39; </span>| <span class="string">&#39;\\&#39;</span>) =&gt; <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(ch)),
-            <span class="string">&#39;r&#39; </span>=&gt; <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="string">&#39;\r&#39;</span>)),
-            <span class="string">&#39;n&#39; </span>=&gt; <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="string">&#39;\n&#39;</span>)),
-            <span class="string">&#39;t&#39; </span>=&gt; <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="string">&#39;\t&#39;</span>)),
-            <span class="string">&#39;0&#39; </span>=&gt; <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="string">&#39;\0&#39;</span>)),
-            <span class="string">&#39;u&#39; </span><span class="kw">if </span>ALLOW_UNICODE =&gt; <span class="self">self</span>.tokenize_unicode_escape().map(<span class="prelude-val">Some</span>),
-            <span class="string">&#39;x&#39; </span>=&gt; {
+            ch @ (<span class="string">'"' </span>| <span class="string">'\'' </span>| <span class="string">'\\'</span>) =&gt; <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(ch)),
+            <span class="string">'r' </span>=&gt; <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="string">'\r'</span>)),
+            <span class="string">'n' </span>=&gt; <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="string">'\n'</span>)),
+            <span class="string">'t' </span>=&gt; <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="string">'\t'</span>)),
+            <span class="string">'0' </span>=&gt; <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(<span class="string">'\0'</span>)),
+            <span class="string">'u' </span><span class="kw">if </span>ALLOW_UNICODE =&gt; <span class="self">self</span>.tokenize_unicode_escape().map(<span class="prelude-val">Some</span>),
+            <span class="string">'x' </span>=&gt; {
                 <span class="kw">let </span>escape_start = <span class="self">self</span>.chars.last_offset();
                 <span class="kw">match </span><span class="self">self</span>.tokenize_ascii_escape()<span class="question-mark">? </span>{
                     byte <span class="kw">if </span>byte.is_ascii() =&gt; <span class="prelude-val">Ok</span>(<span class="prelude-val">Some</span>(byte <span class="kw">as </span>char)),
@@ -2972,12 +2972,12 @@
                     )),
                 }
             }
-            <span class="string">&#39;\r&#39; </span><span class="kw">if </span>ALLOW_CONTINUE =&gt; {
+            <span class="string">'\r' </span><span class="kw">if </span>ALLOW_CONTINUE =&gt; {
                 <span class="self">self</span>.forbid_isolated_cr()<span class="question-mark">?</span>;
                 <span class="self">self</span>.eat_whitespace_for_string_continue();
                 <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>)
             }
-            <span class="string">&#39;\n&#39; </span><span class="kw">if </span>ALLOW_CONTINUE =&gt; {
+            <span class="string">'\n' </span><span class="kw">if </span>ALLOW_CONTINUE =&gt; {
                 <span class="self">self</span>.eat_whitespace_for_string_continue();
                 <span class="prelude-val">Ok</span>(<span class="prelude-val">None</span>)
             }
@@ -2989,17 +2989,17 @@
         <span class="kw">let </span>start = <span class="self">self</span>.chars.last_offset();
         <span class="comment">// Open brace
         </span><span class="kw">match </span><span class="self">self</span>.next_or_eof()<span class="question-mark">? </span>{
-            <span class="string">&#39;{&#39; </span>=&gt; {}
+            <span class="string">'{' </span>=&gt; {}
             other =&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="self">self</span>.error_at_last_char(ErrorKind::Unexpected(other))),
         }
 
         <span class="kw">let </span><span class="kw-2">mut </span>possible_char = <span class="number">0u32</span>;
         <span class="kw">loop </span>{
             <span class="kw">match </span><span class="self">self</span>.next_or_eof()<span class="question-mark">? </span>{
-                <span class="string">&#39;}&#39; </span>=&gt; {
+                <span class="string">'}' </span>=&gt; {
                     <span class="kw">break</span>;
                 }
-                <span class="string">&#39;_&#39; </span>=&gt; <span class="kw">continue</span>,
+                <span class="string">'_' </span>=&gt; <span class="kw">continue</span>,
                 ch =&gt; {
                     <span class="kw">let </span>radix_value = ch
                         .to_digit(<span class="number">16</span>)
@@ -3035,10 +3035,10 @@
         <span class="prelude-val">Ok</span>((first_digit &lt;&lt; <span class="number">4</span>) | second_digit)
     }
 
-    <span class="kw">fn </span>tokenize_byte_string(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;Token&lt;<span class="lifetime">&#39;a</span>&gt;, Error&gt; {
+    <span class="kw">fn </span>tokenize_byte_string(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;Token&lt;<span class="lifetime">'a</span>&gt;, Error&gt; {
         <span class="kw">loop </span>{
             <span class="kw">match </span><span class="self">self</span>.next_or_eof()<span class="question-mark">? </span>{
-                <span class="string">&#39;&quot;&#39; </span>=&gt; {
+                <span class="string">'"' </span>=&gt; {
                     <span class="kw">let </span>range = <span class="self">self</span>.chars.marked_range();
                     <span class="kw">let </span>contents = <span class="kw-2">&amp;</span><span class="self">self</span>.chars.source[range.start + <span class="number">2</span>..range.end - <span class="number">1</span>];
                     <span class="kw">return </span><span class="prelude-val">Ok</span>(Token::new(
@@ -3046,7 +3046,7 @@
                         TokenKind::Bytes(Cow::Borrowed(contents.as_bytes())),
                     ));
                 }
-                <span class="string">&#39;\\&#39; </span>=&gt; <span class="kw">break</span>,
+                <span class="string">'\\' </span>=&gt; <span class="kw">break</span>,
                 ch <span class="kw">if </span>ch.is_ascii() =&gt; {}
                 <span class="kw">_ </span>=&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="self">self</span>.error_at_last_char(ErrorKind::InvalidAscii)),
             }
@@ -3062,18 +3062,18 @@
 
         <span class="kw">loop </span>{
             <span class="kw">let </span>byte = <span class="kw">match </span><span class="self">self</span>.next_or_eof()<span class="question-mark">? </span>{
-                ch @ (<span class="string">&#39;&quot;&#39; </span>| <span class="string">&#39;\&#39;&#39; </span>| <span class="string">&#39;\\&#39;</span>) =&gt; <span class="prelude-val">Some</span>(ch <span class="kw">as </span>u8),
-                <span class="string">&#39;r&#39; </span>=&gt; <span class="prelude-val">Some</span>(<span class="string">b&#39;\r&#39;</span>),
-                <span class="string">&#39;n&#39; </span>=&gt; <span class="prelude-val">Some</span>(<span class="string">b&#39;\n&#39;</span>),
-                <span class="string">&#39;t&#39; </span>=&gt; <span class="prelude-val">Some</span>(<span class="string">b&#39;\t&#39;</span>),
-                <span class="string">&#39;0&#39; </span>=&gt; <span class="prelude-val">Some</span>(<span class="string">b&#39;\0&#39;</span>),
-                <span class="string">&#39;x&#39; </span>=&gt; <span class="prelude-val">Some</span>(<span class="self">self</span>.tokenize_ascii_escape()<span class="question-mark">?</span>),
-                <span class="string">&#39;\r&#39; </span>=&gt; {
+                ch @ (<span class="string">'"' </span>| <span class="string">'\'' </span>| <span class="string">'\\'</span>) =&gt; <span class="prelude-val">Some</span>(ch <span class="kw">as </span>u8),
+                <span class="string">'r' </span>=&gt; <span class="prelude-val">Some</span>(<span class="string">b'\r'</span>),
+                <span class="string">'n' </span>=&gt; <span class="prelude-val">Some</span>(<span class="string">b'\n'</span>),
+                <span class="string">'t' </span>=&gt; <span class="prelude-val">Some</span>(<span class="string">b'\t'</span>),
+                <span class="string">'0' </span>=&gt; <span class="prelude-val">Some</span>(<span class="string">b'\0'</span>),
+                <span class="string">'x' </span>=&gt; <span class="prelude-val">Some</span>(<span class="self">self</span>.tokenize_ascii_escape()<span class="question-mark">?</span>),
+                <span class="string">'\r' </span>=&gt; {
                     <span class="self">self</span>.forbid_isolated_cr()<span class="question-mark">?</span>;
                     <span class="self">self</span>.eat_whitespace_for_string_continue();
                     <span class="prelude-val">None
                 </span>}
-                <span class="string">&#39;\n&#39; </span>=&gt; {
+                <span class="string">'\n' </span>=&gt; {
                     <span class="self">self</span>.eat_whitespace_for_string_continue();
                     <span class="prelude-val">None
                 </span>}
@@ -3086,18 +3086,18 @@
 
             <span class="kw">loop </span>{
                 <span class="kw">match </span><span class="self">self</span>.next_or_eof()<span class="question-mark">? </span>{
-                    <span class="string">&#39;&quot;&#39; </span>=&gt; {
+                    <span class="string">'"' </span>=&gt; {
                         <span class="comment">// We want to keep the scratch buffer around to keep
                         // from needing to constantly grow it while parsing.
                         </span><span class="kw">let </span>contents = scratch.clone();
                         scratch.clear();
-                        <span class="self">self</span>.scratch = String::from_utf8(scratch).expect(<span class="string">&quot;empty vec&quot;</span>);
+                        <span class="self">self</span>.scratch = String::from_utf8(scratch).expect(<span class="string">"empty vec"</span>);
                         <span class="kw">return </span><span class="prelude-val">Ok</span>(Token::new(
                             <span class="self">self</span>.chars.marked_range(),
                             TokenKind::Bytes(Cow::Owned(contents)),
                         ));
                     }
-                    <span class="string">&#39;\\&#39; </span>=&gt; <span class="kw">break</span>,
+                    <span class="string">'\\' </span>=&gt; <span class="kw">break</span>,
                     ch <span class="kw">if </span>ch.is_ascii() =&gt; {
                         scratch.push(ch <span class="kw">as </span>u8);
                     }
@@ -3107,32 +3107,32 @@
         }
     }
 
-    <span class="kw">fn </span>tokenize_raw_string(<span class="kw-2">&amp;mut </span><span class="self">self</span>, <span class="kw-2">mut </span>pound_count: usize) -&gt; <span class="prelude-ty">Result</span>&lt;Token&lt;<span class="lifetime">&#39;a</span>&gt;, Error&gt; {
+    <span class="kw">fn </span>tokenize_raw_string(<span class="kw-2">&amp;mut </span><span class="self">self</span>, <span class="kw-2">mut </span>pound_count: usize) -&gt; <span class="prelude-ty">Result</span>&lt;Token&lt;<span class="lifetime">'a</span>&gt;, Error&gt; {
         <span class="comment">// Count the number of leading pound signs
         </span><span class="kw">loop </span>{
             <span class="kw">match </span><span class="self">self</span>.next_or_eof()<span class="question-mark">? </span>{
-                <span class="string">&#39;#&#39; </span>=&gt; pound_count += <span class="number">1</span>,
-                <span class="string">&#39;&quot;&#39; </span>=&gt; <span class="kw">break</span>,
+                <span class="string">'#' </span>=&gt; pound_count += <span class="number">1</span>,
+                <span class="string">'"' </span>=&gt; <span class="kw">break</span>,
                 other =&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="self">self</span>.error_at_last_char(ErrorKind::Unexpected(other))),
             }
         }
 
         <span class="comment">// String contents
-        </span><span class="lifetime">&#39;contents</span>: <span class="kw">loop </span>{
+        </span><span class="lifetime">'contents</span>: <span class="kw">loop </span>{
             <span class="kw">match </span><span class="self">self</span>.next_or_eof()<span class="question-mark">? </span>{
-                <span class="string">&#39;\r&#39; </span>=&gt; {
+                <span class="string">'\r' </span>=&gt; {
                     <span class="self">self</span>.forbid_isolated_cr()<span class="question-mark">?</span>;
                 }
-                <span class="string">&#39;&quot;&#39; </span>=&gt; {
+                <span class="string">'"' </span>=&gt; {
                     <span class="kw">let </span><span class="kw-2">mut </span>pounds_needed = pound_count;
-                    <span class="kw">while </span><span class="self">self</span>.chars.peek() == <span class="prelude-val">Some</span>(<span class="string">&#39;#&#39;</span>) {
+                    <span class="kw">while </span><span class="self">self</span>.chars.peek() == <span class="prelude-val">Some</span>(<span class="string">'#'</span>) {
                         <span class="self">self</span>.chars.next();
                         pounds_needed -= <span class="number">1</span>;
 
                         <span class="comment">// Only break if the correct number of pound signs has been
                         // encountered.
                         </span><span class="kw">if </span>pounds_needed == <span class="number">0 </span>{
-                            <span class="kw">break </span><span class="lifetime">&#39;contents</span>;
+                            <span class="kw">break </span><span class="lifetime">'contents</span>;
                         }
                     }
                 }
@@ -3149,34 +3149,34 @@
         ))
     }
 
-    <span class="kw">fn </span>tokenize_raw_byte_string(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;Token&lt;<span class="lifetime">&#39;a</span>&gt;, Error&gt; {
+    <span class="kw">fn </span>tokenize_raw_byte_string(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;Token&lt;<span class="lifetime">'a</span>&gt;, Error&gt; {
         <span class="comment">// Count the number of leading pound signs
         </span><span class="kw">let </span><span class="kw-2">mut </span>pound_count = <span class="number">0</span>;
         <span class="kw">loop </span>{
             <span class="kw">match </span><span class="self">self</span>.next_or_eof()<span class="question-mark">? </span>{
-                <span class="string">&#39;#&#39; </span>=&gt; pound_count += <span class="number">1</span>,
-                <span class="string">&#39;&quot;&#39; </span>=&gt; <span class="kw">break</span>,
+                <span class="string">'#' </span>=&gt; pound_count += <span class="number">1</span>,
+                <span class="string">'"' </span>=&gt; <span class="kw">break</span>,
                 other <span class="kw">if </span>pound_count == <span class="number">0 </span>=&gt; <span class="kw">return </span><span class="self">self</span>.tokenize_identifier(<span class="prelude-val">Some</span>(other)),
                 other =&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="self">self</span>.error_at_last_char(ErrorKind::Unexpected(other))),
             }
         }
 
         <span class="comment">// String contents
-        </span><span class="lifetime">&#39;contents</span>: <span class="kw">loop </span>{
+        </span><span class="lifetime">'contents</span>: <span class="kw">loop </span>{
             <span class="kw">match </span><span class="self">self</span>.next_or_eof()<span class="question-mark">? </span>{
-                <span class="string">&#39;\r&#39; </span>=&gt; {
+                <span class="string">'\r' </span>=&gt; {
                     <span class="self">self</span>.forbid_isolated_cr()<span class="question-mark">?</span>;
                 }
-                <span class="string">&#39;&quot;&#39; </span>=&gt; {
+                <span class="string">'"' </span>=&gt; {
                     <span class="kw">let </span><span class="kw-2">mut </span>pounds_needed = pound_count;
-                    <span class="kw">while </span><span class="self">self</span>.chars.peek() == <span class="prelude-val">Some</span>(<span class="string">&#39;#&#39;</span>) {
+                    <span class="kw">while </span><span class="self">self</span>.chars.peek() == <span class="prelude-val">Some</span>(<span class="string">'#'</span>) {
                         <span class="self">self</span>.chars.next();
                         pounds_needed -= <span class="number">1</span>;
 
                         <span class="comment">// Only break if the correct number of pound signs has been
                         // encountered.
                         </span><span class="kw">if </span>pounds_needed == <span class="number">0 </span>{
-                            <span class="kw">break </span><span class="lifetime">&#39;contents</span>;
+                            <span class="kw">break </span><span class="lifetime">'contents</span>;
                         }
                     }
                 }
@@ -3195,7 +3195,7 @@
     }
 
     <span class="kw">fn </span>forbid_isolated_cr(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;(), Error&gt; {
-        <span class="kw">if </span><span class="self">self</span>.chars.peek() == <span class="prelude-val">Some</span>(<span class="string">&#39;\n&#39;</span>) {
+        <span class="kw">if </span><span class="self">self</span>.chars.peek() == <span class="prelude-val">Some</span>(<span class="string">'\n'</span>) {
             <span class="prelude-val">Ok</span>(())
         } <span class="kw">else </span>{
             <span class="prelude-val">Err</span>(<span class="self">self</span>.error_at_last_char(ErrorKind::InvalidAscii))
@@ -3206,16 +3206,16 @@
         <span class="kw">while </span><span class="self">self
             </span>.chars
             .peek()
-            .map_or(<span class="bool-val">false</span>, |ch| <span class="macro">matches!</span>(ch, <span class="string">&#39; &#39; </span>| <span class="string">&#39;\n&#39; </span>| <span class="string">&#39;\r&#39; </span>| <span class="string">&#39;\t&#39;</span>))
+            .map_or(<span class="bool-val">false</span>, |ch| <span class="macro">matches!</span>(ch, <span class="string">' ' </span>| <span class="string">'\n' </span>| <span class="string">'\r' </span>| <span class="string">'\t'</span>))
         {
             <span class="self">self</span>.chars.next();
         }
     }
 
-    <span class="kw">fn </span>tokenize_identifier(<span class="kw-2">&amp;mut </span><span class="self">self</span>, initial_char: <span class="prelude-ty">Option</span>&lt;char&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;Token&lt;<span class="lifetime">&#39;a</span>&gt;, Error&gt; {
+    <span class="kw">fn </span>tokenize_identifier(<span class="kw-2">&amp;mut </span><span class="self">self</span>, initial_char: <span class="prelude-ty">Option</span>&lt;char&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;Token&lt;<span class="lifetime">'a</span>&gt;, Error&gt; {
         <span class="kw">let </span>(require_start, initial_char, is_raw, initial_char_index) =
             <span class="kw">if let </span><span class="prelude-val">Some</span>(ch) = initial_char {
-                (ch != <span class="string">&#39;_&#39;</span>, ch, <span class="bool-val">false</span>, <span class="self">self</span>.chars.last_offset())
+                (ch != <span class="string">'_'</span>, ch, <span class="bool-val">false</span>, <span class="self">self</span>.chars.last_offset())
             } <span class="kw">else </span>{
                 <span class="kw">let </span>initial = <span class="self">self</span>.next_or_eof()<span class="question-mark">?</span>;
                 (<span class="bool-val">true</span>, initial, <span class="bool-val">true</span>, <span class="self">self</span>.chars.last_offset())
@@ -3241,12 +3241,12 @@
             <span class="prelude-val">Ok</span>(Token::new(
                 <span class="self">self</span>.chars.marked_range(),
                 <span class="kw">match </span>source {
-                    <span class="string">&quot;true&quot; </span><span class="kw">if </span>!is_raw =&gt; TokenKind::Bool(<span class="bool-val">true</span>),
-                    <span class="string">&quot;false&quot; </span><span class="kw">if </span>!is_raw =&gt; TokenKind::Bool(<span class="bool-val">false</span>),
-                    <span class="string">&quot;inf&quot; </span>| <span class="string">&quot;+inf&quot; </span><span class="kw">if </span>!is_raw =&gt; TokenKind::Float(f64::INFINITY),
-                    <span class="string">&quot;NaN&quot; </span>| <span class="string">&quot;+NaN&quot; </span><span class="kw">if </span>!is_raw =&gt; TokenKind::Float(f64::NAN),
-                    <span class="string">&quot;-inf&quot; </span><span class="kw">if </span>!is_raw =&gt; TokenKind::Float(-f64::INFINITY),
-                    <span class="string">&quot;-NaN&quot; </span><span class="kw">if </span>!is_raw =&gt; TokenKind::Float(-f64::NAN),
+                    <span class="string">"true" </span><span class="kw">if </span>!is_raw =&gt; TokenKind::Bool(<span class="bool-val">true</span>),
+                    <span class="string">"false" </span><span class="kw">if </span>!is_raw =&gt; TokenKind::Bool(<span class="bool-val">false</span>),
+                    <span class="string">"inf" </span>| <span class="string">"+inf" </span><span class="kw">if </span>!is_raw =&gt; TokenKind::Float(f64::INFINITY),
+                    <span class="string">"NaN" </span>| <span class="string">"+NaN" </span><span class="kw">if </span>!is_raw =&gt; TokenKind::Float(f64::NAN),
+                    <span class="string">"-inf" </span><span class="kw">if </span>!is_raw =&gt; TokenKind::Float(-f64::INFINITY),
+                    <span class="string">"-NaN" </span><span class="kw">if </span>!is_raw =&gt; TokenKind::Float(-f64::NAN),
                     <span class="kw">_ </span>=&gt; TokenKind::Identifier(source),
                 },
             ))
@@ -3258,20 +3258,20 @@
         }
     }
 
-    <span class="kw">fn </span>tokenize_comment(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;Token&lt;<span class="lifetime">&#39;a</span>&gt;, Error&gt; {
+    <span class="kw">fn </span>tokenize_comment(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;Token&lt;<span class="lifetime">'a</span>&gt;, Error&gt; {
         <span class="kw">match </span><span class="self">self</span>.next_or_eof()<span class="question-mark">? </span>{
-            <span class="string">&#39;*&#39; </span>=&gt; <span class="self">self</span>.tokenize_block_comment(),
-            <span class="string">&#39;/&#39; </span>=&gt; <span class="self">self</span>.tokenize_single_line_comment(),
+            <span class="string">'*' </span>=&gt; <span class="self">self</span>.tokenize_block_comment(),
+            <span class="string">'/' </span>=&gt; <span class="self">self</span>.tokenize_single_line_comment(),
             other =&gt; <span class="prelude-val">Err</span>(<span class="self">self</span>.error_at_last_char(ErrorKind::Unexpected(other))),
         }
     }
 
-    <span class="kw">fn </span>tokenize_block_comment(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;Token&lt;<span class="lifetime">&#39;a</span>&gt;, Error&gt; {
+    <span class="kw">fn </span>tokenize_block_comment(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;Token&lt;<span class="lifetime">'a</span>&gt;, Error&gt; {
         <span class="kw">let </span><span class="kw-2">mut </span>nests = <span class="number">1</span>;
         <span class="kw">while </span>nests &gt; <span class="number">0 </span>{
             <span class="kw">match </span><span class="self">self</span>.next_or_eof()<span class="question-mark">? </span>{
-                <span class="string">&#39;*&#39; </span>=&gt; {
-                    <span class="kw">if </span><span class="self">self</span>.chars.peek() == <span class="prelude-val">Some</span>(<span class="string">&#39;/&#39;</span>) {
+                <span class="string">'*' </span>=&gt; {
+                    <span class="kw">if </span><span class="self">self</span>.chars.peek() == <span class="prelude-val">Some</span>(<span class="string">'/'</span>) {
                         <span class="self">self</span>.chars.next();
                         nests -= <span class="number">1</span>;
                         <span class="kw">if </span>nests == <span class="number">0 </span>{
@@ -3279,13 +3279,13 @@
                         }
                     }
                 }
-                <span class="string">&#39;/&#39; </span>=&gt; {
-                    <span class="kw">if </span><span class="self">self</span>.chars.peek() == <span class="prelude-val">Some</span>(<span class="string">&#39;*&#39;</span>) {
+                <span class="string">'/' </span>=&gt; {
+                    <span class="kw">if </span><span class="self">self</span>.chars.peek() == <span class="prelude-val">Some</span>(<span class="string">'*'</span>) {
                         <span class="self">self</span>.chars.next();
                         nests += <span class="number">1</span>;
                     }
                 }
-                <span class="string">&#39;\r&#39; </span>=&gt; {
+                <span class="string">'\r' </span>=&gt; {
                     <span class="self">self</span>.forbid_isolated_cr()<span class="question-mark">?</span>;
                 }
                 <span class="kw">_ </span>=&gt; {}
@@ -3298,14 +3298,14 @@
         ))
     }
 
-    <span class="kw">fn </span>tokenize_single_line_comment(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;Token&lt;<span class="lifetime">&#39;a</span>&gt;, Error&gt; {
+    <span class="kw">fn </span>tokenize_single_line_comment(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;Token&lt;<span class="lifetime">'a</span>&gt;, Error&gt; {
         <span class="kw">loop </span>{
             <span class="kw">match </span><span class="self">self</span>.chars.peek() {
-                <span class="prelude-val">Some</span>(<span class="string">&#39;\r&#39;</span>) =&gt; {
+                <span class="prelude-val">Some</span>(<span class="string">'\r'</span>) =&gt; {
                     <span class="self">self</span>.forbid_isolated_cr()<span class="question-mark">?</span>;
                     <span class="kw">break</span>;
                 }
-                <span class="prelude-val">Some</span>(<span class="string">&#39;\n&#39;</span>) | <span class="prelude-val">None </span>=&gt; <span class="kw">break</span>,
+                <span class="prelude-val">Some</span>(<span class="string">'\n'</span>) | <span class="prelude-val">None </span>=&gt; <span class="kw">break</span>,
                 <span class="kw">_ </span>=&gt; {
                     <span class="self">self</span>.chars.next();
                 }
@@ -3319,68 +3319,68 @@
     }
 }
 
-<span class="kw">impl</span>&lt;<span class="lifetime">&#39;a</span>, <span class="kw">const </span>INCLUDE_ALL: bool&gt; Iterator <span class="kw">for </span>Tokenizer&lt;<span class="lifetime">&#39;a</span>, INCLUDE_ALL&gt; {
-    <span class="kw">type </span>Item = <span class="prelude-ty">Result</span>&lt;Token&lt;<span class="lifetime">&#39;a</span>&gt;, Error&gt;;
+<span class="kw">impl</span>&lt;<span class="lifetime">'a</span>, <span class="kw">const </span>INCLUDE_ALL: bool&gt; Iterator <span class="kw">for </span>Tokenizer&lt;<span class="lifetime">'a</span>, INCLUDE_ALL&gt; {
+    <span class="kw">type </span>Item = <span class="prelude-ty">Result</span>&lt;Token&lt;<span class="lifetime">'a</span>&gt;, Error&gt;;
 
     <span class="kw">fn </span>next(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>::Item&gt; {
         <span class="kw">loop </span>{
             <span class="self">self</span>.chars.mark_start();
             <span class="kw">let </span>ch = <span class="self">self</span>.chars.next()<span class="question-mark">?</span>;
             <span class="kw">let </span>result = <span class="kw">match </span>ch {
-                <span class="string">&#39;0&#39;</span>..=<span class="string">&#39;9&#39; </span>| <span class="string">&#39;-&#39; </span>| <span class="string">&#39;+&#39; </span>=&gt; <span class="self">self</span>.tokenize_number(ch <span class="kw">as </span>u8),
-                <span class="string">&#39;&quot;&#39; </span>=&gt; <span class="self">self</span>.tokenize_string(),
-                <span class="string">&#39;\&#39;&#39; </span>=&gt; <span class="self">self</span>.tokenize_char(),
-                <span class="string">&#39;r&#39; </span>=&gt; <span class="kw">match </span><span class="self">self</span>.chars.peek() {
-                    <span class="prelude-val">Some</span>(<span class="string">&#39;#&#39;</span>) =&gt; {
+                <span class="string">'0'</span>..=<span class="string">'9' </span>| <span class="string">'-' </span>| <span class="string">'+' </span>=&gt; <span class="self">self</span>.tokenize_number(ch <span class="kw">as </span>u8),
+                <span class="string">'"' </span>=&gt; <span class="self">self</span>.tokenize_string(),
+                <span class="string">'\'' </span>=&gt; <span class="self">self</span>.tokenize_char(),
+                <span class="string">'r' </span>=&gt; <span class="kw">match </span><span class="self">self</span>.chars.peek() {
+                    <span class="prelude-val">Some</span>(<span class="string">'#'</span>) =&gt; {
                         <span class="self">self</span>.chars.next();
                         <span class="kw">match </span><span class="self">self</span>.chars.peek() {
-                            <span class="prelude-val">Some</span>(<span class="string">&#39;#&#39; </span>| <span class="string">&#39;&quot;&#39;</span>) =&gt; <span class="self">self</span>.tokenize_raw_string(<span class="number">1</span>),
+                            <span class="prelude-val">Some</span>(<span class="string">'#' </span>| <span class="string">'"'</span>) =&gt; <span class="self">self</span>.tokenize_raw_string(<span class="number">1</span>),
                             <span class="kw">_ </span>=&gt; <span class="self">self</span>.tokenize_identifier(<span class="prelude-val">None</span>),
                         }
                     }
                     <span class="kw">_ </span>=&gt; <span class="self">self</span>.tokenize_identifier(<span class="prelude-val">Some</span>(ch)),
                 },
-                <span class="string">&#39;b&#39; </span>=&gt; <span class="kw">match </span><span class="self">self</span>.chars.peek() {
-                    <span class="prelude-val">Some</span>(<span class="string">&#39;r&#39;</span>) =&gt; {
+                <span class="string">'b' </span>=&gt; <span class="kw">match </span><span class="self">self</span>.chars.peek() {
+                    <span class="prelude-val">Some</span>(<span class="string">'r'</span>) =&gt; {
                         <span class="self">self</span>.chars.next();
                         <span class="self">self</span>.tokenize_raw_byte_string()
                     }
-                    <span class="prelude-val">Some</span>(<span class="string">&#39;&quot;&#39;</span>) =&gt; {
+                    <span class="prelude-val">Some</span>(<span class="string">'"'</span>) =&gt; {
                         <span class="self">self</span>.chars.next();
                         <span class="self">self</span>.tokenize_byte_string()
                     }
-                    <span class="prelude-val">Some</span>(<span class="string">&#39;\&#39;&#39;</span>) =&gt; {
+                    <span class="prelude-val">Some</span>(<span class="string">'\''</span>) =&gt; {
                         <span class="self">self</span>.chars.next();
                         <span class="self">self</span>.tokenize_byte()
                     }
                     <span class="kw">_ </span>=&gt; <span class="self">self</span>.tokenize_identifier(<span class="prelude-val">Some</span>(ch)),
                 },
-                <span class="string">&#39;(&#39; </span>=&gt; <span class="prelude-val">Ok</span>(Token::new(
+                <span class="string">'(' </span>=&gt; <span class="prelude-val">Ok</span>(Token::new(
                     <span class="self">self</span>.chars.marked_range(),
                     TokenKind::Open(Balanced::Paren),
                 )),
-                <span class="string">&#39;)&#39; </span>=&gt; <span class="prelude-val">Ok</span>(Token::new(
+                <span class="string">')' </span>=&gt; <span class="prelude-val">Ok</span>(Token::new(
                     <span class="self">self</span>.chars.marked_range(),
                     TokenKind::Close(Balanced::Paren),
                 )),
-                <span class="string">&#39;{&#39; </span>=&gt; <span class="prelude-val">Ok</span>(Token::new(
+                <span class="string">'{' </span>=&gt; <span class="prelude-val">Ok</span>(Token::new(
                     <span class="self">self</span>.chars.marked_range(),
                     TokenKind::Open(Balanced::Brace),
                 )),
-                <span class="string">&#39;}&#39; </span>=&gt; <span class="prelude-val">Ok</span>(Token::new(
+                <span class="string">'}' </span>=&gt; <span class="prelude-val">Ok</span>(Token::new(
                     <span class="self">self</span>.chars.marked_range(),
                     TokenKind::Close(Balanced::Brace),
                 )),
-                <span class="string">&#39;[&#39; </span>=&gt; <span class="prelude-val">Ok</span>(Token::new(
+                <span class="string">'[' </span>=&gt; <span class="prelude-val">Ok</span>(Token::new(
                     <span class="self">self</span>.chars.marked_range(),
                     TokenKind::Open(Balanced::Bracket),
                 )),
-                <span class="string">&#39;]&#39; </span>=&gt; <span class="prelude-val">Ok</span>(Token::new(
+                <span class="string">']' </span>=&gt; <span class="prelude-val">Ok</span>(Token::new(
                     <span class="self">self</span>.chars.marked_range(),
                     TokenKind::Close(Balanced::Bracket),
                 )),
-                <span class="string">&#39;:&#39; </span>=&gt; <span class="prelude-val">Ok</span>(Token::new(<span class="self">self</span>.chars.marked_range(), TokenKind::Colon)),
-                <span class="string">&#39;,&#39; </span>=&gt; <span class="prelude-val">Ok</span>(Token::new(<span class="self">self</span>.chars.marked_range(), TokenKind::Comma)),
+                <span class="string">':' </span>=&gt; <span class="prelude-val">Ok</span>(Token::new(<span class="self">self</span>.chars.marked_range(), TokenKind::Colon)),
+                <span class="string">',' </span>=&gt; <span class="prelude-val">Ok</span>(Token::new(<span class="self">self</span>.chars.marked_range(), TokenKind::Comma)),
                 ch <span class="kw">if </span>is_rust_whitespace(ch) =&gt; {
                     <span class="kw">loop </span>{
                         <span class="kw">match </span><span class="self">self</span>.chars.peek() {
@@ -3399,7 +3399,7 @@
                         <span class="kw">continue</span>;
                     }
                 }
-                <span class="string">&#39;/&#39; </span>=&gt; <span class="self">self</span>.tokenize_comment(),
+                <span class="string">'/' </span>=&gt; <span class="self">self</span>.tokenize_comment(),
                 ch =&gt; <span class="self">self</span>.tokenize_identifier(<span class="prelude-val">Some</span>(ch)),
             };
             <span class="kw">break </span><span class="prelude-val">Some</span>(result);
@@ -3411,16 +3411,16 @@
     <span class="comment">// https://doc.rust-lang.org/reference/whitespace.html
     </span><span class="macro">matches!</span>(
         ch,
-        <span class="string">&#39;\t&#39; </span>| <span class="string">&#39;\n&#39;
-            </span>| <span class="string">&#39;\u{b}&#39;
-            </span>| <span class="string">&#39;\u{c}&#39;
-            </span>| <span class="string">&#39;\r&#39;
-            </span>| <span class="string">&#39; &#39;
-            </span>| <span class="string">&#39;\u{85}&#39;
-            </span>| <span class="string">&#39;\u{200e}&#39;
-            </span>| <span class="string">&#39;\u{200f}&#39;
-            </span>| <span class="string">&#39;\u{2028}&#39;
-            </span>| <span class="string">&#39;\u{2029}&#39;
+        <span class="string">'\t' </span>| <span class="string">'\n'
+            </span>| <span class="string">'\u{b}'
+            </span>| <span class="string">'\u{c}'
+            </span>| <span class="string">'\r'
+            </span>| <span class="string">' '
+            </span>| <span class="string">'\u{85}'
+            </span>| <span class="string">'\u{200e}'
+            </span>| <span class="string">'\u{200f}'
+            </span>| <span class="string">'\u{2028}'
+            </span>| <span class="string">'\u{2029}'
     </span>)
 }
 
@@ -3437,12 +3437,12 @@
 }
 
 <span class="kw">impl </span>Display <span class="kw">for </span>Error {
-    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>core::fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; core::fmt::Result {
-        <span class="macro">write!</span>(f, <span class="string">&quot;{} at {:?}&quot;</span>, <span class="self">self</span>.kind, <span class="self">self</span>.location)
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>core::fmt::Formatter&lt;<span class="lifetime">'_</span>&gt;) -&gt; core::fmt::Result {
+        <span class="macro">write!</span>(f, <span class="string">"{} at {:?}"</span>, <span class="self">self</span>.kind, <span class="self">self</span>.location)
     }
 }
 
-<span class="attr">#[cfg(feature = <span class="string">&quot;std&quot;</span>)]
+<span class="attr">#[cfg(feature = <span class="string">"std"</span>)]
 </span><span class="kw">impl </span>std::error::Error <span class="kw">for </span>Error {}
 
 <span class="attr">#[derive(Debug, Clone, Eq, PartialEq)]
@@ -3458,16 +3458,16 @@
 }
 
 <span class="kw">impl </span>Display <span class="kw">for </span>ErrorKind {
-    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>core::fmt::Formatter&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; core::fmt::Result {
+    <span class="kw">fn </span>fmt(<span class="kw-2">&amp;</span><span class="self">self</span>, f: <span class="kw-2">&amp;mut </span>core::fmt::Formatter&lt;<span class="lifetime">'_</span>&gt;) -&gt; core::fmt::Result {
         <span class="kw">match </span><span class="self">self </span>{
-            ErrorKind::UnexpectedEof =&gt; f.write_str(<span class="string">&quot;unexpected eof&quot;</span>),
-            ErrorKind::Unexpected(ch) =&gt; <span class="macro">write!</span>(f, <span class="string">&quot;unexpected `{ch}`&quot;</span>),
-            ErrorKind::ExpectedDigit =&gt; f.write_str(<span class="string">&quot;expected digit&quot;</span>),
-            ErrorKind::InvalidUnicode =&gt; f.write_str(<span class="string">&quot;invalid unicode escape sequence&quot;</span>),
-            ErrorKind::InvalidAscii =&gt; f.write_str(<span class="string">&quot;invalid ascii escape sequence&quot;</span>),
-            ErrorKind::IsolatedCarriageReturn =&gt; f.write_str(<span class="string">&quot;unexpected isolated carriage return&quot;</span>),
-            ErrorKind::IntegerTooLarge =&gt; f.write_str(<span class="string">&quot;value overflowed the maximum size&quot;</span>),
-            ErrorKind::InvalidFloat =&gt; f.write_str(<span class="string">&quot;invalid floating point literal&quot;</span>),
+            ErrorKind::UnexpectedEof =&gt; f.write_str(<span class="string">"unexpected eof"</span>),
+            ErrorKind::Unexpected(ch) =&gt; <span class="macro">write!</span>(f, <span class="string">"unexpected `{ch}`"</span>),
+            ErrorKind::ExpectedDigit =&gt; f.write_str(<span class="string">"expected digit"</span>),
+            ErrorKind::InvalidUnicode =&gt; f.write_str(<span class="string">"invalid unicode escape sequence"</span>),
+            ErrorKind::InvalidAscii =&gt; f.write_str(<span class="string">"invalid ascii escape sequence"</span>),
+            ErrorKind::IsolatedCarriageReturn =&gt; f.write_str(<span class="string">"unexpected isolated carriage return"</span>),
+            ErrorKind::IntegerTooLarge =&gt; f.write_str(<span class="string">"value overflowed the maximum size"</span>),
+            ErrorKind::InvalidFloat =&gt; f.write_str(<span class="string">"invalid floating point literal"</span>),
         }
     }
 }
@@ -3567,7 +3567,7 @@
     <span class="kw">use super</span>::<span class="kw-2">*</span>;
 
     <span class="attr">#[track_caller]
-    </span><span class="kw">fn </span>test_tokens(source: <span class="kw-2">&amp;</span>str, tokens: <span class="kw-2">&amp;</span>[Token&lt;<span class="lifetime">&#39;_</span>&gt;]) {
+    </span><span class="kw">fn </span>test_tokens(source: <span class="kw-2">&amp;</span>str, tokens: <span class="kw-2">&amp;</span>[Token&lt;<span class="lifetime">'_</span>&gt;]) {
         <span class="macro">assert_eq!</span>(
             <span class="kw-2">&amp;</span>Tokenizer::minified(source)
                 .collect::&lt;<span class="prelude-ty">Result</span>&lt;Vec&lt;<span class="kw">_</span>&gt;, <span class="kw">_</span>&gt;&gt;()
@@ -3577,7 +3577,7 @@
     }
 
     <span class="attr">#[track_caller]
-    </span><span class="kw">fn </span>test_tokens_full(source: <span class="kw-2">&amp;</span>str, tokens: <span class="kw-2">&amp;</span>[Token&lt;<span class="lifetime">&#39;_</span>&gt;]) {
+    </span><span class="kw">fn </span>test_tokens_full(source: <span class="kw-2">&amp;</span>str, tokens: <span class="kw-2">&amp;</span>[Token&lt;<span class="lifetime">'_</span>&gt;]) {
         <span class="macro">assert_eq!</span>(
             <span class="kw-2">&amp;</span>Tokenizer::full(source)
                 .collect::&lt;<span class="prelude-ty">Result</span>&lt;Vec&lt;<span class="kw">_</span>&gt;, <span class="kw">_</span>&gt;&gt;()
@@ -3590,171 +3590,171 @@
     </span><span class="kw">fn </span>test_tokens_err(source: <span class="kw-2">&amp;</span>str, location: Range&lt;usize&gt;, kind: ErrorKind) {
         <span class="kw">let </span>err = Tokenizer::minified(source)
             .collect::&lt;<span class="prelude-ty">Result</span>&lt;Vec&lt;<span class="kw">_</span>&gt;, <span class="kw">_</span>&gt;&gt;()
-            .expect_err(<span class="string">&quot;source did not error&quot;</span>);
+            .expect_err(<span class="string">"source did not error"</span>);
         <span class="macro">assert_eq!</span>(err.kind, kind);
         <span class="macro">assert_eq!</span>(err.location, location);
     }
 
     <span class="attr">#[test]
     </span><span class="kw">fn </span>identifiers() {
-        test_tokens(<span class="string">&quot;true&quot;</span>, <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">4</span>, TokenKind::Bool(<span class="bool-val">true</span>))]);
-        test_tokens(<span class="string">&quot;false&quot;</span>, <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">5</span>, TokenKind::Bool(<span class="bool-val">false</span>))]);
+        test_tokens(<span class="string">"true"</span>, <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">4</span>, TokenKind::Bool(<span class="bool-val">true</span>))]);
+        test_tokens(<span class="string">"false"</span>, <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">5</span>, TokenKind::Bool(<span class="bool-val">false</span>))]);
 
-        test_tokens(<span class="string">&quot;r#true&quot;</span>, <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">6</span>, TokenKind::Identifier(<span class="string">&quot;true&quot;</span>))]);
+        test_tokens(<span class="string">"r#true"</span>, <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">6</span>, TokenKind::Identifier(<span class="string">"true"</span>))]);
         test_tokens(
-            <span class="string">&quot;r#false&quot;</span>,
-            <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">7</span>, TokenKind::Identifier(<span class="string">&quot;false&quot;</span>))],
+            <span class="string">"r#false"</span>,
+            <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">7</span>, TokenKind::Identifier(<span class="string">"false"</span>))],
         );
 
-        test_tokens(<span class="string">&quot;_&quot;</span>, <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">1</span>, TokenKind::Identifier(<span class="string">&quot;_&quot;</span>))]);
+        test_tokens(<span class="string">"_"</span>, <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">1</span>, TokenKind::Identifier(<span class="string">"_"</span>))]);
 
-        test_tokens(<span class="string">&quot;_0&quot;</span>, <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">2</span>, TokenKind::Identifier(<span class="string">&quot;_0&quot;</span>))]);
+        test_tokens(<span class="string">"_0"</span>, <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">2</span>, TokenKind::Identifier(<span class="string">"_0"</span>))]);
 
-        test_tokens_err(<span class="string">&quot;=&quot;</span>, <span class="number">0</span>..<span class="number">1</span>, ErrorKind::Unexpected(<span class="string">&#39;=&#39;</span>));
+        test_tokens_err(<span class="string">"="</span>, <span class="number">0</span>..<span class="number">1</span>, ErrorKind::Unexpected(<span class="string">'='</span>));
     }
 
     <span class="attr">#[test]
     </span><span class="kw">fn </span>integers() {
         test_tokens(
-            <span class="string">&quot;0&quot;</span>,
+            <span class="string">"0"</span>,
             <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">1</span>, TokenKind::Integer(Integer::Usize(<span class="number">0</span>)))],
         );
         test_tokens(
-            <span class="string">&quot;9&quot;</span>,
+            <span class="string">"9"</span>,
             <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">1</span>, TokenKind::Integer(Integer::Usize(<span class="number">9</span>)))],
         );
         test_tokens(
-            <span class="string">&quot;10&quot;</span>,
+            <span class="string">"10"</span>,
             <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">2</span>, TokenKind::Integer(Integer::Usize(<span class="number">10</span>)))],
         );
         test_tokens(
-            <span class="string">&quot;99&quot;</span>,
+            <span class="string">"99"</span>,
             <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">2</span>, TokenKind::Integer(Integer::Usize(<span class="number">99</span>)))],
         );
         test_tokens(
-            <span class="string">&quot;+0&quot;</span>,
+            <span class="string">"+0"</span>,
             <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">2</span>, TokenKind::Integer(Integer::Isize(<span class="number">0</span>)))],
         );
         test_tokens(
-            <span class="string">&quot;+9&quot;</span>,
+            <span class="string">"+9"</span>,
             <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">2</span>, TokenKind::Integer(Integer::Isize(<span class="number">9</span>)))],
         );
         test_tokens(
-            <span class="string">&quot;-0&quot;</span>,
+            <span class="string">"-0"</span>,
             <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">2</span>, TokenKind::Integer(Integer::Isize(<span class="number">0</span>)))],
         );
         test_tokens(
-            <span class="string">&quot;-9&quot;</span>,
+            <span class="string">"-9"</span>,
             <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">2</span>, TokenKind::Integer(Integer::Isize(-<span class="number">9</span>)))],
         );
         test_tokens(
-            <span class="string">&quot;-10&quot;</span>,
+            <span class="string">"-10"</span>,
             <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">3</span>, TokenKind::Integer(Integer::Isize(-<span class="number">10</span>)))],
         );
         test_tokens(
-            <span class="string">&quot;-99&quot;</span>,
+            <span class="string">"-99"</span>,
             <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">3</span>, TokenKind::Integer(Integer::Isize(-<span class="number">99</span>)))],
         );
 
         <span class="comment">// Test 16-bit integer maximums
         </span>test_tokens(
-            <span class="string">&quot;+32_767&quot;</span>,
+            <span class="string">"+32_767"</span>,
             <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">7</span>, TokenKind::Integer(Integer::Isize(<span class="number">32_767</span>)))],
         );
         test_tokens(
-            <span class="string">&quot;-32_768&quot;</span>,
+            <span class="string">"-32_768"</span>,
             <span class="kw-2">&amp;</span>[Token::new(
                 <span class="number">0</span>..<span class="number">7</span>,
                 TokenKind::Integer(Integer::Isize(-<span class="number">32_768</span>)),
             )],
         );
         test_tokens(
-            <span class="string">&quot;65_535&quot;</span>,
+            <span class="string">"65_535"</span>,
             <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">6</span>, TokenKind::Integer(Integer::Usize(<span class="number">65_535</span>)))],
         );
 
         <span class="comment">// Test 32-bit integer maximums
         </span>test_tokens(
-            <span class="string">&quot;+2_147_483_647&quot;</span>,
+            <span class="string">"+2_147_483_647"</span>,
             <span class="kw-2">&amp;</span>[Token::new(
                 <span class="number">0</span>..<span class="number">14</span>,
-                <span class="attr">#[cfg(any(target_pointer_width = <span class="string">&quot;32&quot;</span>, target_pointer_width = <span class="string">&quot;64&quot;</span>))]
+                <span class="attr">#[cfg(any(target_pointer_width = <span class="string">"32"</span>, target_pointer_width = <span class="string">"64"</span>))]
                 </span>TokenKind::Integer(Integer::Isize(<span class="number">2_147_483_647</span>)),
-                <span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;16&quot;</span>)]
+                <span class="attr">#[cfg(target_pointer_width = <span class="string">"16"</span>)]
                 </span>TokenKind::Integer(Integer::SignedLarge(<span class="number">2_147_483_647</span>)),
             )],
         );
         test_tokens(
-            <span class="string">&quot;-2_147_483_648&quot;</span>,
+            <span class="string">"-2_147_483_648"</span>,
             <span class="kw-2">&amp;</span>[Token::new(
                 <span class="number">0</span>..<span class="number">14</span>,
-                <span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+                <span class="attr">#[cfg(target_pointer_width = <span class="string">"64"</span>)]
                 </span>TokenKind::Integer(Integer::Isize(-<span class="number">2_147_483_648</span>)),
-                <span class="attr">#[cfg(not(target_pointer_width = <span class="string">&quot;64&quot;</span>))]
+                <span class="attr">#[cfg(not(target_pointer_width = <span class="string">"64"</span>))]
                 </span>TokenKind::Integer(Integer::SignedLarge(-<span class="number">2_147_483_648</span>)),
             )],
         );
         test_tokens(
-            <span class="string">&quot;4_294_967_295&quot;</span>,
+            <span class="string">"4_294_967_295"</span>,
             <span class="kw-2">&amp;</span>[Token::new(
                 <span class="number">0</span>..<span class="number">13</span>,
-                <span class="attr">#[cfg(any(target_pointer_width = <span class="string">&quot;32&quot;</span>, target_pointer_width = <span class="string">&quot;64&quot;</span>))]
+                <span class="attr">#[cfg(any(target_pointer_width = <span class="string">"32"</span>, target_pointer_width = <span class="string">"64"</span>))]
                 </span>TokenKind::Integer(Integer::Usize(<span class="number">4_294_967_295</span>)),
-                <span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;16&quot;</span>)]
+                <span class="attr">#[cfg(target_pointer_width = <span class="string">"16"</span>)]
                 </span>TokenKind::Integer(Integer::UnsignedLarge(<span class="number">4_294_967_295</span>)),
             )],
         );
 
         <span class="comment">// Test 64-bit integer maximums
         </span>test_tokens(
-            <span class="string">&quot;+9_223_372_036_854_775_807&quot;</span>,
+            <span class="string">"+9_223_372_036_854_775_807"</span>,
             <span class="kw-2">&amp;</span>[Token::new(
                 <span class="number">0</span>..<span class="number">26</span>,
-                <span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+                <span class="attr">#[cfg(target_pointer_width = <span class="string">"64"</span>)]
                 </span>TokenKind::Integer(Integer::Isize(<span class="number">9_223_372_036_854_775_807</span>)),
-                <span class="attr">#[cfg(not(target_pointer_width = <span class="string">&quot;64&quot;</span>))]
+                <span class="attr">#[cfg(not(target_pointer_width = <span class="string">"64"</span>))]
                 </span>TokenKind::Integer(Integer::SignedLarge(<span class="number">9_223_372_036_854_775_807</span>)),
             )],
         );
         test_tokens(
-            <span class="string">&quot;-9_223_372_036_854_775_808&quot;</span>,
+            <span class="string">"-9_223_372_036_854_775_808"</span>,
             <span class="kw-2">&amp;</span>[Token::new(
                 <span class="number">0</span>..<span class="number">26</span>,
-                <span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+                <span class="attr">#[cfg(target_pointer_width = <span class="string">"64"</span>)]
                 </span>TokenKind::Integer(Integer::Isize(-<span class="number">9_223_372_036_854_775_808</span>)),
-                <span class="attr">#[cfg(not(target_pointer_width = <span class="string">&quot;64&quot;</span>))]
+                <span class="attr">#[cfg(not(target_pointer_width = <span class="string">"64"</span>))]
                 </span>TokenKind::Integer(Integer::SignedLarge(-<span class="number">9_223_372_036_854_775_808</span>)),
             )],
         );
         test_tokens(
-            <span class="string">&quot;18_446_744_073_709_551_615&quot;</span>,
+            <span class="string">"18_446_744_073_709_551_615"</span>,
             <span class="kw-2">&amp;</span>[Token::new(
                 <span class="number">0</span>..<span class="number">26</span>,
-                <span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+                <span class="attr">#[cfg(target_pointer_width = <span class="string">"64"</span>)]
                 </span>TokenKind::Integer(Integer::Usize(<span class="number">18_446_744_073_709_551_615</span>)),
-                <span class="attr">#[cfg(not(target_pointer_width = <span class="string">&quot;64&quot;</span>))]
+                <span class="attr">#[cfg(not(target_pointer_width = <span class="string">"64"</span>))]
                 </span>TokenKind::Integer(Integer::UnsignedLarge(<span class="number">18_446_744_073_709_551_615</span>)),
             )],
         );
 
-        <span class="attr">#[cfg(feature = <span class="string">&quot;integer128&quot;</span>)]
+        <span class="attr">#[cfg(feature = <span class="string">"integer128"</span>)]
         </span>{
             test_tokens(
-                <span class="string">&quot;+9_223_372_036_854_775_808&quot;</span>,
+                <span class="string">"+9_223_372_036_854_775_808"</span>,
                 <span class="kw-2">&amp;</span>[Token::new(
                     <span class="number">0</span>..<span class="number">26</span>,
                     TokenKind::Integer(Integer::SignedLarge(<span class="number">9_223_372_036_854_775_808</span>)),
                 )],
             );
             test_tokens(
-                <span class="string">&quot;-9_223_372_036_854_775_809&quot;</span>,
+                <span class="string">"-9_223_372_036_854_775_809"</span>,
                 <span class="kw-2">&amp;</span>[Token::new(
                     <span class="number">0</span>..<span class="number">26</span>,
                     TokenKind::Integer(Integer::SignedLarge(-<span class="number">9_223_372_036_854_775_809</span>)),
                 )],
             );
             test_tokens(
-                <span class="string">&quot;18_446_744_073_709_551_616&quot;</span>,
+                <span class="string">"18_446_744_073_709_551_616"</span>,
                 <span class="kw-2">&amp;</span>[Token::new(
                     <span class="number">0</span>..<span class="number">26</span>,
                     TokenKind::Integer(Integer::UnsignedLarge(<span class="number">18_446_744_073_709_551_616</span>)),
@@ -3766,67 +3766,67 @@
     <span class="attr">#[test]
     </span><span class="kw">fn </span>hex_integers() {
         test_tokens(
-            <span class="string">&quot;0x1&quot;</span>,
+            <span class="string">"0x1"</span>,
             <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">3</span>, TokenKind::Integer(Integer::Usize(<span class="number">1</span>)))],
         );
         test_tokens(
-            <span class="string">&quot;0X12&quot;</span>,
+            <span class="string">"0X12"</span>,
             <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">4</span>, TokenKind::Integer(Integer::Usize(<span class="number">0x12</span>)))],
         );
         test_tokens(
-            <span class="string">&quot;0x12_3&quot;</span>,
+            <span class="string">"0x12_3"</span>,
             <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">6</span>, TokenKind::Integer(Integer::Usize(<span class="number">0x123</span>)))],
         );
         test_tokens(
-            <span class="string">&quot;0xaBc&quot;</span>,
+            <span class="string">"0xaBc"</span>,
             <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">5</span>, TokenKind::Integer(Integer::Usize(<span class="number">0xabc</span>)))],
         );
 
         <span class="comment">// Test 16-bit integer maximums
         </span>test_tokens(
-            <span class="string">&quot;+0xFFFF&quot;</span>,
+            <span class="string">"+0xFFFF"</span>,
             <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">7</span>, TokenKind::Integer(Integer::Isize(<span class="number">0xFFFF</span>)))],
         );
         test_tokens(
-            <span class="string">&quot;-0xFFFF&quot;</span>,
+            <span class="string">"-0xFFFF"</span>,
             <span class="kw-2">&amp;</span>[Token::new(
                 <span class="number">0</span>..<span class="number">7</span>,
                 TokenKind::Integer(Integer::Isize(-<span class="number">0xFFFF</span>)),
             )],
         );
         test_tokens(
-            <span class="string">&quot;0xFFFF&quot;</span>,
+            <span class="string">"0xFFFF"</span>,
             <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">6</span>, TokenKind::Integer(Integer::Usize(<span class="number">0xFFFF</span>)))],
         );
 
         <span class="comment">// Test 32-bit integer maximums
         </span>test_tokens(
-            <span class="string">&quot;+0xFFFF_FFFF&quot;</span>,
+            <span class="string">"+0xFFFF_FFFF"</span>,
             <span class="kw-2">&amp;</span>[Token::new(
                 <span class="number">0</span>..<span class="number">12</span>,
-                <span class="attr">#[cfg(any(target_pointer_width = <span class="string">&quot;32&quot;</span>, target_pointer_width = <span class="string">&quot;64&quot;</span>))]
+                <span class="attr">#[cfg(any(target_pointer_width = <span class="string">"32"</span>, target_pointer_width = <span class="string">"64"</span>))]
                 </span>TokenKind::Integer(Integer::Isize(<span class="number">0xFFFF_FFFF</span>)),
-                <span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;16&quot;</span>)]
+                <span class="attr">#[cfg(target_pointer_width = <span class="string">"16"</span>)]
                 </span>TokenKind::Integer(Integer::SignedLarge(<span class="number">0xFFFF_FFFF</span>)),
             )],
         );
         test_tokens(
-            <span class="string">&quot;-0xFFFF_FFFF&quot;</span>,
+            <span class="string">"-0xFFFF_FFFF"</span>,
             <span class="kw-2">&amp;</span>[Token::new(
                 <span class="number">0</span>..<span class="number">12</span>,
-                <span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+                <span class="attr">#[cfg(target_pointer_width = <span class="string">"64"</span>)]
                 </span>TokenKind::Integer(Integer::Isize(-<span class="number">0xFFFF_FFFF</span>)),
-                <span class="attr">#[cfg(not(target_pointer_width = <span class="string">&quot;64&quot;</span>))]
+                <span class="attr">#[cfg(not(target_pointer_width = <span class="string">"64"</span>))]
                 </span>TokenKind::Integer(Integer::SignedLarge(-<span class="number">0xFFFF_FFFF</span>)),
             )],
         );
         test_tokens(
-            <span class="string">&quot;0xFFFF_FFFF&quot;</span>,
+            <span class="string">"0xFFFF_FFFF"</span>,
             <span class="kw-2">&amp;</span>[Token::new(
                 <span class="number">0</span>..<span class="number">11</span>,
-                <span class="attr">#[cfg(any(target_pointer_width = <span class="string">&quot;32&quot;</span>, target_pointer_width = <span class="string">&quot;64&quot;</span>))]
+                <span class="attr">#[cfg(any(target_pointer_width = <span class="string">"32"</span>, target_pointer_width = <span class="string">"64"</span>))]
                 </span>TokenKind::Integer(Integer::Usize(<span class="number">0xFFFF_FFFF</span>)),
-                <span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;16&quot;</span>)]
+                <span class="attr">#[cfg(target_pointer_width = <span class="string">"16"</span>)]
                 </span>TokenKind::Integer(Integer::UnsignedLarge(<span class="number">0xFFFF_FFFF</span>)),
             )],
         );
@@ -3834,42 +3834,42 @@
         <span class="comment">// Test 64-bit integer maximums
         </span><span class="attr">#[allow(overflowing_literals)]
         </span>test_tokens(
-            <span class="string">&quot;+0xFFFF_FFFF_FFFF_FFFF&quot;</span>,
+            <span class="string">"+0xFFFF_FFFF_FFFF_FFFF"</span>,
             <span class="kw-2">&amp;</span>[Token::new(
                 <span class="number">0</span>..<span class="number">22</span>,
-                <span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+                <span class="attr">#[cfg(target_pointer_width = <span class="string">"64"</span>)]
                 </span>TokenKind::Integer(Integer::Isize(<span class="number">0xFFFF_FFFF_FFFF_FFFF</span>)),
-                <span class="attr">#[cfg(not(target_pointer_width = <span class="string">&quot;64&quot;</span>))]
+                <span class="attr">#[cfg(not(target_pointer_width = <span class="string">"64"</span>))]
                 </span>TokenKind::Integer(Integer::SignedLarge(<span class="number">0xFFFF_FFFF_FFFF_FFFF</span>)),
             )],
         );
         <span class="attr">#[allow(overflowing_literals)]
         </span>test_tokens(
-            <span class="string">&quot;-0xFFFF_FFFF_FFFF_FFFF&quot;</span>,
+            <span class="string">"-0xFFFF_FFFF_FFFF_FFFF"</span>,
             <span class="kw-2">&amp;</span>[Token::new(
                 <span class="number">0</span>..<span class="number">22</span>,
-                <span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+                <span class="attr">#[cfg(target_pointer_width = <span class="string">"64"</span>)]
                 </span>TokenKind::Integer(Integer::Isize(-<span class="number">0xFFFF_FFFF_FFFF_FFFF</span>)),
-                <span class="attr">#[cfg(not(target_pointer_width = <span class="string">&quot;64&quot;</span>))]
+                <span class="attr">#[cfg(not(target_pointer_width = <span class="string">"64"</span>))]
                 </span>TokenKind::Integer(Integer::SignedLarge(-<span class="number">0xFFFF_FFFF_FFFF_FFFF</span>)),
             )],
         );
         test_tokens(
-            <span class="string">&quot;0xFFFF_FFFF_FFFF_FFFF&quot;</span>,
+            <span class="string">"0xFFFF_FFFF_FFFF_FFFF"</span>,
             <span class="kw-2">&amp;</span>[Token::new(
                 <span class="number">0</span>..<span class="number">21</span>,
-                <span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+                <span class="attr">#[cfg(target_pointer_width = <span class="string">"64"</span>)]
                 </span>TokenKind::Integer(Integer::Usize(<span class="number">0xFFFF_FFFF_FFFF_FFFF</span>)),
-                <span class="attr">#[cfg(not(target_pointer_width = <span class="string">&quot;64&quot;</span>))]
+                <span class="attr">#[cfg(not(target_pointer_width = <span class="string">"64"</span>))]
                 </span>TokenKind::Integer(Integer::UnsignedLarge(<span class="number">0xFFFF_FFFF_FFFF_FFFF</span>)),
             )],
         );
 
-        <span class="attr">#[cfg(feature = <span class="string">&quot;integer128&quot;</span>)]
+        <span class="attr">#[cfg(feature = <span class="string">"integer128"</span>)]
         </span>{
             <span class="attr">#[allow(overflowing_literals)]
             </span>test_tokens(
-                <span class="string">&quot;+0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF&quot;</span>,
+                <span class="string">"+0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF"</span>,
                 <span class="kw-2">&amp;</span>[Token::new(
                     <span class="number">0</span>..<span class="number">42</span>,
                     TokenKind::Integer(Integer::SignedLarge(
@@ -3879,7 +3879,7 @@
             );
             <span class="attr">#[allow(overflowing_literals)]
             </span>test_tokens(
-                <span class="string">&quot;-0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF&quot;</span>,
+                <span class="string">"-0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF"</span>,
                 <span class="kw-2">&amp;</span>[Token::new(
                     <span class="number">0</span>..<span class="number">42</span>,
                     TokenKind::Integer(Integer::SignedLarge(
@@ -3888,7 +3888,7 @@
                 )],
             );
             test_tokens(
-                <span class="string">&quot;0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF&quot;</span>,
+                <span class="string">"0xFFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF_FFFF"</span>,
                 <span class="kw-2">&amp;</span>[Token::new(
                     <span class="number">0</span>..<span class="number">41</span>,
                     TokenKind::Integer(Integer::UnsignedLarge(
@@ -3903,35 +3903,35 @@
     #[allow(overflowing_literals)]
     </span><span class="kw">fn </span>octal_integers() {
         test_tokens(
-            <span class="string">&quot;0o1&quot;</span>,
+            <span class="string">"0o1"</span>,
             <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">3</span>, TokenKind::Integer(Integer::Usize(<span class="number">1</span>)))],
         );
         test_tokens(
-            <span class="string">&quot;0O12&quot;</span>,
+            <span class="string">"0O12"</span>,
             <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">4</span>, TokenKind::Integer(Integer::Usize(<span class="number">0o12</span>)))],
         );
         test_tokens(
-            <span class="string">&quot;0o12_3&quot;</span>,
+            <span class="string">"0o12_3"</span>,
             <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">6</span>, TokenKind::Integer(Integer::Usize(<span class="number">0o123</span>)))],
         );
 
         <span class="comment">// Test 16-bit integer maximums
         </span>test_tokens(
-            <span class="string">&quot;+0o177_777&quot;</span>,
+            <span class="string">"+0o177_777"</span>,
             <span class="kw-2">&amp;</span>[Token::new(
                 <span class="number">0</span>..<span class="number">10</span>,
                 TokenKind::Integer(Integer::Isize(<span class="number">0o177_777</span>)),
             )],
         );
         test_tokens(
-            <span class="string">&quot;-0o177_777&quot;</span>,
+            <span class="string">"-0o177_777"</span>,
             <span class="kw-2">&amp;</span>[Token::new(
                 <span class="number">0</span>..<span class="number">10</span>,
                 TokenKind::Integer(Integer::Isize(-<span class="number">0o177_777</span>)),
             )],
         );
         test_tokens(
-            <span class="string">&quot;0o177_777&quot;</span>,
+            <span class="string">"0o177_777"</span>,
             <span class="kw-2">&amp;</span>[Token::new(
                 <span class="number">0</span>..<span class="number">9</span>,
                 TokenKind::Integer(Integer::Usize(<span class="number">0o177_777</span>)),
@@ -3940,72 +3940,72 @@
 
         <span class="comment">// Test 32-bit integer maximums
         </span>test_tokens(
-            <span class="string">&quot;+0o37_777_777_777&quot;</span>,
+            <span class="string">"+0o37_777_777_777"</span>,
             <span class="kw-2">&amp;</span>[Token::new(
                 <span class="number">0</span>..<span class="number">17</span>,
-                <span class="attr">#[cfg(any(target_pointer_width = <span class="string">&quot;32&quot;</span>, target_pointer_width = <span class="string">&quot;64&quot;</span>))]
+                <span class="attr">#[cfg(any(target_pointer_width = <span class="string">"32"</span>, target_pointer_width = <span class="string">"64"</span>))]
                 </span>TokenKind::Integer(Integer::Isize(<span class="number">0o37_777_777_777</span>)),
-                <span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;16&quot;</span>)]
+                <span class="attr">#[cfg(target_pointer_width = <span class="string">"16"</span>)]
                 </span>TokenKind::Integer(Integer::SignedLarge(<span class="number">0o37_777_777_777</span>)),
             )],
         );
         test_tokens(
-            <span class="string">&quot;-0o37_777_777_777&quot;</span>,
+            <span class="string">"-0o37_777_777_777"</span>,
             <span class="kw-2">&amp;</span>[Token::new(
                 <span class="number">0</span>..<span class="number">17</span>,
-                <span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+                <span class="attr">#[cfg(target_pointer_width = <span class="string">"64"</span>)]
                 </span>TokenKind::Integer(Integer::Isize(-<span class="number">0o37_777_777_777</span>)),
-                <span class="attr">#[cfg(not(target_pointer_width = <span class="string">&quot;64&quot;</span>))]
+                <span class="attr">#[cfg(not(target_pointer_width = <span class="string">"64"</span>))]
                 </span>TokenKind::Integer(Integer::SignedLarge(-<span class="number">0o37_777_777_777</span>)),
             )],
         );
         test_tokens(
-            <span class="string">&quot;0o37_777_777_777&quot;</span>,
+            <span class="string">"0o37_777_777_777"</span>,
             <span class="kw-2">&amp;</span>[Token::new(
                 <span class="number">0</span>..<span class="number">16</span>,
-                <span class="attr">#[cfg(any(target_pointer_width = <span class="string">&quot;32&quot;</span>, target_pointer_width = <span class="string">&quot;64&quot;</span>))]
+                <span class="attr">#[cfg(any(target_pointer_width = <span class="string">"32"</span>, target_pointer_width = <span class="string">"64"</span>))]
                 </span>TokenKind::Integer(Integer::Usize(<span class="number">0o37_777_777_777</span>)),
-                <span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;16&quot;</span>)]
+                <span class="attr">#[cfg(target_pointer_width = <span class="string">"16"</span>)]
                 </span>TokenKind::Integer(Integer::UnsignedLarge(<span class="number">0o37_777_777_777</span>)),
             )],
         );
 
         <span class="comment">// Test 64-bit integer maximums
         </span>test_tokens(
-            <span class="string">&quot;+0o1_777_777_777_777_777_777_777&quot;</span>,
+            <span class="string">"+0o1_777_777_777_777_777_777_777"</span>,
             <span class="kw-2">&amp;</span>[Token::new(
                 <span class="number">0</span>..<span class="number">32</span>,
-                <span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+                <span class="attr">#[cfg(target_pointer_width = <span class="string">"64"</span>)]
                 </span>TokenKind::Integer(Integer::Isize(<span class="number">0o1_777_777_777_777_777_777_777</span>)),
-                <span class="attr">#[cfg(not(target_pointer_width = <span class="string">&quot;64&quot;</span>))]
+                <span class="attr">#[cfg(not(target_pointer_width = <span class="string">"64"</span>))]
                 </span>TokenKind::Integer(Integer::SignedLarge(<span class="number">0o1_777_777_777_777_777_777_777</span>)),
             )],
         );
         test_tokens(
-            <span class="string">&quot;-0o1_777_777_777_777_777_777_777&quot;</span>,
+            <span class="string">"-0o1_777_777_777_777_777_777_777"</span>,
             <span class="kw-2">&amp;</span>[Token::new(
                 <span class="number">0</span>..<span class="number">32</span>,
-                <span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+                <span class="attr">#[cfg(target_pointer_width = <span class="string">"64"</span>)]
                 </span>TokenKind::Integer(Integer::Isize(-<span class="number">0o1_777_777_777_777_777_777_777</span>)),
-                <span class="attr">#[cfg(not(target_pointer_width = <span class="string">&quot;64&quot;</span>))]
+                <span class="attr">#[cfg(not(target_pointer_width = <span class="string">"64"</span>))]
                 </span>TokenKind::Integer(Integer::SignedLarge(-<span class="number">0o1_777_777_777_777_777_777_777</span>)),
             )],
         );
         test_tokens(
-            <span class="string">&quot;0o1_777_777_777_777_777_777_777&quot;</span>,
+            <span class="string">"0o1_777_777_777_777_777_777_777"</span>,
             <span class="kw-2">&amp;</span>[Token::new(
                 <span class="number">0</span>..<span class="number">31</span>,
-                <span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+                <span class="attr">#[cfg(target_pointer_width = <span class="string">"64"</span>)]
                 </span>TokenKind::Integer(Integer::Usize(<span class="number">0o1_777_777_777_777_777_777_777</span>)),
-                <span class="attr">#[cfg(not(target_pointer_width = <span class="string">&quot;64&quot;</span>))]
+                <span class="attr">#[cfg(not(target_pointer_width = <span class="string">"64"</span>))]
                 </span>TokenKind::Integer(Integer::UnsignedLarge(<span class="number">0o1_777_777_777_777_777_777_777</span>)),
             )],
         );
 
-        <span class="attr">#[cfg(feature = <span class="string">&quot;integer128&quot;</span>)]
+        <span class="attr">#[cfg(feature = <span class="string">"integer128"</span>)]
         </span>{
             test_tokens(
-                <span class="string">&quot;+0o3_777_777_777_777_777_777_777_777_777_777_777_777_777_777&quot;</span>,
+                <span class="string">"+0o3_777_777_777_777_777_777_777_777_777_777_777_777_777_777"</span>,
                 <span class="kw-2">&amp;</span>[Token::new(
                     <span class="number">0</span>..<span class="number">60</span>,
                     TokenKind::Integer(Integer::SignedLarge(
@@ -4014,7 +4014,7 @@
                 )],
             );
             test_tokens(
-                <span class="string">&quot;-0o3_777_777_777_777_777_777_777_777_777_777_777_777_777_777&quot;</span>,
+                <span class="string">"-0o3_777_777_777_777_777_777_777_777_777_777_777_777_777_777"</span>,
                 <span class="kw-2">&amp;</span>[Token::new(
                     <span class="number">0</span>..<span class="number">60</span>,
                     TokenKind::Integer(Integer::SignedLarge(
@@ -4023,7 +4023,7 @@
                 )],
             );
             test_tokens(
-                <span class="string">&quot;0o3_777_777_777_777_777_777_777_777_777_777_777_777_777_777&quot;</span>,
+                <span class="string">"0o3_777_777_777_777_777_777_777_777_777_777_777_777_777_777"</span>,
                 <span class="kw-2">&amp;</span>[Token::new(
                     <span class="number">0</span>..<span class="number">59</span>,
                     TokenKind::Integer(Integer::UnsignedLarge(
@@ -4038,35 +4038,35 @@
     #[allow(overflowing_literals)]
     </span><span class="kw">fn </span>binary_integers() {
         test_tokens(
-            <span class="string">&quot;0b1&quot;</span>,
+            <span class="string">"0b1"</span>,
             <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">3</span>, TokenKind::Integer(Integer::Usize(<span class="number">1</span>)))],
         );
         test_tokens(
-            <span class="string">&quot;0B10&quot;</span>,
+            <span class="string">"0B10"</span>,
             <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">4</span>, TokenKind::Integer(Integer::Usize(<span class="number">0b10</span>)))],
         );
         test_tokens(
-            <span class="string">&quot;0b10_1&quot;</span>,
+            <span class="string">"0b10_1"</span>,
             <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">6</span>, TokenKind::Integer(Integer::Usize(<span class="number">0b101</span>)))],
         );
 
         <span class="comment">// Test 16-bit integer maximums
         </span>test_tokens(
-            <span class="string">&quot;+0b1111_1111_1111_1111&quot;</span>,
+            <span class="string">"+0b1111_1111_1111_1111"</span>,
             <span class="kw-2">&amp;</span>[Token::new(
                 <span class="number">0</span>..<span class="number">22</span>,
                 TokenKind::Integer(Integer::Isize(<span class="number">0b1111_1111_1111_1111</span>)),
             )],
         );
         test_tokens(
-            <span class="string">&quot;-0b1111_1111_1111_1111&quot;</span>,
+            <span class="string">"-0b1111_1111_1111_1111"</span>,
             <span class="kw-2">&amp;</span>[Token::new(
                 <span class="number">0</span>..<span class="number">22</span>,
                 TokenKind::Integer(Integer::Isize(-<span class="number">0b1111_1111_1111_1111</span>)),
             )],
         );
         test_tokens(
-            <span class="string">&quot;0b1111_1111_1111_1111&quot;</span>,
+            <span class="string">"0b1111_1111_1111_1111"</span>,
             <span class="kw-2">&amp;</span>[Token::new(
                 <span class="number">0</span>..<span class="number">21</span>,
                 TokenKind::Integer(Integer::Usize(<span class="number">0b1111_1111_1111_1111</span>)),
@@ -4075,36 +4075,36 @@
 
         <span class="comment">// Test 32-bit integer maximums
         </span>test_tokens(
-            <span class="string">&quot;+0b1111_1111_1111_1111_1111_1111_1111_1111&quot;</span>,
+            <span class="string">"+0b1111_1111_1111_1111_1111_1111_1111_1111"</span>,
             <span class="kw-2">&amp;</span>[Token::new(
                 <span class="number">0</span>..<span class="number">42</span>,
-                <span class="attr">#[cfg(any(target_pointer_width = <span class="string">&quot;32&quot;</span>, target_pointer_width = <span class="string">&quot;64&quot;</span>))]
+                <span class="attr">#[cfg(any(target_pointer_width = <span class="string">"32"</span>, target_pointer_width = <span class="string">"64"</span>))]
                 </span>TokenKind::Integer(Integer::Isize(<span class="number">0b1111_1111_1111_1111_1111_1111_1111_1111</span>)),
-                <span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;16&quot;</span>)]
+                <span class="attr">#[cfg(target_pointer_width = <span class="string">"16"</span>)]
                 </span>TokenKind::Integer(Integer::SignedLarge(
                     <span class="number">0b1111_1111_1111_1111_1111_1111_1111_1111</span>,
                 )),
             )],
         );
         test_tokens(
-            <span class="string">&quot;-0b1111_1111_1111_1111_1111_1111_1111_1111&quot;</span>,
+            <span class="string">"-0b1111_1111_1111_1111_1111_1111_1111_1111"</span>,
             <span class="kw-2">&amp;</span>[Token::new(
                 <span class="number">0</span>..<span class="number">42</span>,
-                <span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+                <span class="attr">#[cfg(target_pointer_width = <span class="string">"64"</span>)]
                 </span>TokenKind::Integer(Integer::Isize(-<span class="number">0b1111_1111_1111_1111_1111_1111_1111_1111</span>)),
-                <span class="attr">#[cfg(not(target_pointer_width = <span class="string">&quot;64&quot;</span>))]
+                <span class="attr">#[cfg(not(target_pointer_width = <span class="string">"64"</span>))]
                 </span>TokenKind::Integer(Integer::SignedLarge(
                     -<span class="number">0b1111_1111_1111_1111_1111_1111_1111_1111</span>,
                 )),
             )],
         );
         test_tokens(
-            <span class="string">&quot;0b1111_1111_1111_1111_1111_1111_1111_1111&quot;</span>,
+            <span class="string">"0b1111_1111_1111_1111_1111_1111_1111_1111"</span>,
             <span class="kw-2">&amp;</span>[Token::new(
                 <span class="number">0</span>..<span class="number">41</span>,
-                <span class="attr">#[cfg(any(target_pointer_width = <span class="string">&quot;32&quot;</span>, target_pointer_width = <span class="string">&quot;64&quot;</span>))]
+                <span class="attr">#[cfg(any(target_pointer_width = <span class="string">"32"</span>, target_pointer_width = <span class="string">"64"</span>))]
                 </span>TokenKind::Integer(Integer::Usize(<span class="number">0b1111_1111_1111_1111_1111_1111_1111_1111</span>)),
-                <span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;16&quot;</span>)]
+                <span class="attr">#[cfg(target_pointer_width = <span class="string">"16"</span>)]
                 </span>TokenKind::Integer(Integer::UnsignedLarge(
                     <span class="number">0b1111_1111_1111_1111_1111_1111_1111_1111</span>,
                 )),
@@ -4113,40 +4113,40 @@
 
         <span class="comment">// Test 64-bit integer maximums
         </span>test_tokens(
-            <span class="string">&quot;+0b1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111&quot;</span>,
+            <span class="string">"+0b1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111"</span>,
             <span class="kw-2">&amp;</span>[Token::new(
                 <span class="number">0</span>..<span class="number">82</span>,
-                <span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+                <span class="attr">#[cfg(target_pointer_width = <span class="string">"64"</span>)]
                 </span>TokenKind::Integer(Integer::Isize(<span class="number">0b1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111</span>)),
-                <span class="attr">#[cfg(not(target_pointer_width = <span class="string">&quot;64&quot;</span>))]
+                <span class="attr">#[cfg(not(target_pointer_width = <span class="string">"64"</span>))]
                 </span>TokenKind::Integer(Integer::SignedLarge(<span class="number">0b1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111</span>)),
             )],
         );
         test_tokens(
-            <span class="string">&quot;-0b1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111&quot;</span>,
+            <span class="string">"-0b1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111"</span>,
             <span class="kw-2">&amp;</span>[Token::new(
                 <span class="number">0</span>..<span class="number">82</span>,
-                <span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+                <span class="attr">#[cfg(target_pointer_width = <span class="string">"64"</span>)]
                 </span>TokenKind::Integer(Integer::Isize(-<span class="number">0b1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111</span>)),
-                <span class="attr">#[cfg(not(target_pointer_width = <span class="string">&quot;64&quot;</span>))]
+                <span class="attr">#[cfg(not(target_pointer_width = <span class="string">"64"</span>))]
                 </span>TokenKind::Integer(Integer::SignedLarge(-<span class="number">0b1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111</span>)),
             )],
         );
         test_tokens(
-            <span class="string">&quot;0b1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111&quot;</span>,
+            <span class="string">"0b1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111"</span>,
             <span class="kw-2">&amp;</span>[Token::new(
                 <span class="number">0</span>..<span class="number">81</span>,
-                <span class="attr">#[cfg(target_pointer_width = <span class="string">&quot;64&quot;</span>)]
+                <span class="attr">#[cfg(target_pointer_width = <span class="string">"64"</span>)]
                 </span>TokenKind::Integer(Integer::Usize(<span class="number">0b1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111</span>)),
-                <span class="attr">#[cfg(not(target_pointer_width = <span class="string">&quot;64&quot;</span>))]
+                <span class="attr">#[cfg(not(target_pointer_width = <span class="string">"64"</span>))]
                 </span>TokenKind::Integer(Integer::UnsignedLarge(<span class="number">0b1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111</span>)),
             )],
         );
 
-        <span class="attr">#[cfg(feature = <span class="string">&quot;integer128&quot;</span>)]
+        <span class="attr">#[cfg(feature = <span class="string">"integer128"</span>)]
         </span>{
             test_tokens(
-                <span class="string">&quot;+0b1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111&quot;</span>,
+                <span class="string">"+0b1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111"</span>,
                 <span class="kw-2">&amp;</span>[Token::new(
                     <span class="number">0</span>..<span class="number">162</span>,
                     TokenKind::Integer(Integer::SignedLarge(
@@ -4155,7 +4155,7 @@
                 )],
             );
             test_tokens(
-                <span class="string">&quot;-0b1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111&quot;</span>,
+                <span class="string">"-0b1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111"</span>,
                 <span class="kw-2">&amp;</span>[Token::new(
                     <span class="number">0</span>..<span class="number">162</span>,
                     TokenKind::Integer(Integer::SignedLarge(
@@ -4164,7 +4164,7 @@
                 )],
             );
             test_tokens(
-                <span class="string">&quot;0b1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111&quot;</span>,
+                <span class="string">"0b1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111_1111"</span>,
                 <span class="kw-2">&amp;</span>[Token::new(
                     <span class="number">0</span>..<span class="number">161</span>,
                     TokenKind::Integer(Integer::UnsignedLarge(
@@ -4177,42 +4177,42 @@
 
     <span class="attr">#[test]
     </span><span class="kw">fn </span>floats() {
-        test_tokens(<span class="string">&quot;0.&quot;</span>, <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">2</span>, TokenKind::Float(<span class="number">0.</span>))]);
-        test_tokens(<span class="string">&quot;1.0&quot;</span>, <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">3</span>, TokenKind::Float(<span class="number">1.</span>))]);
-        test_tokens(<span class="string">&quot;-1.0&quot;</span>, <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">4</span>, TokenKind::Float(-<span class="number">1.</span>))]);
-        test_tokens(<span class="string">&quot;+1.0&quot;</span>, <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">4</span>, TokenKind::Float(<span class="number">1.</span>))]);
-        test_tokens(<span class="string">&quot;-1.0e1&quot;</span>, <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">6</span>, TokenKind::Float(-<span class="number">10.</span>))]);
-        test_tokens(<span class="string">&quot;+1.0e1&quot;</span>, <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">6</span>, TokenKind::Float(<span class="number">10.</span>))]);
-        test_tokens(<span class="string">&quot;-1.0e+1&quot;</span>, <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">7</span>, TokenKind::Float(-<span class="number">10.</span>))]);
-        test_tokens(<span class="string">&quot;+1.0e+1&quot;</span>, <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">7</span>, TokenKind::Float(<span class="number">10.</span>))]);
-        test_tokens(<span class="string">&quot;-10.0e-1&quot;</span>, <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">8</span>, TokenKind::Float(-<span class="number">1.</span>))]);
-        test_tokens(<span class="string">&quot;+10.0e-1&quot;</span>, <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">8</span>, TokenKind::Float(<span class="number">1.</span>))]);
-        test_tokens(<span class="string">&quot;-1.0e10&quot;</span>, <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">7</span>, TokenKind::Float(-<span class="number">1e10</span>))]);
-        test_tokens(<span class="string">&quot;+1.0e10&quot;</span>, <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">7</span>, TokenKind::Float(<span class="number">1.0e10</span>))]);
-        test_tokens(<span class="string">&quot;-1e10&quot;</span>, <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">5</span>, TokenKind::Float(-<span class="number">1e10</span>))]);
-        test_tokens(<span class="string">&quot;+1e10&quot;</span>, <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">5</span>, TokenKind::Float(<span class="number">1e10</span>))]);
-        test_tokens(<span class="string">&quot;inf&quot;</span>, <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">3</span>, TokenKind::Float(f64::INFINITY))]);
-        test_tokens(<span class="string">&quot;NaN&quot;</span>, <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">3</span>, TokenKind::Float(f64::NAN))]);
+        test_tokens(<span class="string">"0."</span>, <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">2</span>, TokenKind::Float(<span class="number">0.</span>))]);
+        test_tokens(<span class="string">"1.0"</span>, <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">3</span>, TokenKind::Float(<span class="number">1.</span>))]);
+        test_tokens(<span class="string">"-1.0"</span>, <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">4</span>, TokenKind::Float(-<span class="number">1.</span>))]);
+        test_tokens(<span class="string">"+1.0"</span>, <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">4</span>, TokenKind::Float(<span class="number">1.</span>))]);
+        test_tokens(<span class="string">"-1.0e1"</span>, <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">6</span>, TokenKind::Float(-<span class="number">10.</span>))]);
+        test_tokens(<span class="string">"+1.0e1"</span>, <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">6</span>, TokenKind::Float(<span class="number">10.</span>))]);
+        test_tokens(<span class="string">"-1.0e+1"</span>, <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">7</span>, TokenKind::Float(-<span class="number">10.</span>))]);
+        test_tokens(<span class="string">"+1.0e+1"</span>, <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">7</span>, TokenKind::Float(<span class="number">10.</span>))]);
+        test_tokens(<span class="string">"-10.0e-1"</span>, <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">8</span>, TokenKind::Float(-<span class="number">1.</span>))]);
+        test_tokens(<span class="string">"+10.0e-1"</span>, <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">8</span>, TokenKind::Float(<span class="number">1.</span>))]);
+        test_tokens(<span class="string">"-1.0e10"</span>, <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">7</span>, TokenKind::Float(-<span class="number">1e10</span>))]);
+        test_tokens(<span class="string">"+1.0e10"</span>, <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">7</span>, TokenKind::Float(<span class="number">1.0e10</span>))]);
+        test_tokens(<span class="string">"-1e10"</span>, <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">5</span>, TokenKind::Float(-<span class="number">1e10</span>))]);
+        test_tokens(<span class="string">"+1e10"</span>, <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">5</span>, TokenKind::Float(<span class="number">1e10</span>))]);
+        test_tokens(<span class="string">"inf"</span>, <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">3</span>, TokenKind::Float(f64::INFINITY))]);
+        test_tokens(<span class="string">"NaN"</span>, <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">3</span>, TokenKind::Float(f64::NAN))]);
         test_tokens(
-            <span class="string">&quot;-inf&quot;</span>,
+            <span class="string">"-inf"</span>,
             <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">4</span>, TokenKind::Float(-f64::INFINITY))],
         );
-        test_tokens(<span class="string">&quot;-NaN&quot;</span>, <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">4</span>, TokenKind::Float(-f64::NAN))]);
-        test_tokens(<span class="string">&quot;+inf&quot;</span>, <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">4</span>, TokenKind::Float(f64::INFINITY))]);
-        test_tokens(<span class="string">&quot;+NaN&quot;</span>, <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">4</span>, TokenKind::Float(f64::NAN))]);
+        test_tokens(<span class="string">"-NaN"</span>, <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">4</span>, TokenKind::Float(-f64::NAN))]);
+        test_tokens(<span class="string">"+inf"</span>, <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">4</span>, TokenKind::Float(f64::INFINITY))]);
+        test_tokens(<span class="string">"+NaN"</span>, <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">4</span>, TokenKind::Float(f64::NAN))]);
     }
 
     <span class="attr">#[test]
     </span><span class="kw">fn </span>maps() {
         test_tokens(
-            <span class="string">&quot;{a:1,b:2}&quot;</span>,
+            <span class="string">"{a:1,b:2}"</span>,
             <span class="kw-2">&amp;</span>[
                 Token::new(<span class="number">0</span>..<span class="number">1</span>, TokenKind::Open(Balanced::Brace)),
-                Token::new(<span class="number">1</span>..<span class="number">2</span>, TokenKind::Identifier(<span class="string">&quot;a&quot;</span>)),
+                Token::new(<span class="number">1</span>..<span class="number">2</span>, TokenKind::Identifier(<span class="string">"a"</span>)),
                 Token::new(<span class="number">2</span>..<span class="number">3</span>, TokenKind::Colon),
                 Token::new(<span class="number">3</span>..<span class="number">4</span>, TokenKind::Integer(Integer::Usize(<span class="number">1</span>))),
                 Token::new(<span class="number">4</span>..<span class="number">5</span>, TokenKind::Comma),
-                Token::new(<span class="number">5</span>..<span class="number">6</span>, TokenKind::Identifier(<span class="string">&quot;b&quot;</span>)),
+                Token::new(<span class="number">5</span>..<span class="number">6</span>, TokenKind::Identifier(<span class="string">"b"</span>)),
                 Token::new(<span class="number">6</span>..<span class="number">7</span>, TokenKind::Colon),
                 Token::new(<span class="number">7</span>..<span class="number">8</span>, TokenKind::Integer(Integer::Usize(<span class="number">2</span>))),
                 Token::new(<span class="number">8</span>..<span class="number">9</span>, TokenKind::Close(Balanced::Brace)),
@@ -4222,7 +4222,7 @@
 
     <span class="attr">#[test]
     </span><span class="kw">fn </span>strings() {
-        <span class="macro">macro_rules! </span>test_string {
+        <span class="macro">macro_rules!</span> test_string {
             (<span class="macro-nonterminal">$char</span>:tt) =&gt; {
                 <span class="kw">let </span>ch = <span class="macro">core::stringify!</span>(<span class="macro-nonterminal">$char</span>);
                 test_tokens(
@@ -4234,20 +4234,20 @@
                 );
             };
         }
-        <span class="macro">test_string!</span>(<span class="string">&quot;&quot;</span>);
-        <span class="macro">test_string!</span>(<span class="string">&quot;abc&quot;</span>);
-        <span class="macro">test_string!</span>(<span class="string">&quot;\r\t\n\0\x41\u{1_F980}\\\&quot;&quot;</span>);
+        <span class="macro">test_string!</span>(<span class="string">""</span>);
+        <span class="macro">test_string!</span>(<span class="string">"abc"</span>);
+        <span class="macro">test_string!</span>(<span class="string">"\r\t\n\0\x41\u{1_F980}\\\""</span>);
         <span class="comment">// string-continue, better tested with an escaped literal than trust the
         // line endings being preserved in git.
         </span>test_tokens(
-            <span class="string">&quot;\&quot;a\\\n \t \r \n  b\&quot;&quot;</span>,
-            <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">14</span>, TokenKind::String(Cow::Borrowed(<span class="string">&quot;ab&quot;</span>)))],
+            <span class="string">"\"a\\\n \t \r \n  b\""</span>,
+            <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">14</span>, TokenKind::String(Cow::Borrowed(<span class="string">"ab"</span>)))],
         );
     }
 
     <span class="attr">#[test]
     </span><span class="kw">fn </span>raw_strings() {
-        <span class="macro">macro_rules! </span>test_string {
+        <span class="macro">macro_rules!</span> test_string {
             (<span class="macro-nonterminal">$char</span>:tt) =&gt; {
                 <span class="kw">let </span>ch = <span class="macro">core::stringify!</span>(<span class="macro-nonterminal">$char</span>);
                 test_tokens(
@@ -4259,51 +4259,51 @@
                 );
             };
         }
-        <span class="macro">test_string!</span>(<span class="string">r###&quot;&quot;##&quot;###</span>);
-        <span class="macro">test_string!</span>(<span class="string">r#&quot;abc&quot;#</span>);
-        <span class="macro">test_string!</span>(<span class="string">r#&quot;&quot;\r\t\n\0\x41\u{1_F980}\\\&quot;&quot;&quot;#</span>);
+        <span class="macro">test_string!</span>(<span class="string">r###""##"###</span>);
+        <span class="macro">test_string!</span>(<span class="string">r#"abc"#</span>);
+        <span class="macro">test_string!</span>(<span class="string">r#""\r\t\n\0\x41\u{1_F980}\\\"""#</span>);
     }
 
     <span class="attr">#[test]
     </span><span class="kw">fn </span>chars() {
-        <span class="macro">macro_rules! </span>test_char {
+        <span class="macro">macro_rules!</span> test_char {
             (<span class="macro-nonterminal">$char</span>:tt) =&gt; {
                 <span class="kw">let </span>ch = <span class="macro">core::stringify!</span>(<span class="macro-nonterminal">$char</span>);
                 test_tokens(ch, <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..ch.len(), TokenKind::Character(<span class="macro-nonterminal">$char</span>))]);
             };
         }
 
-        <span class="macro">test_char!</span>(<span class="string">&#39;\0&#39;</span>);
-        <span class="macro">test_char!</span>(<span class="string">&#39;\r&#39;</span>);
-        <span class="macro">test_char!</span>(<span class="string">&#39;\t&#39;</span>);
-        <span class="macro">test_char!</span>(<span class="string">&#39;\\&#39;</span>);
-        <span class="macro">test_char!</span>(<span class="string">&#39;\&#39;&#39;</span>);
-        <span class="macro">test_char!</span>(<span class="string">&#39;\&quot;&#39;</span>);
-        <span class="macro">test_char!</span>(<span class="string">&#39;\x42&#39;</span>);
-        <span class="macro">test_char!</span>(<span class="string">&#39;\u{1_F980}&#39;</span>);
+        <span class="macro">test_char!</span>(<span class="string">'\0'</span>);
+        <span class="macro">test_char!</span>(<span class="string">'\r'</span>);
+        <span class="macro">test_char!</span>(<span class="string">'\t'</span>);
+        <span class="macro">test_char!</span>(<span class="string">'\\'</span>);
+        <span class="macro">test_char!</span>(<span class="string">'\''</span>);
+        <span class="macro">test_char!</span>(<span class="string">'\"'</span>);
+        <span class="macro">test_char!</span>(<span class="string">'\x42'</span>);
+        <span class="macro">test_char!</span>(<span class="string">'\u{1_F980}'</span>);
     }
 
     <span class="attr">#[test]
     </span><span class="kw">fn </span>bytes() {
-        <span class="macro">macro_rules! </span>test_byte {
+        <span class="macro">macro_rules!</span> test_byte {
             (<span class="macro-nonterminal">$char</span>:tt) =&gt; {
                 <span class="kw">let </span>ch = <span class="macro">core::stringify!</span>(<span class="macro-nonterminal">$char</span>);
                 test_tokens(ch, <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..ch.len(), TokenKind::Byte(<span class="macro-nonterminal">$char</span>))]);
             };
         }
 
-        <span class="macro">test_byte!</span>(<span class="string">b&#39;\0&#39;</span>);
-        <span class="macro">test_byte!</span>(<span class="string">b&#39;\r&#39;</span>);
-        <span class="macro">test_byte!</span>(<span class="string">b&#39;\t&#39;</span>);
-        <span class="macro">test_byte!</span>(<span class="string">b&#39;\\&#39;</span>);
-        <span class="macro">test_byte!</span>(<span class="string">b&#39;\&#39;&#39;</span>);
-        <span class="macro">test_byte!</span>(<span class="string">b&#39;\&quot;&#39;</span>);
-        <span class="macro">test_byte!</span>(<span class="string">b&#39;\x42&#39;</span>);
+        <span class="macro">test_byte!</span>(<span class="string">b'\0'</span>);
+        <span class="macro">test_byte!</span>(<span class="string">b'\r'</span>);
+        <span class="macro">test_byte!</span>(<span class="string">b'\t'</span>);
+        <span class="macro">test_byte!</span>(<span class="string">b'\\'</span>);
+        <span class="macro">test_byte!</span>(<span class="string">b'\''</span>);
+        <span class="macro">test_byte!</span>(<span class="string">b'\"'</span>);
+        <span class="macro">test_byte!</span>(<span class="string">b'\x42'</span>);
     }
 
     <span class="attr">#[test]
     </span><span class="kw">fn </span>byte_strings() {
-        <span class="macro">macro_rules! </span>test_byte_string {
+        <span class="macro">macro_rules!</span> test_byte_string {
             (<span class="macro-nonterminal">$char</span>:tt) =&gt; {
                 <span class="kw">let </span>ch = <span class="macro">core::stringify!</span>(<span class="macro-nonterminal">$char</span>);
                 test_tokens(
@@ -4316,25 +4316,25 @@
             };
         }
 
-        <span class="macro">test_byte_string!</span>(<span class="string">b&quot;hello world&quot;</span>);
-        <span class="macro">test_byte_string!</span>(<span class="string">b&quot;\0&quot;</span>);
-        <span class="macro">test_byte_string!</span>(<span class="string">b&quot;\r&quot;</span>);
-        <span class="macro">test_byte_string!</span>(<span class="string">b&quot;\t&quot;</span>);
-        <span class="macro">test_byte_string!</span>(<span class="string">b&quot;\\&quot;</span>);
-        <span class="macro">test_byte_string!</span>(<span class="string">b&quot;\&#39;&quot;</span>);
-        <span class="macro">test_byte_string!</span>(<span class="string">b&quot;\&quot;&quot;</span>);
-        <span class="macro">test_byte_string!</span>(<span class="string">b&quot;\x42&quot;</span>);
+        <span class="macro">test_byte_string!</span>(<span class="string">b"hello world"</span>);
+        <span class="macro">test_byte_string!</span>(<span class="string">b"\0"</span>);
+        <span class="macro">test_byte_string!</span>(<span class="string">b"\r"</span>);
+        <span class="macro">test_byte_string!</span>(<span class="string">b"\t"</span>);
+        <span class="macro">test_byte_string!</span>(<span class="string">b"\\"</span>);
+        <span class="macro">test_byte_string!</span>(<span class="string">b"\'"</span>);
+        <span class="macro">test_byte_string!</span>(<span class="string">b"\""</span>);
+        <span class="macro">test_byte_string!</span>(<span class="string">b"\x42"</span>);
         <span class="comment">// string-continue, better tested with an escaped literal than trust the
         // line endings being preserved in git.
         </span>test_tokens(
-            <span class="string">&quot;b\&quot;a\\\n \t \r \n  b\&quot;&quot;</span>,
-            <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">15</span>, TokenKind::Bytes(Cow::Borrowed(<span class="string">b&quot;ab&quot;</span>)))],
+            <span class="string">"b\"a\\\n \t \r \n  b\""</span>,
+            <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">15</span>, TokenKind::Bytes(Cow::Borrowed(<span class="string">b"ab"</span>)))],
         );
     }
 
     <span class="attr">#[test]
     </span><span class="kw">fn </span>raw_byte_strings() {
-        <span class="macro">macro_rules! </span>test_string {
+        <span class="macro">macro_rules!</span> test_string {
             (<span class="macro-nonterminal">$char</span>:tt) =&gt; {
                 <span class="kw">let </span>ch = <span class="macro">core::stringify!</span>(<span class="macro-nonterminal">$char</span>);
                 test_tokens(
@@ -4346,14 +4346,14 @@
                 );
             };
         }
-        <span class="macro">test_string!</span>(<span class="string">br###&quot;&quot;##&quot;###</span>);
-        <span class="macro">test_string!</span>(<span class="string">br#&quot;abc&quot;#</span>);
-        <span class="macro">test_string!</span>(<span class="string">br#&quot;&quot;\r\t\n\0\x41\u{1_F980}\\\&quot;&quot;&quot;#</span>);
+        <span class="macro">test_string!</span>(<span class="string">br###""##"###</span>);
+        <span class="macro">test_string!</span>(<span class="string">br#"abc"#</span>);
+        <span class="macro">test_string!</span>(<span class="string">br#""\r\t\n\0\x41\u{1_F980}\\\"""#</span>);
     }
 
     <span class="attr">#[test]
     </span><span class="kw">fn </span>block_comments() {
-        <span class="macro">macro_rules! </span>test_comment {
+        <span class="macro">macro_rules!</span> test_comment {
             (<span class="macro-nonterminal">$comment</span>:tt) =&gt; {
                 test_tokens_full(
                     <span class="macro-nonterminal">$comment</span>,
@@ -4361,21 +4361,21 @@
                 );
             };
         }
-        <span class="macro">test_comment!</span>(<span class="string">&quot;/* hello */&quot;</span>);
-        <span class="macro">test_comment!</span>(<span class="string">&quot;/*** /* hello */ **/&quot;</span>);
+        <span class="macro">test_comment!</span>(<span class="string">"/* hello */"</span>);
+        <span class="macro">test_comment!</span>(<span class="string">"/*** /* hello */ **/"</span>);
     }
 
     <span class="attr">#[test]
     </span><span class="kw">fn </span>single_line_comments() {
         test_tokens_full(
-            <span class="string">&quot;// test&quot;</span>,
-            <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">7</span>, TokenKind::Comment(<span class="string">&quot;// test&quot;</span>))],
+            <span class="string">"// test"</span>,
+            <span class="kw-2">&amp;</span>[Token::new(<span class="number">0</span>..<span class="number">7</span>, TokenKind::Comment(<span class="string">"// test"</span>))],
         );
         test_tokens_full(
-            <span class="string">&quot;// test\n&quot;</span>,
+            <span class="string">"// test\n"</span>,
             <span class="kw-2">&amp;</span>[
-                Token::new(<span class="number">0</span>..<span class="number">7</span>, TokenKind::Comment(<span class="string">&quot;// test&quot;</span>)),
-                Token::new(<span class="number">7</span>..<span class="number">8</span>, TokenKind::Whitespace(<span class="string">&quot;\n&quot;</span>)),
+                Token::new(<span class="number">0</span>..<span class="number">7</span>, TokenKind::Comment(<span class="string">"// test"</span>)),
+                Token::new(<span class="number">7</span>..<span class="number">8</span>, TokenKind::Whitespace(<span class="string">"\n"</span>)),
             ],
         );
     }

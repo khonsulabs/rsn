@@ -1,4 +1,5 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/writer.rs`."><title>writer.rs - source</title><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceSerif4-Regular-46f98efaafac5295.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Regular-018c141bf0843ffd.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/FiraSans-Medium-8f9a781e4970d388.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Regular-562dcc5011b6de7d.ttf.woff2"><link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/SourceCodePro-Semibold-d899c5a5c4aeb14a.ttf.woff2"><link rel="stylesheet" href="../../static.files/normalize-76eba96aa4d2e634.css"><link rel="stylesheet" href="../../static.files/rustdoc-9ee3a5e31a2afa3e.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="rsn" data-themes="" data-resource-suffix="" data-rustdoc-version="1.76.0-nightly (6b771f6b5 2023-11-15)" data-channel="nightly" data-search-js="search-8fbf244ebcf71464.js" data-settings-js="settings-74424d7eec62a23e.js" ><script src="../../static.files/storage-fec3eaa3851e447d.js"></script><script defer src="../../static.files/src-script-3280b574d94e47b4.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-f06f02fd918e3bb3.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-5d8b3c7633ad77ba.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-16x16-8b506e7a72182f1c.png"><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-422f7d1d52889060.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-2c020d218678b618.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"></nav><main><nav class="sub"><form class="search-form"><span></span><input class="search-input" name="search" aria-label="Run search in the documentation" autocomplete="off" spellcheck="false" placeholder="Click or press ‘S’ to search, ‘?’ for more options…" type="search"><div id="help-button" title="help" tabindex="-1"><a href="../../help.html">?</a></div><div id="settings-menu" tabindex="-1"><a href="../../settings.html" title="settings"><img width="22" height="22" alt="Change settings" src="../../static.files/wheel-7b819b6101059cd0.svg"></a></div></form></nav><section id="main-content" class="content"><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers"><a href="#1" id="1">1</a>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/writer.rs`."><title>writer.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-a5dc3bae.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="rsn" data-themes="" data-resource-suffix="" data-rustdoc-version="1.84.0-nightly (da935398d 2024-10-19)" data-channel="nightly" data-search-js="search-c5a66128.js" data-settings-js="settings-0f613d39.js" ><script src="../../static.files/storage-59e33391.js"></script><script defer src="../../static.files/src-script-56102188.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-5f194d8c.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-893ab5e7.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-6580c154.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1><div class="sub-heading">rsn/</div>writer.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers">
+<a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
 <a href="#4" id="4">4</a>
@@ -398,8 +399,7 @@
 <a href="#398" id="398">398</a>
 <a href="#399" id="399">399</a>
 <a href="#400" id="400">400</a>
-<a href="#401" id="401">401</a>
-</pre></div><pre class="rust"><code><span class="kw">use </span>alloc::borrow::Cow;
+<a href="#401" id="401">401</a></pre></div><pre class="rust"><code><span class="kw">use </span>alloc::borrow::Cow;
 <span class="kw">use </span>alloc::string::String;
 <span class="kw">use </span>alloc::vec::Vec;
 <span class="kw">use </span>core::fmt;
@@ -409,23 +409,23 @@
 <span class="kw">use </span><span class="kw">crate</span>::value::{StructContents, Value};
 
 <span class="attr">#[derive(Debug)]
-</span><span class="kw">pub struct </span>Writer&lt;<span class="lifetime">&#39;config</span>, Output&gt; {
+</span><span class="kw">pub struct </span>Writer&lt;<span class="lifetime">'config</span>, Output&gt; {
     output: Output,
     nested: Vec&lt;NestedState&gt;,
-    config: Cow&lt;<span class="lifetime">&#39;config</span>, Config&gt;,
+    config: Cow&lt;<span class="lifetime">'config</span>, Config&gt;,
 }
 
-<span class="kw">impl </span>Default <span class="kw">for </span>Writer&lt;<span class="lifetime">&#39;static</span>, String&gt; {
+<span class="kw">impl </span>Default <span class="kw">for </span>Writer&lt;<span class="lifetime">'static</span>, String&gt; {
     <span class="kw">fn </span>default() -&gt; <span class="self">Self </span>{
         <span class="self">Self</span>::new(String::new(), <span class="kw-2">&amp;</span>Config::Compact)
     }
 }
 
-<span class="kw">impl</span>&lt;<span class="lifetime">&#39;config</span>, Output&gt; Writer&lt;<span class="lifetime">&#39;config</span>, Output&gt;
+<span class="kw">impl</span>&lt;<span class="lifetime">'config</span>, Output&gt; Writer&lt;<span class="lifetime">'config</span>, Output&gt;
 <span class="kw">where
     </span>Output: Write,
 {
-    <span class="kw">pub fn </span>new(output: Output, config: <span class="kw-2">&amp;</span><span class="lifetime">&#39;config </span>Config) -&gt; <span class="self">Self </span>{
+    <span class="kw">pub fn </span>new(output: Output, config: <span class="kw-2">&amp;</span><span class="lifetime">'config </span>Config) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{
             output,
             nested: Vec::new(),
@@ -442,9 +442,9 @@
         <span class="self">self</span>.prepare_to_write_value()<span class="question-mark">?</span>;
         <span class="self">self</span>.output.write_str(name)<span class="question-mark">?</span>;
         <span class="kw">if </span><span class="macro">matches!</span>(<span class="self">self</span>.config.as_ref(), Config::Pretty { .. }) {
-            <span class="self">self</span>.output.write_char(<span class="string">&#39; &#39;</span>)<span class="question-mark">?</span>;
+            <span class="self">self</span>.output.write_char(<span class="string">' '</span>)<span class="question-mark">?</span>;
         }
-        <span class="self">self</span>.output.write_char(<span class="string">&#39;{&#39;</span>)<span class="question-mark">?</span>;
+        <span class="self">self</span>.output.write_char(<span class="string">'{'</span>)<span class="question-mark">?</span>;
         <span class="self">self</span>.nested.push(NestedState::Map(MapState::Empty));
         <span class="prelude-val">Ok</span>(())
     }
@@ -453,25 +453,25 @@
         <span class="self">self</span>.prepare_to_write_value()<span class="question-mark">?</span>;
         <span class="self">self</span>.nested.push(NestedState::Tuple(SequenceState::Empty));
         <span class="self">self</span>.output.write_str(name)<span class="question-mark">?</span>;
-        <span class="self">self</span>.output.write_char(<span class="string">&#39;(&#39;</span>)
+        <span class="self">self</span>.output.write_char(<span class="string">'('</span>)
     }
 
     <span class="kw">pub fn </span>begin_map(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; fmt::Result {
         <span class="self">self</span>.prepare_to_write_value()<span class="question-mark">?</span>;
         <span class="self">self</span>.nested.push(NestedState::Map(MapState::Empty));
-        <span class="self">self</span>.output.write_char(<span class="string">&#39;{&#39;</span>)
+        <span class="self">self</span>.output.write_char(<span class="string">'{'</span>)
     }
 
     <span class="kw">pub fn </span>begin_tuple(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; fmt::Result {
         <span class="self">self</span>.prepare_to_write_value()<span class="question-mark">?</span>;
         <span class="self">self</span>.nested.push(NestedState::Tuple(SequenceState::Empty));
-        <span class="self">self</span>.output.write_char(<span class="string">&#39;(&#39;</span>)
+        <span class="self">self</span>.output.write_char(<span class="string">'('</span>)
     }
 
     <span class="kw">pub fn </span>begin_list(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; fmt::Result {
         <span class="self">self</span>.prepare_to_write_value()<span class="question-mark">?</span>;
         <span class="self">self</span>.nested.push(NestedState::List(SequenceState::Empty));
-        <span class="self">self</span>.output.write_char(<span class="string">&#39;[&#39;</span>)
+        <span class="self">self</span>.output.write_char(<span class="string">'['</span>)
     }
 
     <span class="kw">pub fn </span>write_primitive&lt;P&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, p: <span class="kw-2">&amp;</span>P) -&gt; fmt::Result
@@ -497,7 +497,7 @@
                 <span class="self">self</span>.insert_newline()<span class="question-mark">?</span>;
             }
             <span class="prelude-val">Some</span>(NestedState::List(<span class="kw">_</span>) | NestedState::Tuple(<span class="kw">_</span>)) =&gt; {
-                <span class="self">self</span>.output.write_char(<span class="string">&#39;,&#39;</span>)<span class="question-mark">?</span>;
+                <span class="self">self</span>.output.write_char(<span class="string">','</span>)<span class="question-mark">?</span>;
                 <span class="self">self</span>.insert_newline()<span class="question-mark">?</span>;
             }
             <span class="prelude-val">Some</span>(NestedState::Map(state @ MapState::Empty)) =&gt; {
@@ -506,15 +506,15 @@
             }
             <span class="prelude-val">Some</span>(NestedState::Map(state @ MapState::AfterEntry)) =&gt; {
                 <span class="kw-2">*</span>state = MapState::AfterKey;
-                <span class="self">self</span>.output.write_char(<span class="string">&#39;,&#39;</span>)<span class="question-mark">?</span>;
+                <span class="self">self</span>.output.write_char(<span class="string">','</span>)<span class="question-mark">?</span>;
                 <span class="self">self</span>.insert_newline()<span class="question-mark">?</span>;
             }
             <span class="prelude-val">Some</span>(NestedState::Map(state @ MapState::AfterKey)) =&gt; {
                 <span class="kw-2">*</span>state = MapState::AfterEntry;
                 <span class="kw">if </span><span class="macro">matches!</span>(<span class="self">self</span>.config.as_ref(), Config::Compact) {
-                    <span class="self">self</span>.output.write_char(<span class="string">&#39;:&#39;</span>)<span class="question-mark">?</span>;
+                    <span class="self">self</span>.output.write_char(<span class="string">':'</span>)<span class="question-mark">?</span>;
                 } <span class="kw">else </span>{
-                    <span class="self">self</span>.output.write_str(<span class="string">&quot;: &quot;</span>)<span class="question-mark">?</span>;
+                    <span class="self">self</span>.output.write_str(<span class="string">": "</span>)<span class="question-mark">?</span>;
                 }
             }
             <span class="prelude-val">None </span>=&gt; {}
@@ -539,30 +539,30 @@
     }
 
     <span class="kw">pub fn </span>finish_nested(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; fmt::Result {
-        <span class="kw">match </span><span class="self">self</span>.nested.pop().expect(<span class="string">&quot;not in a nested state&quot;</span>) {
+        <span class="kw">match </span><span class="self">self</span>.nested.pop().expect(<span class="string">"not in a nested state"</span>) {
             NestedState::Tuple(state) =&gt; {
                 <span class="kw">if </span><span class="macro">matches!</span>(state, SequenceState::NotEmpty) {
                     <span class="self">self</span>.insert_newline()<span class="question-mark">?</span>;
                 }
-                <span class="self">self</span>.output.write_char(<span class="string">&#39;)&#39;</span>)
+                <span class="self">self</span>.output.write_char(<span class="string">')'</span>)
             }
             NestedState::List(state) =&gt; {
                 <span class="kw">if </span><span class="macro">matches!</span>(state, SequenceState::NotEmpty) {
                     <span class="self">self</span>.insert_newline()<span class="question-mark">?</span>;
                 }
-                <span class="self">self</span>.output.write_char(<span class="string">&#39;]&#39;</span>)
+                <span class="self">self</span>.output.write_char(<span class="string">']'</span>)
             }
             NestedState::Map(state @ (MapState::AfterEntry | MapState::Empty)) =&gt; {
                 <span class="kw">if </span><span class="macro">matches!</span>(state, MapState::AfterEntry) {
                     <span class="self">self</span>.insert_newline()<span class="question-mark">?</span>;
                 }
-                <span class="self">self</span>.output.write_char(<span class="string">&#39;}&#39;</span>)
+                <span class="self">self</span>.output.write_char(<span class="string">'}'</span>)
             }
-            NestedState::Map(<span class="kw">_</span>) =&gt; <span class="macro">unreachable!</span>(<span class="string">&quot;map entry not complete&quot;</span>),
+            NestedState::Map(<span class="kw">_</span>) =&gt; <span class="macro">unreachable!</span>(<span class="string">"map entry not complete"</span>),
         }
     }
 
-    <span class="kw">pub fn </span>write_value(<span class="kw-2">&amp;mut </span><span class="self">self</span>, value: <span class="kw-2">&amp;</span>Value&lt;<span class="lifetime">&#39;_</span>&gt;) -&gt; fmt::Result {
+    <span class="kw">pub fn </span>write_value(<span class="kw-2">&amp;mut </span><span class="self">self</span>, value: <span class="kw-2">&amp;</span>Value&lt;<span class="lifetime">'_</span>&gt;) -&gt; fmt::Result {
         <span class="kw">match </span>value {
             Value::Integer(value) =&gt; <span class="kw">match </span>value {
                 Integer::Usize(value) =&gt; <span class="self">self</span>.write_primitive(value),
@@ -625,11 +625,11 @@
     <span class="kw">fn </span>render_to&lt;W: Write&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, buffer: <span class="kw-2">&amp;mut </span>W) -&gt; fmt::Result;
 }
 
-<span class="macro">macro_rules! </span>impl_primitive_using_to_string {
+<span class="macro">macro_rules!</span> impl_primitive_using_to_string {
     (<span class="macro-nonterminal">$</span><span class="kw">type</span>:<span class="macro-nonterminal">ty</span>) =&gt; {
         <span class="kw">impl </span>Primitive <span class="kw">for </span><span class="macro-nonterminal">$</span><span class="kw">type </span>{
             <span class="kw">fn </span><span class="macro-nonterminal">render_to</span>&lt;W: Write&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, buffer: <span class="kw-2">&amp;mut </span>W) -&gt; fmt::Result {
-                <span class="macro">write!</span>(buffer, <span class="string">&quot;{self}&quot;</span>)
+                <span class="macro">write!</span>(buffer, <span class="string">"{self}"</span>)
             }
         }
     };
@@ -652,23 +652,23 @@
 
 <span class="kw">impl </span>Primitive <span class="kw">for </span>str {
     <span class="kw">fn </span>render_to&lt;W: Write&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, buffer: <span class="kw-2">&amp;mut </span>W) -&gt; fmt::Result {
-        buffer.write_char(<span class="string">&#39;&quot;&#39;</span>)<span class="question-mark">?</span>;
+        buffer.write_char(<span class="string">'"'</span>)<span class="question-mark">?</span>;
         <span class="kw">for </span>ch <span class="kw">in </span><span class="self">self</span>.chars() {
             escape_string_char(ch, buffer)<span class="question-mark">?</span>;
         }
-        buffer.write_char(<span class="string">&#39;&quot;&#39;</span>)
+        buffer.write_char(<span class="string">'"'</span>)
     }
 }
 
 <span class="kw">impl </span>Primitive <span class="kw">for </span>bool {
     <span class="kw">fn </span>render_to&lt;W: Write&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, buffer: <span class="kw-2">&amp;mut </span>W) -&gt; fmt::Result {
-        buffer.write_str(<span class="kw">if </span><span class="kw-2">*</span><span class="self">self </span>{ <span class="string">&quot;true&quot; </span>} <span class="kw">else </span>{ <span class="string">&quot;false&quot; </span>})
+        buffer.write_str(<span class="kw">if </span><span class="kw-2">*</span><span class="self">self </span>{ <span class="string">"true" </span>} <span class="kw">else </span>{ <span class="string">"false" </span>})
     }
 }
 
 <span class="kw">impl </span>Primitive <span class="kw">for </span>[u8] {
     <span class="kw">fn </span>render_to&lt;W: Write&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, buffer: <span class="kw-2">&amp;mut </span>W) -&gt; fmt::Result {
-        buffer.write_str(<span class="string">&quot;b\&quot;&quot;</span>)<span class="question-mark">?</span>;
+        buffer.write_str(<span class="string">"b\""</span>)<span class="question-mark">?</span>;
         <span class="kw">for </span>byte <span class="kw">in </span><span class="self">self </span>{
             <span class="kw">match </span>DEFAULT_STRING_ESCAPE_HANDLING.get(usize::from(<span class="kw-2">*</span>byte)) {
                 <span class="prelude-val">Some</span>(<span class="prelude-val">Some</span>(escaped)) =&gt; {
@@ -679,11 +679,11 @@
                 }
                 <span class="prelude-val">None </span>=&gt; {
                     <span class="comment">// Non-ASCII, must be hex-escaped.
-                    </span><span class="macro">write!</span>(buffer, <span class="string">&quot;\\x{byte:02x}&quot;</span>)<span class="question-mark">?</span>;
+                    </span><span class="macro">write!</span>(buffer, <span class="string">"\\x{byte:02x}"</span>)<span class="question-mark">?</span>;
                 }
             }
         }
-        buffer.write_char(<span class="string">&#39;&quot;&#39;</span>)
+        buffer.write_char(<span class="string">'"'</span>)
     }
 }
 
@@ -701,23 +701,23 @@
 
 <span class="kw">impl </span>Primitive <span class="kw">for </span>char {
     <span class="kw">fn </span>render_to&lt;W: Write&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, buffer: <span class="kw-2">&amp;mut </span>W) -&gt; fmt::Result {
-        buffer.write_char(<span class="string">&#39;\&#39;&#39;</span>)<span class="question-mark">?</span>;
+        buffer.write_char(<span class="string">'\''</span>)<span class="question-mark">?</span>;
         escape_string_char(<span class="kw-2">*</span><span class="self">self</span>, buffer)<span class="question-mark">?</span>;
-        buffer.write_char(<span class="string">&#39;\&#39;&#39;</span>)
+        buffer.write_char(<span class="string">'\''</span>)
     }
 }
 
 <span class="attr">#[rustfmt::skip]
-</span><span class="kw">static </span>DEFAULT_STRING_ESCAPE_HANDLING: [<span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">&#39;static </span>str&gt;; <span class="number">128</span>] = [
+</span><span class="kw">static </span>DEFAULT_STRING_ESCAPE_HANDLING: [<span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span><span class="lifetime">'static </span>str&gt;; <span class="number">128</span>] = [
     <span class="comment">// 0x0         1              2              3              4              5              6              7
-    </span><span class="prelude-val">Some</span>(<span class="string">&quot;\\0&quot;</span>),   <span class="prelude-val">Some</span>(<span class="string">&quot;\\x01&quot;</span>), <span class="prelude-val">Some</span>(<span class="string">&quot;\\x02&quot;</span>), <span class="prelude-val">Some</span>(<span class="string">&quot;\\x03&quot;</span>), <span class="prelude-val">Some</span>(<span class="string">&quot;\\x04&quot;</span>), <span class="prelude-val">Some</span>(<span class="string">&quot;\\x05&quot;</span>), <span class="prelude-val">Some</span>(<span class="string">&quot;\\x06&quot;</span>), <span class="prelude-val">Some</span>(<span class="string">&quot;\\x07&quot;</span>),
+    </span><span class="prelude-val">Some</span>(<span class="string">"\\0"</span>),   <span class="prelude-val">Some</span>(<span class="string">"\\x01"</span>), <span class="prelude-val">Some</span>(<span class="string">"\\x02"</span>), <span class="prelude-val">Some</span>(<span class="string">"\\x03"</span>), <span class="prelude-val">Some</span>(<span class="string">"\\x04"</span>), <span class="prelude-val">Some</span>(<span class="string">"\\x05"</span>), <span class="prelude-val">Some</span>(<span class="string">"\\x06"</span>), <span class="prelude-val">Some</span>(<span class="string">"\\x07"</span>),
     <span class="comment">// 0x8         9              A              B              C              D              E              F
-    </span><span class="prelude-val">Some</span>(<span class="string">&quot;\\x08&quot;</span>), <span class="prelude-val">Some</span>(<span class="string">&quot;\\t&quot;</span>),   <span class="prelude-val">Some</span>(<span class="string">&quot;\\n&quot;</span>),   <span class="prelude-val">Some</span>(<span class="string">&quot;\\x0b&quot;</span>), <span class="prelude-val">Some</span>(<span class="string">&quot;\\x0c&quot;</span>), <span class="prelude-val">Some</span>(<span class="string">&quot;\\r&quot;</span>),   <span class="prelude-val">Some</span>(<span class="string">&quot;\\x0e&quot;</span>), <span class="prelude-val">Some</span>(<span class="string">&quot;\\x0f&quot;</span>),
+    </span><span class="prelude-val">Some</span>(<span class="string">"\\x08"</span>), <span class="prelude-val">Some</span>(<span class="string">"\\t"</span>),   <span class="prelude-val">Some</span>(<span class="string">"\\n"</span>),   <span class="prelude-val">Some</span>(<span class="string">"\\x0b"</span>), <span class="prelude-val">Some</span>(<span class="string">"\\x0c"</span>), <span class="prelude-val">Some</span>(<span class="string">"\\r"</span>),   <span class="prelude-val">Some</span>(<span class="string">"\\x0e"</span>), <span class="prelude-val">Some</span>(<span class="string">"\\x0f"</span>),
     <span class="comment">// 0x10
-    </span><span class="prelude-val">Some</span>(<span class="string">&quot;\\x10&quot;</span>), <span class="prelude-val">Some</span>(<span class="string">&quot;\\x11&quot;</span>), <span class="prelude-val">Some</span>(<span class="string">&quot;\\x12&quot;</span>), <span class="prelude-val">Some</span>(<span class="string">&quot;\\x13&quot;</span>), <span class="prelude-val">Some</span>(<span class="string">&quot;\\x14&quot;</span>), <span class="prelude-val">Some</span>(<span class="string">&quot;\\x15&quot;</span>), <span class="prelude-val">Some</span>(<span class="string">&quot;\\x16&quot;</span>), <span class="prelude-val">Some</span>(<span class="string">&quot;\\x17&quot;</span>),
-    <span class="prelude-val">Some</span>(<span class="string">&quot;\\x18&quot;</span>), <span class="prelude-val">Some</span>(<span class="string">&quot;\\x19&quot;</span>), <span class="prelude-val">Some</span>(<span class="string">&quot;\\x1a&quot;</span>), <span class="prelude-val">Some</span>(<span class="string">&quot;\\x1b&quot;</span>), <span class="prelude-val">Some</span>(<span class="string">&quot;\\x1c&quot;</span>), <span class="prelude-val">Some</span>(<span class="string">&quot;\\x1d&quot;</span>), <span class="prelude-val">Some</span>(<span class="string">&quot;\\x1e&quot;</span>), <span class="prelude-val">Some</span>(<span class="string">&quot;\\x1f&quot;</span>),
+    </span><span class="prelude-val">Some</span>(<span class="string">"\\x10"</span>), <span class="prelude-val">Some</span>(<span class="string">"\\x11"</span>), <span class="prelude-val">Some</span>(<span class="string">"\\x12"</span>), <span class="prelude-val">Some</span>(<span class="string">"\\x13"</span>), <span class="prelude-val">Some</span>(<span class="string">"\\x14"</span>), <span class="prelude-val">Some</span>(<span class="string">"\\x15"</span>), <span class="prelude-val">Some</span>(<span class="string">"\\x16"</span>), <span class="prelude-val">Some</span>(<span class="string">"\\x17"</span>),
+    <span class="prelude-val">Some</span>(<span class="string">"\\x18"</span>), <span class="prelude-val">Some</span>(<span class="string">"\\x19"</span>), <span class="prelude-val">Some</span>(<span class="string">"\\x1a"</span>), <span class="prelude-val">Some</span>(<span class="string">"\\x1b"</span>), <span class="prelude-val">Some</span>(<span class="string">"\\x1c"</span>), <span class="prelude-val">Some</span>(<span class="string">"\\x1d"</span>), <span class="prelude-val">Some</span>(<span class="string">"\\x1e"</span>), <span class="prelude-val">Some</span>(<span class="string">"\\x1f"</span>),
     <span class="comment">// 0x20
-    </span><span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">Some</span>(<span class="string">&quot;\\\&quot;&quot;</span>),  <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,
+    </span><span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">Some</span>(<span class="string">"\\\""</span>),  <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,
     <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,
     <span class="comment">// 0x30
     </span><span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,
@@ -727,13 +727,13 @@
     <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,
     <span class="comment">// 0x50
     </span><span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,
-    <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">Some</span>(<span class="string">&quot;\\\\&quot;</span>),  <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,
+    <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">Some</span>(<span class="string">"\\\\"</span>),  <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,
     <span class="comment">// 0x60
     </span><span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,
     <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,
     <span class="comment">// 0x70
     </span><span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,
-    <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">Some</span>(<span class="string">&quot;\\x7f&quot;</span>),
+    <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">None</span>,          <span class="prelude-val">Some</span>(<span class="string">"\\x7f"</span>),
 ];
 
 <span class="attr">#[derive(Debug)]
@@ -761,8 +761,8 @@
     <span class="attr">#[default]
     </span>Compact,
     Pretty {
-        indentation: Cow&lt;<span class="lifetime">&#39;static</span>, str&gt;,
-        newline: Cow&lt;<span class="lifetime">&#39;static</span>, str&gt;,
+        indentation: Cow&lt;<span class="lifetime">'static</span>, str&gt;,
+        newline: Cow&lt;<span class="lifetime">'static</span>, str&gt;,
     },
 }
 
@@ -773,14 +773,14 @@
     <span class="kw">for </span>ch <span class="kw">in </span><span class="number">0_u8</span>..<span class="number">128 </span>{
         to_encode.push(ch <span class="kw">as </span>char);
     }
-    to_encode.write_char(<span class="string">&#39;\u{1_F980}&#39;</span>).unwrap();
+    to_encode.write_char(<span class="string">'\u{1_F980}'</span>).unwrap();
     <span class="kw">let </span><span class="kw-2">mut </span>rendered = String::new();
     to_encode.render_to(<span class="kw-2">&amp;mut </span>rendered).unwrap();
     <span class="macro">assert_eq!</span>(
         rendered,
-        <span class="string">&quot;\&quot;\\0\\x01\\x02\\x03\\x04\\x05\\x06\\x07\\x08\\t\\n\\x0b\\x0c\\r\\x0e\\x0f\\x10\\x11\\x12\\x13\\x14\\x15\\x16\\x17\\x18\\x19\\x1a\\x1b\\x1c\\x1d\\x1e\\x1f !\\\&quot;#$%&amp;&#39;()*+,-./0123456789:;&lt;=&gt;?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\\x7f🦀\&quot;&quot;
+        <span class="string">"\"\\0\\x01\\x02\\x03\\x04\\x05\\x06\\x07\\x08\\t\\n\\x0b\\x0c\\r\\x0e\\x0f\\x10\\x11\\x12\\x13\\x14\\x15\\x16\\x17\\x18\\x19\\x1a\\x1b\\x1c\\x1d\\x1e\\x1f !\\\"#$%&amp;'()*+,-./0123456789:;&lt;=&gt;?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\\x7f🦀\""
     </span>);
-    <span class="kw">let </span><span class="prelude-val">Some</span>(<span class="prelude-val">Ok</span>(Token { kind: TokenKind::String(parsed), .. })) = Tokenizer::full(<span class="kw-2">&amp;</span>rendered).next() <span class="kw">else </span>{ <span class="macro">unreachable!</span>(<span class="string">&quot;failed to parse rendered string&quot;</span>) };
+    <span class="kw">let </span><span class="prelude-val">Some</span>(<span class="prelude-val">Ok</span>(Token { kind: TokenKind::String(parsed), .. })) = Tokenizer::full(<span class="kw-2">&amp;</span>rendered).next() <span class="kw">else </span>{ <span class="macro">unreachable!</span>(<span class="string">"failed to parse rendered string"</span>) };
     <span class="macro">assert_eq!</span>(parsed, to_encode);
 }
 
@@ -795,9 +795,9 @@
     to_encode.render_to(<span class="kw-2">&amp;mut </span>rendered).unwrap();
     <span class="macro">assert_eq!</span>(
         rendered,
-        <span class="string">&quot;b\&quot;\\0\\x01\\x02\\x03\\x04\\x05\\x06\\x07\\x08\\t\\n\\x0b\\x0c\\r\\x0e\\x0f\\x10\\x11\\x12\\x13\\x14\\x15\\x16\\x17\\x18\\x19\\x1a\\x1b\\x1c\\x1d\\x1e\\x1f !\\\&quot;#$%&amp;&#39;()*+,-./0123456789:;&lt;=&gt;?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\\x7f\\x80\\x81\\x82\\x83\\x84\\x85\\x86\\x87\\x88\\x89\\x8a\\x8b\\x8c\\x8d\\x8e\\x8f\\x90\\x91\\x92\\x93\\x94\\x95\\x96\\x97\\x98\\x99\\x9a\\x9b\\x9c\\x9d\\x9e\\x9f\\xa0\\xa1\\xa2\\xa3\\xa4\\xa5\\xa6\\xa7\\xa8\\xa9\\xaa\\xab\\xac\\xad\\xae\\xaf\\xb0\\xb1\\xb2\\xb3\\xb4\\xb5\\xb6\\xb7\\xb8\\xb9\\xba\\xbb\\xbc\\xbd\\xbe\\xbf\\xc0\\xc1\\xc2\\xc3\\xc4\\xc5\\xc6\\xc7\\xc8\\xc9\\xca\\xcb\\xcc\\xcd\\xce\\xcf\\xd0\\xd1\\xd2\\xd3\\xd4\\xd5\\xd6\\xd7\\xd8\\xd9\\xda\\xdb\\xdc\\xdd\\xde\\xdf\\xe0\\xe1\\xe2\\xe3\\xe4\\xe5\\xe6\\xe7\\xe8\\xe9\\xea\\xeb\\xec\\xed\\xee\\xef\\xf0\\xf1\\xf2\\xf3\\xf4\\xf5\\xf6\\xf7\\xf8\\xf9\\xfa\\xfb\\xfc\\xfd\\xfe\&quot;&quot;
+        <span class="string">"b\"\\0\\x01\\x02\\x03\\x04\\x05\\x06\\x07\\x08\\t\\n\\x0b\\x0c\\r\\x0e\\x0f\\x10\\x11\\x12\\x13\\x14\\x15\\x16\\x17\\x18\\x19\\x1a\\x1b\\x1c\\x1d\\x1e\\x1f !\\\"#$%&amp;'()*+,-./0123456789:;&lt;=&gt;?@ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\\\]^_`abcdefghijklmnopqrstuvwxyz{|}~\\x7f\\x80\\x81\\x82\\x83\\x84\\x85\\x86\\x87\\x88\\x89\\x8a\\x8b\\x8c\\x8d\\x8e\\x8f\\x90\\x91\\x92\\x93\\x94\\x95\\x96\\x97\\x98\\x99\\x9a\\x9b\\x9c\\x9d\\x9e\\x9f\\xa0\\xa1\\xa2\\xa3\\xa4\\xa5\\xa6\\xa7\\xa8\\xa9\\xaa\\xab\\xac\\xad\\xae\\xaf\\xb0\\xb1\\xb2\\xb3\\xb4\\xb5\\xb6\\xb7\\xb8\\xb9\\xba\\xbb\\xbc\\xbd\\xbe\\xbf\\xc0\\xc1\\xc2\\xc3\\xc4\\xc5\\xc6\\xc7\\xc8\\xc9\\xca\\xcb\\xcc\\xcd\\xce\\xcf\\xd0\\xd1\\xd2\\xd3\\xd4\\xd5\\xd6\\xd7\\xd8\\xd9\\xda\\xdb\\xdc\\xdd\\xde\\xdf\\xe0\\xe1\\xe2\\xe3\\xe4\\xe5\\xe6\\xe7\\xe8\\xe9\\xea\\xeb\\xec\\xed\\xee\\xef\\xf0\\xf1\\xf2\\xf3\\xf4\\xf5\\xf6\\xf7\\xf8\\xf9\\xfa\\xfb\\xfc\\xfd\\xfe\""
     </span>);
-    <span class="kw">let </span><span class="prelude-val">Some</span>(<span class="prelude-val">Ok</span>(Token { kind: TokenKind::Bytes(parsed), .. })) = Tokenizer::full(<span class="kw-2">&amp;</span>rendered).next() <span class="kw">else </span>{ <span class="macro">unreachable!</span>(<span class="string">&quot;failed to parse rendered bytes&quot;</span>) };
+    <span class="kw">let </span><span class="prelude-val">Some</span>(<span class="prelude-val">Ok</span>(Token { kind: TokenKind::Bytes(parsed), .. })) = Tokenizer::full(<span class="kw-2">&amp;</span>rendered).next() <span class="kw">else </span>{ <span class="macro">unreachable!</span>(<span class="string">"failed to parse rendered bytes"</span>) };
     <span class="macro">assert_eq!</span>(parsed, to_encode);
 }
 </code></pre></div></section></main></body></html>
