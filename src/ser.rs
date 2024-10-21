@@ -14,6 +14,7 @@ use crate::writer::{self, Writer};
 pub struct Serializer<'config, Output> {
     writer: Writer<'config, Output>,
     implicit_map_at_root: bool,
+    anonymous_structs: bool,
 }
 
 impl Default for Serializer<'static, String> {
@@ -21,6 +22,7 @@ impl Default for Serializer<'static, String> {
         Self {
             writer: Writer::default(),
             implicit_map_at_root: false,
+            anonymous_structs: false,
         }
     }
 }
@@ -33,6 +35,7 @@ where
         Self {
             writer: Writer::new(output, &config.writer),
             implicit_map_at_root: config.implicit_map_at_root,
+            anonymous_structs: config.anonymous_structs,
         }
     }
 
@@ -239,6 +242,7 @@ where
         Ok(self)
     }
 
+    // TODO implicit_map_at_root
     fn serialize_map(self, _len: Option<usize>) -> Result<Self::SerializeMap, Self::Error> {
         self.mark_value_seen();
         self.writer.begin_map()?;
@@ -254,7 +258,11 @@ where
         self.mark_value_seen();
 
         if !is_implicit_map {
-            self.writer.begin_named_map(name)?;
+            if self.anonymous_structs {
+                self.writer.begin_map()?;
+            } else {
+                self.writer.begin_named_map(name)?;
+            }
         }
 
         Ok(StructSerializer {
@@ -438,21 +446,31 @@ where
 pub struct Config {
     pub writer: writer::Config,
     pub implicit_map_at_root: bool,
+    pub anonymous_structs: bool,
 }
 
 impl Config {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     pub fn pretty() -> Self {
         Self {
             writer: writer::Config::Pretty {
                 indentation: Cow::Borrowed("  "),
                 newline: Cow::Borrowed("\n"),
             },
-            implicit_map_at_root: false,
+            ..Default::default()
         }
     }
 
     pub const fn implicit_map_at_root(mut self, implicit_map_at_root: bool) -> Self {
         self.implicit_map_at_root = implicit_map_at_root;
+        self
+    }
+
+    pub const fn anonymous_structs(mut self, anonymous_structs: bool) -> Self {
+        self.anonymous_structs = anonymous_structs;
         self
     }
 
