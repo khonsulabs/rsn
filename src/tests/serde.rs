@@ -108,6 +108,23 @@ fn roundtrip_implicit_map<T: Debug + Serialize + for<'de> Deserialize<'de> + Par
     assert_eq!(&restored, value);
 }
 
+#[track_caller]
+fn roundtrip_anonymous_structs<T: Debug + Serialize + for<'de> Deserialize<'de> + PartialEq>(
+    value: &T,
+    check: &str,
+) {
+    let rendered = crate::ser::Config::new()
+        .anonymous_structs(true)
+        .serialize(value);
+    println!("{rendered}");
+    assert_eq!(rendered, check);
+    let restored: T = crate::parser::Config::default()
+        .allow_implicit_map(true)
+        .deserialize(&rendered)
+        .expect("deserialization failed");
+    assert_eq!(&restored, value);
+}
+
 #[test]
 fn struct_of_everything() {
     roundtrip(&StructOfEverything::default(), "StructOfEverything{str:\"\",bytes:b\"\",char:'\\0',u8:0,u16:0,u32:0,u64:0,u128:0,usize:0,i8:0,i16:0,i32:0,i64:0,i128:0,isize:0,bool:false}");
@@ -127,6 +144,13 @@ fn struct_of_everything_implicit() {
     roundtrip_implicit_map(&StructOfEverything::default(), "str: \"\"\nbytes: b\"\"\nchar: '\\0'\nu8: 0\nu16: 0\nu32: 0\nu64: 0\nu128: 0\nusize: 0\ni8: 0\ni16: 0\ni32: 0\ni64: 0\ni128: 0\nisize: 0\nbool: false\n");
     roundtrip_implicit_map(&StructOfEverything::min(), "str: \"\\0\"\nbytes: b\"\\0\"\nchar: '\\0'\nu8: 0\nu16: 0\nu32: 0\nu64: 0\nu128: 0\nusize: 0\ni8: -128\ni16: -32768\ni32: -2147483648\ni64: -9223372036854775808\ni128: -9223372036854775808\nisize: -9223372036854775808\nbool: false\n");
     roundtrip_implicit_map(&StructOfEverything::max(), "str: \"hello 🦀\"\nbytes: b\"hello, world\"\nchar: '🦀'\nu8: 255\nu16: 65535\nu32: 4294967295\nu64: 18446744073709551615\nu128: 18446744073709551615\nusize: 18446744073709551615\ni8: 127\ni16: 32767\ni32: 2147483647\ni64: 9223372036854775807\ni128: 9223372036854775807\nisize: 9223372036854775807\nbool: true\n");
+}
+
+#[test]
+fn struct_of_everything_anonymous() {
+    roundtrip_anonymous_structs(&StructOfEverything::default(), "{str:\"\",bytes:b\"\",char:'\\0',u8:0,u16:0,u32:0,u64:0,u128:0,usize:0,i8:0,i16:0,i32:0,i64:0,i128:0,isize:0,bool:false}");
+    roundtrip_anonymous_structs(&StructOfEverything::min(), "{str:\"\\0\",bytes:b\"\\0\",char:'\\0',u8:0,u16:0,u32:0,u64:0,u128:0,usize:0,i8:-128,i16:-32768,i32:-2147483648,i64:-9223372036854775808,i128:-9223372036854775808,isize:-9223372036854775808,bool:false}");
+    roundtrip_anonymous_structs(&StructOfEverything::max(), "{str:\"hello 🦀\",bytes:b\"hello, world\",char:'🦀',u8:255,u16:65535,u32:4294967295,u64:18446744073709551615,u128:18446744073709551615,usize:18446744073709551615,i8:127,i16:32767,i32:2147483647,i64:9223372036854775807,i128:9223372036854775807,isize:9223372036854775807,bool:true}");
 }
 
 #[derive(Serialize, Deserialize, Debug, Eq, PartialEq)]
