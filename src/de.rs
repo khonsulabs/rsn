@@ -1456,7 +1456,7 @@ mod tests {
             a: u32,
             b: i32,
         }
-        let config = Config::default().allow_implicit_map(true);
+        let config = Config::default().allow_implicit_map_at_root(true);
         let parsed = config.deserialize::<BasicNamed>(r#"a: 1 b: -1"#).unwrap();
         assert_eq!(parsed, BasicNamed { a: 1, b: -1 });
         let parsed = config.deserialize::<BasicNamed>(r#"a: 1, b: -1,"#).unwrap();

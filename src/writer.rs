@@ -356,6 +356,7 @@ enum MapState {
 }
 
 #[derive(Debug, Default, Clone)]
+#[non_exhaustive]
 pub enum Config {
     #[default]
     Compact,

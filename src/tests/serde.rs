@@ -104,7 +104,7 @@ fn roundtrip_implicit_map<T: Debug + Serialize + for<'de> Deserialize<'de> + Par
     println!("{rendered}");
     assert_eq!(rendered, check);
     let restored: T = crate::parser::Config::default()
-        .allow_implicit_map(true)
+        .allow_implicit_map_at_root(true)
         .deserialize(&rendered)
         .expect("deserialization failed");
     assert_eq!(&restored, value);
@@ -121,7 +121,7 @@ fn roundtrip_anonymous_structs<T: Debug + Serialize + for<'de> Deserialize<'de> 
     println!("{rendered}");
     assert_eq!(rendered, check);
     let restored: T = crate::parser::Config::default()
-        .allow_implicit_map(true)
+        .allow_implicit_map_at_root(true)
         .deserialize(&rendered)
         .expect("deserialization failed");
     assert_eq!(&restored, value);

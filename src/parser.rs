@@ -418,7 +418,7 @@ impl<'s> Parser<'s> {
                         TokenKind::Comment(comment) => {
                             Ok(Event::new(token.location, EventKind::Comment(comment)))
                         }
-                        _ if self.config.allow_implicit_map
+                        _ if self.config.allow_implicit_map_at_root
                             && matches!(
                                 self.peek(),
                                 Some(Token {
@@ -501,14 +501,15 @@ impl<'s> Iterator for Parser<'s> {
 }
 
 #[derive(Default, Debug, Clone, Copy)]
+#[non_exhaustive]
 pub struct Config {
-    pub allow_implicit_map: bool,
+    pub allow_implicit_map_at_root: bool,
     pub include_comments: bool,
 }
 
 impl Config {
-    pub const fn allow_implicit_map(mut self, allow: bool) -> Self {
-        self.allow_implicit_map = allow;
+    pub const fn allow_implicit_map_at_root(mut self, allow: bool) -> Self {
+        self.allow_implicit_map_at_root = allow;
         self
     }
 

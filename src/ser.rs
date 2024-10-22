@@ -457,6 +457,7 @@ where
 }
 
 #[derive(Default, Debug, Clone)]
+#[non_exhaustive]
 pub struct Config {
     pub writer: writer::Config,
     pub implicit_map_at_root: bool,
