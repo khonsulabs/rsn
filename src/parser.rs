@@ -325,22 +325,25 @@ impl<'s> Parser<'s> {
 
     fn parse_implicit_map(&mut self, state: MapState) -> Result<Event<'s>, Error> {
         match state {
-            MapState::ExpectingKey => match self.next_token_parts()? {
-                (location, Some(TokenKind::Identifier(key))) => {
-                    self.root_state = State::ImplicitMap(MapState::ExpectingColon);
-                    Ok(Event::new(
+            MapState::ExpectingKey => match self.next_token().transpose()? {
+                Some(Token {
+                    location,
+                    kind: TokenKind::Comment(comment),
+                }) => Ok(Event::new(location, EventKind::Comment(comment))),
+                Some(token) => match self.parse_token(token, None)? {
+                    Event {
+                        kind: EventKind::Primitive(primitive),
                         location,
-                        EventKind::Primitive(Primitive::Identifier(key)),
-                    ))
-                }
-                (location, Some(TokenKind::Comment(comment))) => {
-                    Ok(Event::new(location, EventKind::Comment(comment)))
-                }
-                (location, None) => {
+                    } => {
+                        self.root_state = State::ImplicitMap(MapState::ExpectingColon);
+                        Ok(Event::new(location, EventKind::Primitive(primitive)))
+                    }
+                    Event { location, .. } => Err(Error::new(location, ErrorKind::ExpectedKey)),
+                },
+                None => {
                     self.root_state = State::Finished;
-                    Ok(Event::new(location, EventKind::EndNested))
+                    Ok(Event::new(self.current_range(), EventKind::EndNested))
                 }
-                (location, _) => Err(Error::new(location, ErrorKind::ExpectedKey)),
             },
             MapState::ExpectingColon => match self.next_token_parts()? {
                 (_, Some(TokenKind::Colon)) => {
@@ -366,30 +369,39 @@ impl<'s> Parser<'s> {
                     ErrorKind::ExpectedValue,
                 )),
             },
-            MapState::ExpectingComma => match self.next_token_parts()? {
-                (location, Some(TokenKind::Close(Balanced::Brace))) => {
+            MapState::ExpectingComma => match self.next_token().transpose()? {
+                Some(Token {
+                    location,
+                    kind: TokenKind::Comment(comment),
+                }) => Ok(Event::new(location, EventKind::Comment(comment))),
+                Some(Token {
+                    location,
+                    kind: TokenKind::Close(Balanced::Brace),
+                }) => {
                     self.root_state = State::Finished;
                     Ok(Event::new(location, EventKind::EndNested))
                 }
-                (_, Some(TokenKind::Comma)) => {
+                Some(Token {
+                    kind: TokenKind::Comma,
+                    ..
+                }) => {
                     self.root_state = State::ImplicitMap(MapState::ExpectingKey);
                     self.parse_implicit_map(MapState::ExpectingKey)
                 }
-                (location, Some(TokenKind::Identifier(key))) => {
+                Some(token) => {
                     self.root_state = State::ImplicitMap(MapState::ExpectingColon);
-                    Ok(Event::new(
-                        location,
-                        EventKind::Primitive(Primitive::Identifier(key)),
-                    ))
+                    match self.parse_token(token, None)? {
+                        Event {
+                            location,
+                            kind: EventKind::Primitive(primitive),
+                        } => Ok(Event::new(location, EventKind::Primitive(primitive))),
+                        Event { location, .. } => Err(Error::new(location, ErrorKind::ExpectedKey)),
+                    }
                 }
-                (location, Some(TokenKind::Comment(comment))) => {
-                    Ok(Event::new(location, EventKind::Comment(comment)))
-                }
-                (location, None) => {
+                None => {
                     self.root_state = State::Finished;
-                    Ok(Event::new(location, EventKind::EndNested))
+                    Ok(Event::new(self.current_range(), EventKind::EndNested))
                 }
-                (location, _) => Err(Error::new(location, ErrorKind::ExpectedKey)),
             },
         }
     }
@@ -406,29 +418,28 @@ impl<'s> Parser<'s> {
                         TokenKind::Comment(comment) => {
                             Ok(Event::new(token.location, EventKind::Comment(comment)))
                         }
-                        TokenKind::Identifier(_)
-                            if self.config.allow_implicit_map
-                                && matches!(
-                                    self.peek(),
-                                    Some(Token {
-                                        kind: TokenKind::Colon,
-                                        ..
-                                    })
-                                ) =>
+                        _ if self.config.allow_implicit_map
+                            && matches!(
+                                self.peek(),
+                                Some(Token {
+                                    kind: TokenKind::Colon,
+                                    ..
+                                })
+                            ) =>
                         {
-                            let TokenKind::Identifier(identifier) = token.kind else {
-                                unreachable!("just matched")
-                            };
-                            // Switch to parsing an implicit map
-                            self.root_state =
-                                State::StartingImplicitMap((token.location, identifier));
-                            Ok(Event::new(
-                                0..0,
-                                EventKind::BeginNested {
-                                    name: None,
-                                    kind: Nested::Map,
-                                },
-                            ))
+                            match self.parse_token(token, None) {
+                                Ok(event) => {
+                                    self.root_state = State::StartingImplicitMap(event);
+                                    Ok(Event::new(
+                                        0..0,
+                                        EventKind::BeginNested {
+                                            name: None,
+                                            kind: Nested::Map,
+                                        },
+                                    ))
+                                }
+                                Err(err) => Err(err),
+                            }
                         }
                         _ => {
                             self.root_state = State::Finished;
@@ -437,16 +448,13 @@ impl<'s> Parser<'s> {
                     }
                 }
                 State::StartingImplicitMap(_) => {
-                    let State::StartingImplicitMap((location, identifier)) = mem::replace(
+                    let State::StartingImplicitMap(event) = mem::replace(
                         &mut self.root_state,
                         State::ImplicitMap(MapState::ExpectingColon),
                     ) else {
                         unreachable!("just matched")
                     };
-                    Ok(Event::new(
-                        location,
-                        EventKind::Primitive(Primitive::Identifier(identifier)),
-                    ))
+                    Ok(event)
                 }
                 State::ImplicitMap(state) => self.parse_implicit_map(*state),
                 State::Finished => match self.next_token()? {
@@ -510,10 +518,10 @@ impl Config {
     }
 }
 
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, PartialEq)]
 enum State<'s> {
     AtStart,
-    StartingImplicitMap((Range<usize>, &'s str)),
+    StartingImplicitMap(Event<'s>),
     ImplicitMap(MapState),
     Finished,
 }

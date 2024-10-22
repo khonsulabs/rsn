@@ -54,9 +54,9 @@ where
 {
     type Error = core::fmt::Error;
     type Ok = ();
-    type SerializeMap = Self;
+    type SerializeMap = MapSerializer<'a, 'config, Output>;
     type SerializeSeq = Self;
-    type SerializeStruct = StructSerializer<'a, 'config, Output>;
+    type SerializeStruct = MapSerializer<'a, 'config, Output>;
     type SerializeStructVariant = Self;
     type SerializeTuple = Self;
     type SerializeTupleStruct = Self;
@@ -244,9 +244,15 @@ where
 
     // TODO implicit_map_at_root
     fn serialize_map(self, _len: Option<usize>) -> Result<Self::SerializeMap, Self::Error> {
+        let is_implicit_map = self.implicit_map_at_root;
         self.mark_value_seen();
-        self.writer.begin_map()?;
-        Ok(self)
+        if !is_implicit_map {
+            self.writer.begin_map()?;
+        }
+        Ok(MapSerializer {
+            serializer: self,
+            is_implicit_map,
+        })
     }
 
     fn serialize_struct(
@@ -265,7 +271,7 @@ where
             }
         }
 
-        Ok(StructSerializer {
+        Ok(MapSerializer {
             serializer: self,
             is_implicit_map,
         })
@@ -359,12 +365,12 @@ where
     }
 }
 
-pub struct StructSerializer<'a, 'config, Output> {
+pub struct MapSerializer<'a, 'config, Output> {
     serializer: &'a mut Serializer<'config, Output>,
     is_implicit_map: bool,
 }
 
-impl<'a, 'config, Output> SerializeStruct for StructSerializer<'a, 'config, Output>
+impl<'a, 'config, Output> SerializeStruct for MapSerializer<'a, 'config, Output>
 where
     Output: Write,
 {
@@ -415,7 +421,7 @@ where
     }
 }
 
-impl<'a, 'config, Output> SerializeMap for &'a mut Serializer<'config, Output>
+impl<'a, 'config, Output> SerializeMap for MapSerializer<'a, 'config, Output>
 where
     Output: Write,
 {
@@ -426,18 +432,26 @@ where
     where
         T: serde::Serialize + ?Sized,
     {
-        key.serialize(&mut **self)
+        key.serialize(&mut *self.serializer)
     }
 
     fn serialize_value<T>(&mut self, value: &T) -> Result<(), Self::Error>
     where
         T: serde::Serialize + ?Sized,
     {
-        value.serialize(&mut **self)
+        if self.is_implicit_map {
+            self.serializer.writer.write_raw_value(": ")?;
+            value.serialize(&mut *self.serializer)?;
+            self.serializer.writer.insert_newline()
+        } else {
+            value.serialize(&mut *self.serializer)
+        }
     }
 
     fn end(self) -> Result<Self::Ok, Self::Error> {
-        self.writer.finish_nested()?;
+        if !self.is_implicit_map {
+            self.serializer.writer.finish_nested()?;
+        }
         Ok(())
     }
 }

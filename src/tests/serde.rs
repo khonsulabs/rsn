@@ -1,6 +1,8 @@
 use alloc::borrow::Cow;
 use alloc::vec;
 use core::fmt::Debug;
+use std::collections::BTreeMap;
+use std::string::String;
 
 use serde::{Deserialize, Serialize};
 
@@ -235,4 +237,12 @@ fn value_from_serialize() {
     let value = dbg!(Value::from_serialize(&original));
     let from_value: StructOfEverything = value.to_deserialize().unwrap();
     assert_eq!(original, from_value);
+}
+
+#[test]
+fn implicit_btree_map() {
+    roundtrip_implicit_map(
+        &BTreeMap::from([(String::from("Hello"), 1), (String::from("World"), 2)]),
+        "\"Hello\": 1\n\"World\": 2\n",
+    );
 }
