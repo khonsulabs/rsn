@@ -643,7 +643,7 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
             // We pass in 'i', but it doesn't matter as long as we provide a
             // xid_start character -- identifiers are always borrowed, so the
             // char is never passed to the output.
-            return self.tokenize_identifier(Some('i'));
+            return self.tokenize_identifier('i', false);
         }
 
         if signed {
@@ -916,12 +916,16 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
         }
     }
 
-    fn tokenize_raw_string(&mut self, mut pound_count: usize) -> Result<Token<'a>, Error> {
+    fn tokenize_raw(&mut self) -> Result<Token<'a>, Error> {
+        let mut pound_count = 0;
         // Count the number of leading pound signs
         loop {
             match self.next_or_eof()? {
                 '#' => pound_count += 1,
                 '"' => break,
+                ch if pound_count == 1 && is_xid_start(ch) => {
+                    return self.tokenize_identifier(ch, true);
+                }
                 other => return Err(self.error_at_last_char(ErrorKind::Unexpected(other))),
             }
         }
@@ -934,15 +938,15 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
                 }
                 '"' => {
                     let mut pounds_needed = pound_count;
-                    while self.chars.peek() == Some('#') {
+                    while self.chars.peek() == Some('#') && pounds_needed > 0 {
                         self.chars.next();
                         pounds_needed -= 1;
+                    }
 
-                        // Only break if the correct number of pound signs has been
-                        // encountered.
-                        if pounds_needed == 0 {
-                            break 'contents;
-                        }
+                    // Only break if the correct number of pound signs has been
+                    // encountered.
+                    if pounds_needed == 0 {
+                        break 'contents;
                     }
                 }
                 _ => {}
@@ -965,7 +969,7 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
             match self.next_or_eof()? {
                 '#' => pound_count += 1,
                 '"' => break,
-                other if pound_count == 0 => return self.tokenize_identifier(Some(other)),
+                other if pound_count == 0 => return self.tokenize_identifier(other, true),
                 other => return Err(self.error_at_last_char(ErrorKind::Unexpected(other))),
             }
         }
@@ -978,15 +982,15 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
                 }
                 '"' => {
                     let mut pounds_needed = pound_count;
-                    while self.chars.peek() == Some('#') {
+                    while self.chars.peek() == Some('#') && pounds_needed > 0 {
                         self.chars.next();
                         pounds_needed -= 1;
+                    }
 
-                        // Only break if the correct number of pound signs has been
-                        // encountered.
-                        if pounds_needed == 0 {
-                            break 'contents;
-                        }
+                    // Only break if the correct number of pound signs has been
+                    // encountered.
+                    if pounds_needed == 0 {
+                        break 'contents;
                     }
                 }
                 ch if ch.is_ascii() => {}
@@ -1021,14 +1025,13 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
         }
     }
 
-    fn tokenize_identifier(&mut self, initial_char: Option<char>) -> Result<Token<'a>, Error> {
-        let (require_start, initial_char, is_raw, initial_char_index) =
-            if let Some(ch) = initial_char {
-                (ch != '_', ch, false, self.chars.last_offset())
-            } else {
-                let initial = self.next_or_eof()?;
-                (true, initial, true, self.chars.last_offset())
-            };
+    fn tokenize_identifier(
+        &mut self,
+        initial_char: char,
+        is_raw: bool,
+    ) -> Result<Token<'a>, Error> {
+        let require_start = initial_char != '_';
+        let initial_char_index = self.chars.last_offset();
         // Validate the first character
         let start_is_valid = if require_start {
             is_xid_start(initial_char)
@@ -1140,14 +1143,8 @@ impl<'a, const INCLUDE_ALL: bool> Iterator for Tokenizer<'a, INCLUDE_ALL> {
                 '"' => self.tokenize_string(),
                 '\'' => self.tokenize_char(),
                 'r' => match self.chars.peek() {
-                    Some('#') => {
-                        self.chars.next();
-                        match self.chars.peek() {
-                            Some('#' | '"') => self.tokenize_raw_string(1),
-                            _ => self.tokenize_identifier(None),
-                        }
-                    }
-                    _ => self.tokenize_identifier(Some(ch)),
+                    Some('#' | '"') => self.tokenize_raw(),
+                    _ => self.tokenize_identifier(ch, false),
                 },
                 'b' => match self.chars.peek() {
                     Some('r') => {
@@ -1162,7 +1159,7 @@ impl<'a, const INCLUDE_ALL: bool> Iterator for Tokenizer<'a, INCLUDE_ALL> {
                         self.chars.next();
                         self.tokenize_byte()
                     }
-                    _ => self.tokenize_identifier(Some(ch)),
+                    _ => self.tokenize_identifier(ch, false),
                 },
                 '(' => Ok(Token::new(
                     self.chars.marked_range(),
@@ -1209,7 +1206,7 @@ impl<'a, const INCLUDE_ALL: bool> Iterator for Tokenizer<'a, INCLUDE_ALL> {
                     }
                 }
                 '/' => self.tokenize_comment(),
-                ch => self.tokenize_identifier(Some(ch)),
+                ch => self.tokenize_identifier(ch, false),
             };
             break Some(result);
         }
@@ -2069,6 +2066,7 @@ mod tests {
             };
         }
         test_string!(r###""##"###);
+        test_string!(r"abc");
         test_string!(r#"abc"#);
         test_string!(r#""\r\t\n\0\x41\u{1_F980}\\\"""#);
     }
@@ -2155,6 +2153,7 @@ mod tests {
                 );
             };
         }
+        test_string!(br"abc");
         test_string!(br###""##"###);
         test_string!(br#"abc"#);
         test_string!(br#""\r\t\n\0\x41\u{1_F980}\\\"""#);
