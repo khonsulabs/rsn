@@ -1,4 +1,4 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/ser.rs`."><title>ser.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-a5dc3bae.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="rsn" data-themes="" data-resource-suffix="" data-rustdoc-version="1.84.0-nightly (da935398d 2024-10-19)" data-channel="nightly" data-search-js="search-c5a66128.js" data-settings-js="settings-0f613d39.js" ><script src="../../static.files/storage-59e33391.js"></script><script defer src="../../static.files/src-script-56102188.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-5f194d8c.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-893ab5e7.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-6580c154.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1><div class="sub-heading">rsn/</div>ser.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers">
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Source of the Rust file `src/ser.rs`."><title>ser.rs - source</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../../static.files/rustdoc-a5dc3bae.css"><meta name="rustdoc-vars" data-root-path="../../" data-static-root-path="../../static.files/" data-current-crate="rsn" data-themes="" data-resource-suffix="" data-rustdoc-version="1.84.0-nightly (439284741 2024-10-21)" data-channel="nightly" data-search-js="search-c5a66128.js" data-settings-js="settings-0f613d39.js" ><script src="../../static.files/storage-59e33391.js"></script><script defer src="../../static.files/src-script-56102188.js"></script><script defer src="../../src-files.js"></script><script defer src="../../static.files/main-5f194d8c.js"></script><noscript><link rel="stylesheet" href="../../static.files/noscript-893ab5e7.css"></noscript><link rel="alternate icon" type="image/png" href="../../static.files/favicon-32x32-6580c154.png"><link rel="icon" type="image/svg+xml" href="../../static.files/favicon-044be391.svg"></head><body class="rustdoc src"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="sidebar"><div class="src-sidebar-title"><h2>Files</h2></div></nav><div class="sidebar-resizer"></div><main><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1><div class="sub-heading">rsn/</div>ser.rs</h1><rustdoc-toolbar></rustdoc-toolbar></div><div class="example-wrap"><div data-nosnippet><pre class="src-line-numbers">
 <a href="#1" id="1">1</a>
 <a href="#2" id="2">2</a>
 <a href="#3" id="3">3</a>
@@ -524,7 +524,25 @@
 <a href="#523" id="523">523</a>
 <a href="#524" id="524">524</a>
 <a href="#525" id="525">525</a>
-<a href="#526" id="526">526</a></pre></div><pre class="rust"><code><span class="kw">use </span>alloc::borrow::Cow;
+<a href="#526" id="526">526</a>
+<a href="#527" id="527">527</a>
+<a href="#528" id="528">528</a>
+<a href="#529" id="529">529</a>
+<a href="#530" id="530">530</a>
+<a href="#531" id="531">531</a>
+<a href="#532" id="532">532</a>
+<a href="#533" id="533">533</a>
+<a href="#534" id="534">534</a>
+<a href="#535" id="535">535</a>
+<a href="#536" id="536">536</a>
+<a href="#537" id="537">537</a>
+<a href="#538" id="538">538</a>
+<a href="#539" id="539">539</a>
+<a href="#540" id="540">540</a>
+<a href="#541" id="541">541</a>
+<a href="#542" id="542">542</a>
+<a href="#543" id="543">543</a>
+<a href="#544" id="544">544</a></pre></div><pre class="rust"><code><span class="kw">use </span>alloc::borrow::Cow;
 <span class="kw">use </span>alloc::string::String;
 <span class="kw">use </span>core::fmt::Write;
 
@@ -540,6 +558,7 @@
 </span><span class="kw">pub struct </span>Serializer&lt;<span class="lifetime">'config</span>, Output&gt; {
     writer: Writer&lt;<span class="lifetime">'config</span>, Output&gt;,
     implicit_map_at_root: bool,
+    anonymous_structs: bool,
 }
 
 <span class="kw">impl </span>Default <span class="kw">for </span>Serializer&lt;<span class="lifetime">'static</span>, String&gt; {
@@ -547,6 +566,7 @@
         <span class="self">Self </span>{
             writer: Writer::default(),
             implicit_map_at_root: <span class="bool-val">false</span>,
+            anonymous_structs: <span class="bool-val">false</span>,
         }
     }
 }
@@ -559,6 +579,7 @@
         <span class="self">Self </span>{
             writer: Writer::new(output, <span class="kw-2">&amp;</span>config.writer),
             implicit_map_at_root: config.implicit_map_at_root,
+            anonymous_structs: config.anonymous_structs,
         }
     }
 
@@ -765,7 +786,8 @@
         <span class="prelude-val">Ok</span>(<span class="self">self</span>)
     }
 
-    <span class="kw">fn </span>serialize_map(<span class="self">self</span>, _len: <span class="prelude-ty">Option</span>&lt;usize&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>::SerializeMap, <span class="self">Self</span>::Error&gt; {
+    <span class="comment">// TODO implicit_map_at_root
+    </span><span class="kw">fn </span>serialize_map(<span class="self">self</span>, _len: <span class="prelude-ty">Option</span>&lt;usize&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>::SerializeMap, <span class="self">Self</span>::Error&gt; {
         <span class="self">self</span>.mark_value_seen();
         <span class="self">self</span>.writer.begin_map()<span class="question-mark">?</span>;
         <span class="prelude-val">Ok</span>(<span class="self">self</span>)
@@ -780,7 +802,11 @@
         <span class="self">self</span>.mark_value_seen();
 
         <span class="kw">if </span>!is_implicit_map {
-            <span class="self">self</span>.writer.begin_named_map(name)<span class="question-mark">?</span>;
+            <span class="kw">if </span><span class="self">self</span>.anonymous_structs {
+                <span class="self">self</span>.writer.begin_map()<span class="question-mark">?</span>;
+            } <span class="kw">else </span>{
+                <span class="self">self</span>.writer.begin_named_map(name)<span class="question-mark">?</span>;
+            }
         }
 
         <span class="prelude-val">Ok</span>(StructSerializer {
@@ -964,21 +990,31 @@
 </span><span class="kw">pub struct </span>Config {
     <span class="kw">pub </span>writer: writer::Config,
     <span class="kw">pub </span>implicit_map_at_root: bool,
+    <span class="kw">pub </span>anonymous_structs: bool,
 }
 
 <span class="kw">impl </span>Config {
+    <span class="kw">pub fn </span>new() -&gt; <span class="self">Self </span>{
+        <span class="self">Self</span>::default()
+    }
+
     <span class="kw">pub fn </span>pretty() -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{
             writer: writer::Config::Pretty {
                 indentation: Cow::Borrowed(<span class="string">"  "</span>),
                 newline: Cow::Borrowed(<span class="string">"\n"</span>),
             },
-            implicit_map_at_root: <span class="bool-val">false</span>,
+            ..Default::default()
         }
     }
 
     <span class="kw">pub const fn </span>implicit_map_at_root(<span class="kw-2">mut </span><span class="self">self</span>, implicit_map_at_root: bool) -&gt; <span class="self">Self </span>{
         <span class="self">self</span>.implicit_map_at_root = implicit_map_at_root;
+        <span class="self">self
+    </span>}
+
+    <span class="kw">pub const fn </span>anonymous_structs(<span class="kw-2">mut </span><span class="self">self</span>, anonymous_structs: bool) -&gt; <span class="self">Self </span>{
+        <span class="self">self</span>.anonymous_structs = anonymous_structs;
         <span class="self">self
     </span>}
 
