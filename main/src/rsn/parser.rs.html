@@ -952,7 +952,16 @@
 <a href="#951" id="951">951</a>
 <a href="#952" id="952">952</a>
 <a href="#953" id="953">953</a>
-<a href="#954" id="954">954</a></pre></div><pre class="rust"><code><span class="kw">use </span>alloc::borrow::Cow;
+<a href="#954" id="954">954</a>
+<a href="#955" id="955">955</a>
+<a href="#956" id="956">956</a>
+<a href="#957" id="957">957</a>
+<a href="#958" id="958">958</a>
+<a href="#959" id="959">959</a>
+<a href="#960" id="960">960</a>
+<a href="#961" id="961">961</a>
+<a href="#962" id="962">962</a>
+<a href="#963" id="963">963</a></pre></div><pre class="rust"><code><span class="kw">use </span>alloc::borrow::Cow;
 <span class="kw">use </span>alloc::vec::Vec;
 <span class="kw">use </span>core::fmt::{Display, Formatter};
 <span class="kw">use </span>core::mem;
@@ -1279,22 +1288,25 @@
 
     <span class="kw">fn </span>parse_implicit_map(<span class="kw-2">&amp;mut </span><span class="self">self</span>, state: MapState) -&gt; <span class="prelude-ty">Result</span>&lt;Event&lt;<span class="lifetime">'s</span>&gt;, Error&gt; {
         <span class="kw">match </span>state {
-            MapState::ExpectingKey =&gt; <span class="kw">match </span><span class="self">self</span>.next_token_parts()<span class="question-mark">? </span>{
-                (location, <span class="prelude-val">Some</span>(TokenKind::Identifier(key))) =&gt; {
-                    <span class="self">self</span>.root_state = State::ImplicitMap(MapState::ExpectingColon);
-                    <span class="prelude-val">Ok</span>(Event::new(
+            MapState::ExpectingKey =&gt; <span class="kw">match </span><span class="self">self</span>.next_token().transpose()<span class="question-mark">? </span>{
+                <span class="prelude-val">Some</span>(Token {
+                    location,
+                    kind: TokenKind::Comment(comment),
+                }) =&gt; <span class="prelude-val">Ok</span>(Event::new(location, EventKind::Comment(comment))),
+                <span class="prelude-val">Some</span>(token) =&gt; <span class="kw">match </span><span class="self">self</span>.parse_token(token, <span class="prelude-val">None</span>)<span class="question-mark">? </span>{
+                    Event {
+                        kind: EventKind::Primitive(primitive),
                         location,
-                        EventKind::Primitive(Primitive::Identifier(key)),
-                    ))
-                }
-                (location, <span class="prelude-val">Some</span>(TokenKind::Comment(comment))) =&gt; {
-                    <span class="prelude-val">Ok</span>(Event::new(location, EventKind::Comment(comment)))
-                }
-                (location, <span class="prelude-val">None</span>) =&gt; {
+                    } =&gt; {
+                        <span class="self">self</span>.root_state = State::ImplicitMap(MapState::ExpectingColon);
+                        <span class="prelude-val">Ok</span>(Event::new(location, EventKind::Primitive(primitive)))
+                    }
+                    Event { location, .. } =&gt; <span class="prelude-val">Err</span>(Error::new(location, ErrorKind::ExpectedKey)),
+                },
+                <span class="prelude-val">None </span>=&gt; {
                     <span class="self">self</span>.root_state = State::Finished;
-                    <span class="prelude-val">Ok</span>(Event::new(location, EventKind::EndNested))
+                    <span class="prelude-val">Ok</span>(Event::new(<span class="self">self</span>.current_range(), EventKind::EndNested))
                 }
-                (location, <span class="kw">_</span>) =&gt; <span class="prelude-val">Err</span>(Error::new(location, ErrorKind::ExpectedKey)),
             },
             MapState::ExpectingColon =&gt; <span class="kw">match </span><span class="self">self</span>.next_token_parts()<span class="question-mark">? </span>{
                 (<span class="kw">_</span>, <span class="prelude-val">Some</span>(TokenKind::Colon)) =&gt; {
@@ -1320,30 +1332,39 @@
                     ErrorKind::ExpectedValue,
                 )),
             },
-            MapState::ExpectingComma =&gt; <span class="kw">match </span><span class="self">self</span>.next_token_parts()<span class="question-mark">? </span>{
-                (location, <span class="prelude-val">Some</span>(TokenKind::Close(Balanced::Brace))) =&gt; {
+            MapState::ExpectingComma =&gt; <span class="kw">match </span><span class="self">self</span>.next_token().transpose()<span class="question-mark">? </span>{
+                <span class="prelude-val">Some</span>(Token {
+                    location,
+                    kind: TokenKind::Comment(comment),
+                }) =&gt; <span class="prelude-val">Ok</span>(Event::new(location, EventKind::Comment(comment))),
+                <span class="prelude-val">Some</span>(Token {
+                    location,
+                    kind: TokenKind::Close(Balanced::Brace),
+                }) =&gt; {
                     <span class="self">self</span>.root_state = State::Finished;
                     <span class="prelude-val">Ok</span>(Event::new(location, EventKind::EndNested))
                 }
-                (<span class="kw">_</span>, <span class="prelude-val">Some</span>(TokenKind::Comma)) =&gt; {
+                <span class="prelude-val">Some</span>(Token {
+                    kind: TokenKind::Comma,
+                    ..
+                }) =&gt; {
                     <span class="self">self</span>.root_state = State::ImplicitMap(MapState::ExpectingKey);
                     <span class="self">self</span>.parse_implicit_map(MapState::ExpectingKey)
                 }
-                (location, <span class="prelude-val">Some</span>(TokenKind::Identifier(key))) =&gt; {
+                <span class="prelude-val">Some</span>(token) =&gt; {
                     <span class="self">self</span>.root_state = State::ImplicitMap(MapState::ExpectingColon);
-                    <span class="prelude-val">Ok</span>(Event::new(
-                        location,
-                        EventKind::Primitive(Primitive::Identifier(key)),
-                    ))
+                    <span class="kw">match </span><span class="self">self</span>.parse_token(token, <span class="prelude-val">None</span>)<span class="question-mark">? </span>{
+                        Event {
+                            location,
+                            kind: EventKind::Primitive(primitive),
+                        } =&gt; <span class="prelude-val">Ok</span>(Event::new(location, EventKind::Primitive(primitive))),
+                        Event { location, .. } =&gt; <span class="prelude-val">Err</span>(Error::new(location, ErrorKind::ExpectedKey)),
+                    }
                 }
-                (location, <span class="prelude-val">Some</span>(TokenKind::Comment(comment))) =&gt; {
-                    <span class="prelude-val">Ok</span>(Event::new(location, EventKind::Comment(comment)))
-                }
-                (location, <span class="prelude-val">None</span>) =&gt; {
+                <span class="prelude-val">None </span>=&gt; {
                     <span class="self">self</span>.root_state = State::Finished;
-                    <span class="prelude-val">Ok</span>(Event::new(location, EventKind::EndNested))
+                    <span class="prelude-val">Ok</span>(Event::new(<span class="self">self</span>.current_range(), EventKind::EndNested))
                 }
-                (location, <span class="kw">_</span>) =&gt; <span class="prelude-val">Err</span>(Error::new(location, ErrorKind::ExpectedKey)),
             },
         }
     }
@@ -1360,29 +1381,28 @@
                         TokenKind::Comment(comment) =&gt; {
                             <span class="prelude-val">Ok</span>(Event::new(token.location, EventKind::Comment(comment)))
                         }
-                        TokenKind::Identifier(<span class="kw">_</span>)
-                            <span class="kw">if </span><span class="self">self</span>.config.allow_implicit_map
-                                &amp;&amp; <span class="macro">matches!</span>(
-                                    <span class="self">self</span>.peek(),
-                                    <span class="prelude-val">Some</span>(Token {
-                                        kind: TokenKind::Colon,
-                                        ..
-                                    })
-                                ) =&gt;
+                        <span class="kw">_ if </span><span class="self">self</span>.config.allow_implicit_map_at_root
+                            &amp;&amp; <span class="macro">matches!</span>(
+                                <span class="self">self</span>.peek(),
+                                <span class="prelude-val">Some</span>(Token {
+                                    kind: TokenKind::Colon,
+                                    ..
+                                })
+                            ) =&gt;
                         {
-                            <span class="kw">let </span>TokenKind::Identifier(identifier) = token.kind <span class="kw">else </span>{
-                                <span class="macro">unreachable!</span>(<span class="string">"just matched"</span>)
-                            };
-                            <span class="comment">// Switch to parsing an implicit map
-                            </span><span class="self">self</span>.root_state =
-                                State::StartingImplicitMap((token.location, identifier));
-                            <span class="prelude-val">Ok</span>(Event::new(
-                                <span class="number">0</span>..<span class="number">0</span>,
-                                EventKind::BeginNested {
-                                    name: <span class="prelude-val">None</span>,
-                                    kind: Nested::Map,
-                                },
-                            ))
+                            <span class="kw">match </span><span class="self">self</span>.parse_token(token, <span class="prelude-val">None</span>) {
+                                <span class="prelude-val">Ok</span>(event) =&gt; {
+                                    <span class="self">self</span>.root_state = State::StartingImplicitMap(event);
+                                    <span class="prelude-val">Ok</span>(Event::new(
+                                        <span class="number">0</span>..<span class="number">0</span>,
+                                        EventKind::BeginNested {
+                                            name: <span class="prelude-val">None</span>,
+                                            kind: Nested::Map,
+                                        },
+                                    ))
+                                }
+                                <span class="prelude-val">Err</span>(err) =&gt; <span class="prelude-val">Err</span>(err),
+                            }
                         }
                         <span class="kw">_ </span>=&gt; {
                             <span class="self">self</span>.root_state = State::Finished;
@@ -1391,16 +1411,13 @@
                     }
                 }
                 State::StartingImplicitMap(<span class="kw">_</span>) =&gt; {
-                    <span class="kw">let </span>State::StartingImplicitMap((location, identifier)) = mem::replace(
+                    <span class="kw">let </span>State::StartingImplicitMap(event) = mem::replace(
                         <span class="kw-2">&amp;mut </span><span class="self">self</span>.root_state,
                         State::ImplicitMap(MapState::ExpectingColon),
                     ) <span class="kw">else </span>{
                         <span class="macro">unreachable!</span>(<span class="string">"just matched"</span>)
                     };
-                    <span class="prelude-val">Ok</span>(Event::new(
-                        location,
-                        EventKind::Primitive(Primitive::Identifier(identifier)),
-                    ))
+                    <span class="prelude-val">Ok</span>(event)
                 }
                 State::ImplicitMap(state) =&gt; <span class="self">self</span>.parse_implicit_map(<span class="kw-2">*</span>state),
                 State::Finished =&gt; <span class="kw">match </span><span class="self">self</span>.next_token()<span class="question-mark">? </span>{
@@ -1447,14 +1464,15 @@
 }
 
 <span class="attr">#[derive(Default, Debug, Clone, Copy)]
+#[non_exhaustive]
 </span><span class="kw">pub struct </span>Config {
-    <span class="kw">pub </span>allow_implicit_map: bool,
+    <span class="kw">pub </span>allow_implicit_map_at_root: bool,
     <span class="kw">pub </span>include_comments: bool,
 }
 
 <span class="kw">impl </span>Config {
-    <span class="kw">pub const fn </span>allow_implicit_map(<span class="kw-2">mut </span><span class="self">self</span>, allow: bool) -&gt; <span class="self">Self </span>{
-        <span class="self">self</span>.allow_implicit_map = allow;
+    <span class="kw">pub const fn </span>allow_implicit_map_at_root(<span class="kw-2">mut </span><span class="self">self</span>, allow: bool) -&gt; <span class="self">Self </span>{
+        <span class="self">self</span>.allow_implicit_map_at_root = allow;
         <span class="self">self
     </span>}
 
@@ -1464,10 +1482,10 @@
     </span>}
 }
 
-<span class="attr">#[derive(Debug, Clone, Eq, PartialEq)]
+<span class="attr">#[derive(Debug, Clone, PartialEq)]
 </span><span class="kw">enum </span>State&lt;<span class="lifetime">'s</span>&gt; {
     AtStart,
-    StartingImplicitMap((Range&lt;usize&gt;, <span class="kw-2">&amp;</span><span class="lifetime">'s </span>str)),
+    StartingImplicitMap(Event&lt;<span class="lifetime">'s</span>&gt;),
     ImplicitMap(MapState),
     Finished,
 }

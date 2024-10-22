@@ -1,9 +1,9 @@
 (function() {
-    var implementors = Object.fromEntries([["rsn",[["impl&lt;'a, 'config, Output&gt; <a class=\"trait\" href=\"https://docs.rs/serde/1.0.211/serde/ser/trait.SerializeStruct.html\" title=\"trait serde::ser::SerializeStruct\">SerializeStruct</a> for <a class=\"struct\" href=\"rsn/ser/struct.StructSerializer.html\" title=\"struct rsn::ser::StructSerializer\">StructSerializer</a>&lt;'a, 'config, Output&gt;<div class=\"where\">where\n    Output: <a class=\"trait\" href=\"https://doc.rust-lang.org/nightly/core/fmt/trait.Write.html\" title=\"trait core::fmt::Write\">Write</a>,</div>"]]]]);
+    var implementors = Object.fromEntries([["rsn",[["impl&lt;'a, 'config, Output&gt; <a class=\"trait\" href=\"https://docs.rs/serde/1.0.212/serde/ser/trait.SerializeStruct.html\" title=\"trait serde::ser::SerializeStruct\">SerializeStruct</a> for <a class=\"struct\" href=\"rsn/ser/struct.MapSerializer.html\" title=\"struct rsn::ser::MapSerializer\">MapSerializer</a>&lt;'a, 'config, Output&gt;<div class=\"where\">where\n    Output: <a class=\"trait\" href=\"https://doc.rust-lang.org/nightly/core/fmt/trait.Write.html\" title=\"trait core::fmt::Write\">Write</a>,</div>"]]]]);
     if (window.register_implementors) {
         window.register_implementors(implementors);
     } else {
         window.pending_implementors = implementors;
     }
 })()
-//{"start":57,"fragment_lengths":[543]}
+//{"start":57,"fragment_lengths":[534]}

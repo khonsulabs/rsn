@@ -542,7 +542,22 @@
 <a href="#541" id="541">541</a>
 <a href="#542" id="542">542</a>
 <a href="#543" id="543">543</a>
-<a href="#544" id="544">544</a></pre></div><pre class="rust"><code><span class="kw">use </span>alloc::borrow::Cow;
+<a href="#544" id="544">544</a>
+<a href="#545" id="545">545</a>
+<a href="#546" id="546">546</a>
+<a href="#547" id="547">547</a>
+<a href="#548" id="548">548</a>
+<a href="#549" id="549">549</a>
+<a href="#550" id="550">550</a>
+<a href="#551" id="551">551</a>
+<a href="#552" id="552">552</a>
+<a href="#553" id="553">553</a>
+<a href="#554" id="554">554</a>
+<a href="#555" id="555">555</a>
+<a href="#556" id="556">556</a>
+<a href="#557" id="557">557</a>
+<a href="#558" id="558">558</a>
+<a href="#559" id="559">559</a></pre></div><pre class="rust"><code><span class="kw">use </span>alloc::borrow::Cow;
 <span class="kw">use </span>alloc::string::String;
 <span class="kw">use </span>core::fmt::Write;
 
@@ -598,9 +613,9 @@
 {
     <span class="kw">type </span>Error = core::fmt::Error;
     <span class="kw">type </span><span class="prelude-val">Ok </span>= ();
-    <span class="kw">type </span>SerializeMap = <span class="self">Self</span>;
+    <span class="kw">type </span>SerializeMap = MapSerializer&lt;<span class="lifetime">'a</span>, <span class="lifetime">'config</span>, Output&gt;;
     <span class="kw">type </span>SerializeSeq = <span class="self">Self</span>;
-    <span class="kw">type </span>SerializeStruct = StructSerializer&lt;<span class="lifetime">'a</span>, <span class="lifetime">'config</span>, Output&gt;;
+    <span class="kw">type </span>SerializeStruct = MapSerializer&lt;<span class="lifetime">'a</span>, <span class="lifetime">'config</span>, Output&gt;;
     <span class="kw">type </span>SerializeStructVariant = <span class="self">Self</span>;
     <span class="kw">type </span>SerializeTuple = <span class="self">Self</span>;
     <span class="kw">type </span>SerializeTupleStruct = <span class="self">Self</span>;
@@ -788,9 +803,15 @@
 
     <span class="comment">// TODO implicit_map_at_root
     </span><span class="kw">fn </span>serialize_map(<span class="self">self</span>, _len: <span class="prelude-ty">Option</span>&lt;usize&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>::SerializeMap, <span class="self">Self</span>::Error&gt; {
+        <span class="kw">let </span>is_implicit_map = <span class="self">self</span>.implicit_map_at_root;
         <span class="self">self</span>.mark_value_seen();
-        <span class="self">self</span>.writer.begin_map()<span class="question-mark">?</span>;
-        <span class="prelude-val">Ok</span>(<span class="self">self</span>)
+        <span class="kw">if </span>!is_implicit_map {
+            <span class="self">self</span>.writer.begin_map()<span class="question-mark">?</span>;
+        }
+        <span class="prelude-val">Ok</span>(MapSerializer {
+            serializer: <span class="self">self</span>,
+            is_implicit_map,
+        })
     }
 
     <span class="kw">fn </span>serialize_struct(
@@ -809,7 +830,7 @@
             }
         }
 
-        <span class="prelude-val">Ok</span>(StructSerializer {
+        <span class="prelude-val">Ok</span>(MapSerializer {
             serializer: <span class="self">self</span>,
             is_implicit_map,
         })
@@ -903,12 +924,12 @@
     }
 }
 
-<span class="kw">pub struct </span>StructSerializer&lt;<span class="lifetime">'a</span>, <span class="lifetime">'config</span>, Output&gt; {
+<span class="kw">pub struct </span>MapSerializer&lt;<span class="lifetime">'a</span>, <span class="lifetime">'config</span>, Output&gt; {
     serializer: <span class="kw-2">&amp;</span><span class="lifetime">'a </span><span class="kw-2">mut </span>Serializer&lt;<span class="lifetime">'config</span>, Output&gt;,
     is_implicit_map: bool,
 }
 
-<span class="kw">impl</span>&lt;<span class="lifetime">'a</span>, <span class="lifetime">'config</span>, Output&gt; SerializeStruct <span class="kw">for </span>StructSerializer&lt;<span class="lifetime">'a</span>, <span class="lifetime">'config</span>, Output&gt;
+<span class="kw">impl</span>&lt;<span class="lifetime">'a</span>, <span class="lifetime">'config</span>, Output&gt; SerializeStruct <span class="kw">for </span>MapSerializer&lt;<span class="lifetime">'a</span>, <span class="lifetime">'config</span>, Output&gt;
 <span class="kw">where
     </span>Output: Write,
 {
@@ -959,7 +980,7 @@
     }
 }
 
-<span class="kw">impl</span>&lt;<span class="lifetime">'a</span>, <span class="lifetime">'config</span>, Output&gt; SerializeMap <span class="kw">for </span><span class="kw-2">&amp;</span><span class="lifetime">'a </span><span class="kw-2">mut </span>Serializer&lt;<span class="lifetime">'config</span>, Output&gt;
+<span class="kw">impl</span>&lt;<span class="lifetime">'a</span>, <span class="lifetime">'config</span>, Output&gt; SerializeMap <span class="kw">for </span>MapSerializer&lt;<span class="lifetime">'a</span>, <span class="lifetime">'config</span>, Output&gt;
 <span class="kw">where
     </span>Output: Write,
 {
@@ -970,23 +991,32 @@
     <span class="kw">where
         </span>T: serde::Serialize + <span class="question-mark">?</span>Sized,
     {
-        key.serialize(<span class="kw-2">&amp;mut **</span><span class="self">self</span>)
+        key.serialize(<span class="kw-2">&amp;mut *</span><span class="self">self</span>.serializer)
     }
 
     <span class="kw">fn </span>serialize_value&lt;T&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, value: <span class="kw-2">&amp;</span>T) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="self">Self</span>::Error&gt;
     <span class="kw">where
         </span>T: serde::Serialize + <span class="question-mark">?</span>Sized,
     {
-        value.serialize(<span class="kw-2">&amp;mut **</span><span class="self">self</span>)
+        <span class="kw">if </span><span class="self">self</span>.is_implicit_map {
+            <span class="self">self</span>.serializer.writer.write_raw_value(<span class="string">": "</span>)<span class="question-mark">?</span>;
+            value.serialize(<span class="kw-2">&amp;mut *</span><span class="self">self</span>.serializer)<span class="question-mark">?</span>;
+            <span class="self">self</span>.serializer.writer.insert_newline()
+        } <span class="kw">else </span>{
+            value.serialize(<span class="kw-2">&amp;mut *</span><span class="self">self</span>.serializer)
+        }
     }
 
     <span class="kw">fn </span>end(<span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>::Ok, <span class="self">Self</span>::Error&gt; {
-        <span class="self">self</span>.writer.finish_nested()<span class="question-mark">?</span>;
+        <span class="kw">if </span>!<span class="self">self</span>.is_implicit_map {
+            <span class="self">self</span>.serializer.writer.finish_nested()<span class="question-mark">?</span>;
+        }
         <span class="prelude-val">Ok</span>(())
     }
 }
 
 <span class="attr">#[derive(Default, Debug, Clone)]
+#[non_exhaustive]
 </span><span class="kw">pub struct </span>Config {
     <span class="kw">pub </span>writer: writer::Config,
     <span class="kw">pub </span>implicit_map_at_root: bool,

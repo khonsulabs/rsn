@@ -2995,7 +2995,7 @@
             a: u32,
             b: i32,
         }
-        <span class="kw">let </span>config = Config::default().allow_implicit_map(<span class="bool-val">true</span>);
+        <span class="kw">let </span>config = Config::default().allow_implicit_map_at_root(<span class="bool-val">true</span>);
         <span class="kw">let </span>parsed = config.deserialize::&lt;BasicNamed&gt;(<span class="string">r#"a: 1 b: -1"#</span>).unwrap();
         <span class="macro">assert_eq!</span>(parsed, BasicNamed { a: <span class="number">1</span>, b: -<span class="number">1 </span>});
         <span class="kw">let </span>parsed = config.deserialize::&lt;BasicNamed&gt;(<span class="string">r#"a: 1, b: -1,"#</span>).unwrap();

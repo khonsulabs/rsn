@@ -2188,8 +2188,7 @@
 <a href="#2187" id="2187">2187</a>
 <a href="#2188" id="2188">2188</a>
 <a href="#2189" id="2189">2189</a>
-<a href="#2190" id="2190">2190</a>
-<a href="#2191" id="2191">2191</a></pre></div><pre class="rust"><code><span class="kw">use </span>alloc::borrow::Cow;
+<a href="#2190" id="2190">2190</a></pre></div><pre class="rust"><code><span class="kw">use </span>alloc::borrow::Cow;
 <span class="kw">use </span>alloc::string::String;
 <span class="kw">use </span>core::fmt::Display;
 <span class="kw">use </span>core::mem;
@@ -2834,7 +2833,7 @@
             <span class="comment">// We pass in 'i', but it doesn't matter as long as we provide a
             // xid_start character -- identifiers are always borrowed, so the
             // char is never passed to the output.
-            </span><span class="kw">return </span><span class="self">self</span>.tokenize_identifier(<span class="prelude-val">Some</span>(<span class="string">'i'</span>));
+            </span><span class="kw">return </span><span class="self">self</span>.tokenize_identifier(<span class="string">'i'</span>, <span class="bool-val">false</span>);
         }
 
         <span class="kw">if </span>signed {
@@ -3107,12 +3106,16 @@
         }
     }
 
-    <span class="kw">fn </span>tokenize_raw_string(<span class="kw-2">&amp;mut </span><span class="self">self</span>, <span class="kw-2">mut </span>pound_count: usize) -&gt; <span class="prelude-ty">Result</span>&lt;Token&lt;<span class="lifetime">'a</span>&gt;, Error&gt; {
+    <span class="kw">fn </span>tokenize_raw(<span class="kw-2">&amp;mut </span><span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;Token&lt;<span class="lifetime">'a</span>&gt;, Error&gt; {
+        <span class="kw">let </span><span class="kw-2">mut </span>pound_count = <span class="number">0</span>;
         <span class="comment">// Count the number of leading pound signs
         </span><span class="kw">loop </span>{
             <span class="kw">match </span><span class="self">self</span>.next_or_eof()<span class="question-mark">? </span>{
                 <span class="string">'#' </span>=&gt; pound_count += <span class="number">1</span>,
                 <span class="string">'"' </span>=&gt; <span class="kw">break</span>,
+                ch <span class="kw">if </span>pound_count == <span class="number">1 </span>&amp;&amp; is_xid_start(ch) =&gt; {
+                    <span class="kw">return </span><span class="self">self</span>.tokenize_identifier(ch, <span class="bool-val">true</span>);
+                }
                 other =&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="self">self</span>.error_at_last_char(ErrorKind::Unexpected(other))),
             }
         }
@@ -3125,15 +3128,15 @@
                 }
                 <span class="string">'"' </span>=&gt; {
                     <span class="kw">let </span><span class="kw-2">mut </span>pounds_needed = pound_count;
-                    <span class="kw">while </span><span class="self">self</span>.chars.peek() == <span class="prelude-val">Some</span>(<span class="string">'#'</span>) {
+                    <span class="kw">while </span><span class="self">self</span>.chars.peek() == <span class="prelude-val">Some</span>(<span class="string">'#'</span>) &amp;&amp; pounds_needed &gt; <span class="number">0 </span>{
                         <span class="self">self</span>.chars.next();
                         pounds_needed -= <span class="number">1</span>;
+                    }
 
-                        <span class="comment">// Only break if the correct number of pound signs has been
-                        // encountered.
-                        </span><span class="kw">if </span>pounds_needed == <span class="number">0 </span>{
-                            <span class="kw">break </span><span class="lifetime">'contents</span>;
-                        }
+                    <span class="comment">// Only break if the correct number of pound signs has been
+                    // encountered.
+                    </span><span class="kw">if </span>pounds_needed == <span class="number">0 </span>{
+                        <span class="kw">break </span><span class="lifetime">'contents</span>;
                     }
                 }
                 <span class="kw">_ </span>=&gt; {}
@@ -3156,7 +3159,7 @@
             <span class="kw">match </span><span class="self">self</span>.next_or_eof()<span class="question-mark">? </span>{
                 <span class="string">'#' </span>=&gt; pound_count += <span class="number">1</span>,
                 <span class="string">'"' </span>=&gt; <span class="kw">break</span>,
-                other <span class="kw">if </span>pound_count == <span class="number">0 </span>=&gt; <span class="kw">return </span><span class="self">self</span>.tokenize_identifier(<span class="prelude-val">Some</span>(other)),
+                other <span class="kw">if </span>pound_count == <span class="number">0 </span>=&gt; <span class="kw">return </span><span class="self">self</span>.tokenize_identifier(other, <span class="bool-val">true</span>),
                 other =&gt; <span class="kw">return </span><span class="prelude-val">Err</span>(<span class="self">self</span>.error_at_last_char(ErrorKind::Unexpected(other))),
             }
         }
@@ -3169,15 +3172,15 @@
                 }
                 <span class="string">'"' </span>=&gt; {
                     <span class="kw">let </span><span class="kw-2">mut </span>pounds_needed = pound_count;
-                    <span class="kw">while </span><span class="self">self</span>.chars.peek() == <span class="prelude-val">Some</span>(<span class="string">'#'</span>) {
+                    <span class="kw">while </span><span class="self">self</span>.chars.peek() == <span class="prelude-val">Some</span>(<span class="string">'#'</span>) &amp;&amp; pounds_needed &gt; <span class="number">0 </span>{
                         <span class="self">self</span>.chars.next();
                         pounds_needed -= <span class="number">1</span>;
+                    }
 
-                        <span class="comment">// Only break if the correct number of pound signs has been
-                        // encountered.
-                        </span><span class="kw">if </span>pounds_needed == <span class="number">0 </span>{
-                            <span class="kw">break </span><span class="lifetime">'contents</span>;
-                        }
+                    <span class="comment">// Only break if the correct number of pound signs has been
+                    // encountered.
+                    </span><span class="kw">if </span>pounds_needed == <span class="number">0 </span>{
+                        <span class="kw">break </span><span class="lifetime">'contents</span>;
                     }
                 }
                 ch <span class="kw">if </span>ch.is_ascii() =&gt; {}
@@ -3212,14 +3215,13 @@
         }
     }
 
-    <span class="kw">fn </span>tokenize_identifier(<span class="kw-2">&amp;mut </span><span class="self">self</span>, initial_char: <span class="prelude-ty">Option</span>&lt;char&gt;) -&gt; <span class="prelude-ty">Result</span>&lt;Token&lt;<span class="lifetime">'a</span>&gt;, Error&gt; {
-        <span class="kw">let </span>(require_start, initial_char, is_raw, initial_char_index) =
-            <span class="kw">if let </span><span class="prelude-val">Some</span>(ch) = initial_char {
-                (ch != <span class="string">'_'</span>, ch, <span class="bool-val">false</span>, <span class="self">self</span>.chars.last_offset())
-            } <span class="kw">else </span>{
-                <span class="kw">let </span>initial = <span class="self">self</span>.next_or_eof()<span class="question-mark">?</span>;
-                (<span class="bool-val">true</span>, initial, <span class="bool-val">true</span>, <span class="self">self</span>.chars.last_offset())
-            };
+    <span class="kw">fn </span>tokenize_identifier(
+        <span class="kw-2">&amp;mut </span><span class="self">self</span>,
+        initial_char: char,
+        is_raw: bool,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;Token&lt;<span class="lifetime">'a</span>&gt;, Error&gt; {
+        <span class="kw">let </span>require_start = initial_char != <span class="string">'_'</span>;
+        <span class="kw">let </span>initial_char_index = <span class="self">self</span>.chars.last_offset();
         <span class="comment">// Validate the first character
         </span><span class="kw">let </span>start_is_valid = <span class="kw">if </span>require_start {
             is_xid_start(initial_char)
@@ -3331,14 +3333,8 @@
                 <span class="string">'"' </span>=&gt; <span class="self">self</span>.tokenize_string(),
                 <span class="string">'\'' </span>=&gt; <span class="self">self</span>.tokenize_char(),
                 <span class="string">'r' </span>=&gt; <span class="kw">match </span><span class="self">self</span>.chars.peek() {
-                    <span class="prelude-val">Some</span>(<span class="string">'#'</span>) =&gt; {
-                        <span class="self">self</span>.chars.next();
-                        <span class="kw">match </span><span class="self">self</span>.chars.peek() {
-                            <span class="prelude-val">Some</span>(<span class="string">'#' </span>| <span class="string">'"'</span>) =&gt; <span class="self">self</span>.tokenize_raw_string(<span class="number">1</span>),
-                            <span class="kw">_ </span>=&gt; <span class="self">self</span>.tokenize_identifier(<span class="prelude-val">None</span>),
-                        }
-                    }
-                    <span class="kw">_ </span>=&gt; <span class="self">self</span>.tokenize_identifier(<span class="prelude-val">Some</span>(ch)),
+                    <span class="prelude-val">Some</span>(<span class="string">'#' </span>| <span class="string">'"'</span>) =&gt; <span class="self">self</span>.tokenize_raw(),
+                    <span class="kw">_ </span>=&gt; <span class="self">self</span>.tokenize_identifier(ch, <span class="bool-val">false</span>),
                 },
                 <span class="string">'b' </span>=&gt; <span class="kw">match </span><span class="self">self</span>.chars.peek() {
                     <span class="prelude-val">Some</span>(<span class="string">'r'</span>) =&gt; {
@@ -3353,7 +3349,7 @@
                         <span class="self">self</span>.chars.next();
                         <span class="self">self</span>.tokenize_byte()
                     }
-                    <span class="kw">_ </span>=&gt; <span class="self">self</span>.tokenize_identifier(<span class="prelude-val">Some</span>(ch)),
+                    <span class="kw">_ </span>=&gt; <span class="self">self</span>.tokenize_identifier(ch, <span class="bool-val">false</span>),
                 },
                 <span class="string">'(' </span>=&gt; <span class="prelude-val">Ok</span>(Token::new(
                     <span class="self">self</span>.chars.marked_range(),
@@ -3400,7 +3396,7 @@
                     }
                 }
                 <span class="string">'/' </span>=&gt; <span class="self">self</span>.tokenize_comment(),
-                ch =&gt; <span class="self">self</span>.tokenize_identifier(<span class="prelude-val">Some</span>(ch)),
+                ch =&gt; <span class="self">self</span>.tokenize_identifier(ch, <span class="bool-val">false</span>),
             };
             <span class="kw">break </span><span class="prelude-val">Some</span>(result);
         }
@@ -4260,6 +4256,7 @@
             };
         }
         <span class="macro">test_string!</span>(<span class="string">r###""##"###</span>);
+        <span class="macro">test_string!</span>(<span class="string">r"abc"</span>);
         <span class="macro">test_string!</span>(<span class="string">r#"abc"#</span>);
         <span class="macro">test_string!</span>(<span class="string">r#""\r\t\n\0\x41\u{1_F980}\\\"""#</span>);
     }
@@ -4346,6 +4343,7 @@
                 );
             };
         }
+        <span class="macro">test_string!</span>(<span class="string">br"abc"</span>);
         <span class="macro">test_string!</span>(<span class="string">br###""##"###</span>);
         <span class="macro">test_string!</span>(<span class="string">br#"abc"#</span>);
         <span class="macro">test_string!</span>(<span class="string">br#""\r\t\n\0\x41\u{1_F980}\\\"""#</span>);
