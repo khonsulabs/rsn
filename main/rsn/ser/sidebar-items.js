@@ -1,1 +1,1 @@
-window.SIDEBAR_ITEMS = {"struct":["Config","MapSerializer","Serializer"]};
+window.SIDEBAR_ITEMS = {"struct":["Config","Serializer"]};

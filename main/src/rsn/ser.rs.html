@@ -566,7 +566,52 @@
 <a href="#565" id="565">565</a>
 <a href="#566" id="566">566</a>
 <a href="#567" id="567">567</a>
-<a href="#568" id="568">568</a></pre></div><pre class="rust"><code><span class="kw">use </span>alloc::borrow::Cow;
+<a href="#568" id="568">568</a>
+<a href="#569" id="569">569</a>
+<a href="#570" id="570">570</a>
+<a href="#571" id="571">571</a>
+<a href="#572" id="572">572</a>
+<a href="#573" id="573">573</a>
+<a href="#574" id="574">574</a>
+<a href="#575" id="575">575</a>
+<a href="#576" id="576">576</a>
+<a href="#577" id="577">577</a>
+<a href="#578" id="578">578</a>
+<a href="#579" id="579">579</a>
+<a href="#580" id="580">580</a>
+<a href="#581" id="581">581</a>
+<a href="#582" id="582">582</a>
+<a href="#583" id="583">583</a>
+<a href="#584" id="584">584</a>
+<a href="#585" id="585">585</a>
+<a href="#586" id="586">586</a>
+<a href="#587" id="587">587</a>
+<a href="#588" id="588">588</a>
+<a href="#589" id="589">589</a>
+<a href="#590" id="590">590</a>
+<a href="#591" id="591">591</a>
+<a href="#592" id="592">592</a>
+<a href="#593" id="593">593</a>
+<a href="#594" id="594">594</a>
+<a href="#595" id="595">595</a>
+<a href="#596" id="596">596</a>
+<a href="#597" id="597">597</a>
+<a href="#598" id="598">598</a>
+<a href="#599" id="599">599</a>
+<a href="#600" id="600">600</a>
+<a href="#601" id="601">601</a>
+<a href="#602" id="602">602</a>
+<a href="#603" id="603">603</a>
+<a href="#604" id="604">604</a>
+<a href="#605" id="605">605</a>
+<a href="#606" id="606">606</a>
+<a href="#607" id="607">607</a>
+<a href="#608" id="608">608</a>
+<a href="#609" id="609">609</a>
+<a href="#610" id="610">610</a>
+<a href="#611" id="611">611</a>
+<a href="#612" id="612">612</a>
+<a href="#613" id="613">613</a></pre></div><pre class="rust"><code><span class="kw">use </span>alloc::borrow::Cow;
 <span class="kw">use </span>alloc::string::String;
 <span class="kw">use </span>core::fmt::Write;
 
@@ -578,7 +623,8 @@
 
 <span class="kw">use </span><span class="kw">crate</span>::writer::{<span class="self">self</span>, Writer};
 
-<span class="attr">#[derive(Debug)]
+<span class="doccomment">/// A Serde serializer that generates Rsn.
+</span><span class="attr">#[derive(Debug)]
 </span><span class="kw">pub struct </span>Serializer&lt;<span class="lifetime">'config</span>, Output&gt; {
     writer: Writer&lt;<span class="lifetime">'config</span>, Output&gt;,
     implicit_map_at_root: bool,
@@ -599,15 +645,17 @@
 <span class="kw">where
     </span>Output: Write,
 {
-    <span class="kw">pub fn </span>new(output: Output, config: <span class="kw-2">&amp;</span><span class="lifetime">'config </span>Config) -&gt; <span class="self">Self </span>{
+    <span class="doccomment">/// Returns a new serializer that writes to `output` using `configuration`.
+    </span><span class="kw">pub fn </span>new(output: Output, configuration: <span class="kw-2">&amp;</span><span class="lifetime">'config </span>Config) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{
-            writer: Writer::new(output, <span class="kw-2">&amp;</span>config.writer),
-            implicit_map_at_root: config.implicit_map_at_root,
-            anonymous_structs: config.anonymous_structs,
+            writer: Writer::new(output, <span class="kw-2">&amp;</span>configuration.writer),
+            implicit_map_at_root: configuration.implicit_map_at_root,
+            anonymous_structs: configuration.anonymous_structs,
         }
     }
 
-    <span class="kw">pub fn </span>finish(<span class="self">self</span>) -&gt; Output {
+    <span class="doccomment">/// Finishes writing to the output and returns the output.
+    </span><span class="kw">pub fn </span>finish(<span class="self">self</span>) -&gt; Output {
         <span class="self">self</span>.writer.finish()
     }
 
@@ -622,9 +670,9 @@
 {
     <span class="kw">type </span>Error = core::fmt::Error;
     <span class="kw">type </span><span class="prelude-val">Ok </span>= ();
-    <span class="kw">type </span>SerializeMap = MapSerializer&lt;<span class="lifetime">'a</span>, <span class="lifetime">'config</span>, Output&gt;;
+    <span class="kw">type </span>SerializeMap = sealed::MapSerializer&lt;<span class="lifetime">'a</span>, <span class="lifetime">'config</span>, Output&gt;;
     <span class="kw">type </span>SerializeSeq = <span class="self">Self</span>;
-    <span class="kw">type </span>SerializeStruct = MapSerializer&lt;<span class="lifetime">'a</span>, <span class="lifetime">'config</span>, Output&gt;;
+    <span class="kw">type </span>SerializeStruct = sealed::MapSerializer&lt;<span class="lifetime">'a</span>, <span class="lifetime">'config</span>, Output&gt;;
     <span class="kw">type </span>SerializeStructVariant = <span class="self">Self</span>;
     <span class="kw">type </span>SerializeTuple = <span class="self">Self</span>;
     <span class="kw">type </span>SerializeTupleStruct = <span class="self">Self</span>;
@@ -816,7 +864,7 @@
         <span class="kw">if </span>!is_implicit_map {
             <span class="self">self</span>.writer.begin_map()<span class="question-mark">?</span>;
         }
-        <span class="prelude-val">Ok</span>(MapSerializer {
+        <span class="prelude-val">Ok</span>(sealed::MapSerializer {
             serializer: <span class="self">self</span>,
             is_implicit_map,
         })
@@ -838,7 +886,7 @@
             }
         }
 
-        <span class="prelude-val">Ok</span>(MapSerializer {
+        <span class="prelude-val">Ok</span>(sealed::MapSerializer {
             serializer: <span class="self">self</span>,
             is_implicit_map,
         })
@@ -932,107 +980,123 @@
     }
 }
 
-<span class="kw">pub struct </span>MapSerializer&lt;<span class="lifetime">'a</span>, <span class="lifetime">'config</span>, Output&gt; {
-    serializer: <span class="kw-2">&amp;</span><span class="lifetime">'a </span><span class="kw-2">mut </span>Serializer&lt;<span class="lifetime">'config</span>, Output&gt;,
-    is_implicit_map: bool,
-}
+<span class="kw">mod </span>sealed {
+    <span class="kw">use super</span>::{SerializeMap, SerializeStruct, SerializeStructVariant, Serializer, Write};
 
-<span class="kw">impl</span>&lt;<span class="lifetime">'a</span>, <span class="lifetime">'config</span>, Output&gt; SerializeStruct <span class="kw">for </span>MapSerializer&lt;<span class="lifetime">'a</span>, <span class="lifetime">'config</span>, Output&gt;
-<span class="kw">where
-    </span>Output: Write,
-{
-    <span class="kw">type </span>Error = core::fmt::Error;
-    <span class="kw">type </span><span class="prelude-val">Ok </span>= ();
+    <span class="kw">pub struct </span>MapSerializer&lt;<span class="lifetime">'a</span>, <span class="lifetime">'config</span>, Output&gt; {
+        <span class="kw">pub </span>serializer: <span class="kw-2">&amp;</span><span class="lifetime">'a </span><span class="kw-2">mut </span>Serializer&lt;<span class="lifetime">'config</span>, Output&gt;,
+        <span class="kw">pub </span>is_implicit_map: bool,
+    }
 
-    <span class="kw">fn </span>serialize_field&lt;T&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, key: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>str, value: <span class="kw-2">&amp;</span>T) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="self">Self</span>::Error&gt;
+    <span class="kw">impl</span>&lt;<span class="lifetime">'a</span>, <span class="lifetime">'config</span>, Output&gt; SerializeStruct <span class="kw">for </span>MapSerializer&lt;<span class="lifetime">'a</span>, <span class="lifetime">'config</span>, Output&gt;
     <span class="kw">where
-        </span>T: serde::Serialize + <span class="question-mark">?</span>Sized,
+        </span>Output: Write,
     {
-        <span class="kw">if </span><span class="self">self</span>.is_implicit_map {
-            <span class="self">self</span>.serializer.writer.write_raw_value(key)<span class="question-mark">?</span>;
-            <span class="self">self</span>.serializer.writer.write_raw_value(<span class="string">": "</span>)<span class="question-mark">?</span>;
-            value.serialize(<span class="kw-2">&amp;mut *</span><span class="self">self</span>.serializer)<span class="question-mark">?</span>;
-            <span class="self">self</span>.serializer.writer.insert_newline()<span class="question-mark">?</span>;
-        } <span class="kw">else </span>{
-            <span class="self">self</span>.serializer.writer.write_raw_value(key)<span class="question-mark">?</span>;
-            value.serialize(<span class="kw-2">&amp;mut *</span><span class="self">self</span>.serializer)<span class="question-mark">?</span>;
+        <span class="kw">type </span>Error = core::fmt::Error;
+        <span class="kw">type </span><span class="prelude-val">Ok </span>= ();
+
+        <span class="kw">fn </span>serialize_field&lt;T&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, key: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>str, value: <span class="kw-2">&amp;</span>T) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="self">Self</span>::Error&gt;
+        <span class="kw">where
+            </span>T: serde::Serialize + <span class="question-mark">?</span>Sized,
+        {
+            <span class="kw">if </span><span class="self">self</span>.is_implicit_map {
+                <span class="self">self</span>.serializer.writer.write_raw_value(key)<span class="question-mark">?</span>;
+                <span class="self">self</span>.serializer.writer.write_raw_value(<span class="string">": "</span>)<span class="question-mark">?</span>;
+                value.serialize(<span class="kw-2">&amp;mut *</span><span class="self">self</span>.serializer)<span class="question-mark">?</span>;
+                <span class="self">self</span>.serializer.writer.insert_newline()<span class="question-mark">?</span>;
+            } <span class="kw">else </span>{
+                <span class="self">self</span>.serializer.writer.write_raw_value(key)<span class="question-mark">?</span>;
+                value.serialize(<span class="kw-2">&amp;mut *</span><span class="self">self</span>.serializer)<span class="question-mark">?</span>;
+            }
+            <span class="prelude-val">Ok</span>(())
         }
-        <span class="prelude-val">Ok</span>(())
-    }
 
-    <span class="kw">fn </span>end(<span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>::Ok, <span class="self">Self</span>::Error&gt; {
-        <span class="kw">if </span>!<span class="self">self</span>.is_implicit_map {
-            <span class="self">self</span>.serializer.writer.finish_nested()<span class="question-mark">?</span>;
-        }
-        <span class="prelude-val">Ok</span>(())
-    }
-}
-
-<span class="kw">impl</span>&lt;<span class="lifetime">'a</span>, <span class="lifetime">'config</span>, Output&gt; SerializeStructVariant <span class="kw">for </span><span class="kw-2">&amp;</span><span class="lifetime">'a </span><span class="kw-2">mut </span>Serializer&lt;<span class="lifetime">'config</span>, Output&gt;
-<span class="kw">where
-    </span>Output: Write,
-{
-    <span class="kw">type </span>Error = core::fmt::Error;
-    <span class="kw">type </span><span class="prelude-val">Ok </span>= ();
-
-    <span class="kw">fn </span>serialize_field&lt;T&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, key: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>str, value: <span class="kw-2">&amp;</span>T) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="self">Self</span>::Error&gt;
-    <span class="kw">where
-        </span>T: serde::Serialize + <span class="question-mark">?</span>Sized,
-    {
-        <span class="self">self</span>.writer.write_raw_value(key)<span class="question-mark">?</span>;
-        value.serialize(<span class="kw-2">&amp;mut **</span><span class="self">self</span>)
-    }
-
-    <span class="kw">fn </span>end(<span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>::Ok, <span class="self">Self</span>::Error&gt; {
-        <span class="self">self</span>.writer.finish_nested()
-    }
-}
-
-<span class="kw">impl</span>&lt;<span class="lifetime">'a</span>, <span class="lifetime">'config</span>, Output&gt; SerializeMap <span class="kw">for </span>MapSerializer&lt;<span class="lifetime">'a</span>, <span class="lifetime">'config</span>, Output&gt;
-<span class="kw">where
-    </span>Output: Write,
-{
-    <span class="kw">type </span>Error = core::fmt::Error;
-    <span class="kw">type </span><span class="prelude-val">Ok </span>= ();
-
-    <span class="kw">fn </span>serialize_key&lt;T&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, key: <span class="kw-2">&amp;</span>T) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="self">Self</span>::Error&gt;
-    <span class="kw">where
-        </span>T: serde::Serialize + <span class="question-mark">?</span>Sized,
-    {
-        key.serialize(<span class="kw-2">&amp;mut *</span><span class="self">self</span>.serializer)
-    }
-
-    <span class="kw">fn </span>serialize_value&lt;T&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, value: <span class="kw-2">&amp;</span>T) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="self">Self</span>::Error&gt;
-    <span class="kw">where
-        </span>T: serde::Serialize + <span class="question-mark">?</span>Sized,
-    {
-        <span class="kw">if </span><span class="self">self</span>.is_implicit_map {
-            <span class="self">self</span>.serializer.writer.write_raw_value(<span class="string">": "</span>)<span class="question-mark">?</span>;
-            value.serialize(<span class="kw-2">&amp;mut *</span><span class="self">self</span>.serializer)<span class="question-mark">?</span>;
-            <span class="self">self</span>.serializer.writer.insert_newline()
-        } <span class="kw">else </span>{
-            value.serialize(<span class="kw-2">&amp;mut *</span><span class="self">self</span>.serializer)
+        <span class="kw">fn </span>end(<span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>::Ok, <span class="self">Self</span>::Error&gt; {
+            <span class="kw">if </span>!<span class="self">self</span>.is_implicit_map {
+                <span class="self">self</span>.serializer.writer.finish_nested()<span class="question-mark">?</span>;
+            }
+            <span class="prelude-val">Ok</span>(())
         }
     }
 
-    <span class="kw">fn </span>end(<span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>::Ok, <span class="self">Self</span>::Error&gt; {
-        <span class="kw">if </span>!<span class="self">self</span>.is_implicit_map {
-            <span class="self">self</span>.serializer.writer.finish_nested()<span class="question-mark">?</span>;
+    <span class="kw">impl</span>&lt;<span class="lifetime">'a</span>, <span class="lifetime">'config</span>, Output&gt; SerializeStructVariant <span class="kw">for </span><span class="kw-2">&amp;</span><span class="lifetime">'a </span><span class="kw-2">mut </span>Serializer&lt;<span class="lifetime">'config</span>, Output&gt;
+    <span class="kw">where
+        </span>Output: Write,
+    {
+        <span class="kw">type </span>Error = core::fmt::Error;
+        <span class="kw">type </span><span class="prelude-val">Ok </span>= ();
+
+        <span class="kw">fn </span>serialize_field&lt;T&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, key: <span class="kw-2">&amp;</span><span class="lifetime">'static </span>str, value: <span class="kw-2">&amp;</span>T) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="self">Self</span>::Error&gt;
+        <span class="kw">where
+            </span>T: serde::Serialize + <span class="question-mark">?</span>Sized,
+        {
+            <span class="self">self</span>.writer.write_raw_value(key)<span class="question-mark">?</span>;
+            value.serialize(<span class="kw-2">&amp;mut **</span><span class="self">self</span>)
         }
-        <span class="prelude-val">Ok</span>(())
+
+        <span class="kw">fn </span>end(<span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>::Ok, <span class="self">Self</span>::Error&gt; {
+            <span class="self">self</span>.writer.finish_nested()
+        }
+    }
+
+    <span class="kw">impl</span>&lt;<span class="lifetime">'a</span>, <span class="lifetime">'config</span>, Output&gt; SerializeMap <span class="kw">for </span>MapSerializer&lt;<span class="lifetime">'a</span>, <span class="lifetime">'config</span>, Output&gt;
+    <span class="kw">where
+        </span>Output: Write,
+    {
+        <span class="kw">type </span>Error = core::fmt::Error;
+        <span class="kw">type </span><span class="prelude-val">Ok </span>= ();
+
+        <span class="kw">fn </span>serialize_key&lt;T&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, key: <span class="kw-2">&amp;</span>T) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="self">Self</span>::Error&gt;
+        <span class="kw">where
+            </span>T: serde::Serialize + <span class="question-mark">?</span>Sized,
+        {
+            key.serialize(<span class="kw-2">&amp;mut *</span><span class="self">self</span>.serializer)
+        }
+
+        <span class="kw">fn </span>serialize_value&lt;T&gt;(<span class="kw-2">&amp;mut </span><span class="self">self</span>, value: <span class="kw-2">&amp;</span>T) -&gt; <span class="prelude-ty">Result</span>&lt;(), <span class="self">Self</span>::Error&gt;
+        <span class="kw">where
+            </span>T: serde::Serialize + <span class="question-mark">?</span>Sized,
+        {
+            <span class="kw">if </span><span class="self">self</span>.is_implicit_map {
+                <span class="self">self</span>.serializer.writer.write_raw_value(<span class="string">": "</span>)<span class="question-mark">?</span>;
+                value.serialize(<span class="kw-2">&amp;mut *</span><span class="self">self</span>.serializer)<span class="question-mark">?</span>;
+                <span class="self">self</span>.serializer.writer.insert_newline()
+            } <span class="kw">else </span>{
+                value.serialize(<span class="kw-2">&amp;mut *</span><span class="self">self</span>.serializer)
+            }
+        }
+
+        <span class="kw">fn </span>end(<span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>::Ok, <span class="self">Self</span>::Error&gt; {
+            <span class="kw">if </span>!<span class="self">self</span>.is_implicit_map {
+                <span class="self">self</span>.serializer.writer.finish_nested()<span class="question-mark">?</span>;
+            }
+            <span class="prelude-val">Ok</span>(())
+        }
     }
 }
 
-<span class="attr">#[derive(Default, Debug, Clone)]
+<span class="doccomment">/// The configuration for a [`Serializer`].
+</span><span class="attr">#[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 </span><span class="kw">pub struct </span>Config {
-    <span class="kw">pub </span>writer: writer::Config,
-    <span class="kw">pub </span>implicit_map_at_root: bool,
-    <span class="kw">pub </span>anonymous_structs: bool,
+    <span class="doccomment">/// The writer configuration.
+    </span><span class="kw">pub </span>writer: writer::Config,
+    <span class="doccomment">/// Whether a map-like type at the root of the document should use the
+    /// implicit map syntax.
+    </span><span class="kw">pub </span>implicit_map_at_root: bool,
+    <span class="doccomment">/// Whether to include the names of structures in.
+    </span><span class="kw">pub </span>anonymous_structs: bool,
 }
 
 <span class="kw">impl </span>Config {
-    <span class="attr">#[must_use]
+    <span class="doccomment">/// Returns the default configuration.
+    ///
+    /// The default configuration uses:
+    ///
+    /// - `writer`: [`writer::Config::Compact`]
+    /// - `implicit_map_at_root`: `false`
+    /// - `anonymous_structs`: `false`
+    </span><span class="attr">#[must_use]
     </span><span class="kw">pub const fn </span>new() -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{
             writer: writer::Config::Compact,
@@ -1041,7 +1105,8 @@
         }
     }
 
-    <span class="attr">#[must_use]
+    <span class="doccomment">/// Returns the default configuration with nested indentation and newlines.
+    </span><span class="attr">#[must_use]
     </span><span class="kw">pub fn </span>pretty() -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{
             writer: writer::Config::Pretty {
@@ -1052,27 +1117,45 @@
         }
     }
 
-    <span class="attr">#[must_use]
+    <span class="doccomment">/// Sets [`Config::implicit_map_at_root`] and returns self.
+    </span><span class="attr">#[must_use]
     </span><span class="kw">pub const fn </span>implicit_map_at_root(<span class="kw-2">mut </span><span class="self">self</span>, implicit_map_at_root: bool) -&gt; <span class="self">Self </span>{
         <span class="self">self</span>.implicit_map_at_root = implicit_map_at_root;
         <span class="self">self
     </span>}
 
-    <span class="attr">#[must_use]
+    <span class="doccomment">/// Sets [`Config::anonymous_structs`] and returns self.
+    </span><span class="attr">#[must_use]
     </span><span class="kw">pub const fn </span>anonymous_structs(<span class="kw-2">mut </span><span class="self">self</span>, anonymous_structs: bool) -&gt; <span class="self">Self </span>{
         <span class="self">self</span>.anonymous_structs = anonymous_structs;
         <span class="self">self
     </span>}
 
-    <span class="attr">#[must_use]
-    </span><span class="kw">pub fn </span>serialize&lt;S: Serialize&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, value: <span class="kw-2">&amp;</span>S) -&gt; String {
+    <span class="doccomment">/// Returns `value` serialized as Rsn with this configuration.
+    ///
+    /// # Errors
+    ///
+    /// Rsn itself does not produce any errors while serializing values. This
+    /// function will return errors that arise within `Serialize` implementations
+    /// encountered while serializing `value`.
+    </span><span class="kw">pub fn </span>serialize&lt;S: Serialize&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, value: <span class="kw-2">&amp;</span>S) -&gt; <span class="prelude-ty">Result</span>&lt;String, core::fmt::Error&gt; {
         <span class="kw">let </span><span class="kw-2">mut </span>serializer = Serializer::new(String::new(), <span class="self">self</span>);
-        value.serialize(<span class="kw-2">&amp;mut </span>serializer).expect(<span class="string">"core::fmt::Error"</span>);
-        serializer.finish()
+        value.serialize(<span class="kw-2">&amp;mut </span>serializer)<span class="question-mark">?</span>;
+        <span class="prelude-val">Ok</span>(serializer.finish())
     }
 
-    <span class="kw">pub fn </span>serialize_to_vec&lt;S: Serialize&gt;(<span class="kw-2">&amp;</span><span class="self">self</span>, value: <span class="kw-2">&amp;</span>S) -&gt; alloc::vec::Vec&lt;u8&gt; {
-        <span class="self">self</span>.serialize(value).into_bytes()
+    <span class="doccomment">/// Returns `value` serialized as Rsn with this configuration.
+    ///
+    /// # Errors
+    ///
+    /// Rsn itself does not produce any errors while serializing values. This
+    /// function will return errors that arise within `Serialize` implementations
+    /// encountered while serializing `value`.
+    </span><span class="kw">pub fn </span>serialize_to_vec&lt;S: Serialize&gt;(
+        <span class="kw-2">&amp;</span><span class="self">self</span>,
+        value: <span class="kw-2">&amp;</span>S,
+    ) -&gt; <span class="prelude-ty">Result</span>&lt;alloc::vec::Vec&lt;u8&gt;, core::fmt::Error&gt; {
+        <span class="self">self</span>.serialize(value).map(String::into_bytes)
     }
 }
 
@@ -1104,7 +1187,14 @@
         }
     }
     <span class="kw">impl </span>Config {
-        <span class="kw">pub fn </span>serialize_to_writer&lt;S: Serialize, W: std::io::Write&gt;(
+        <span class="doccomment">/// Serializes `value` into `writer` using this configuration.
+        ///
+        /// # Errors
+        ///
+        /// Returns any errors occurring while serializing `value` or while
+        /// writing to `writer`.
+        </span><span class="attr">#[allow(clippy::missing_panics_doc)]
+        </span><span class="kw">pub fn </span>serialize_to_writer&lt;S: Serialize, W: std::io::Write&gt;(
             <span class="kw-2">&amp;</span><span class="self">self</span>,
             value: <span class="kw-2">&amp;</span>S,
             writer: W,
@@ -1131,7 +1221,7 @@
         b: i32,
     }
 
-    <span class="kw">let </span>rendered = <span class="kw">crate</span>::to_string(<span class="kw-2">&amp;</span>BasicNamed { a: <span class="number">1</span>, b: -<span class="number">1 </span>});
+    <span class="kw">let </span>rendered = <span class="kw">crate</span>::to_string(<span class="kw-2">&amp;</span>BasicNamed { a: <span class="number">1</span>, b: -<span class="number">1 </span>}).expect(<span class="string">"no errors"</span>);
     <span class="macro">assert_eq!</span>(rendered, <span class="string">"BasicNamed{a:1,b:-1}"</span>);
 }
 </code></pre></div></section></main></body></html>

@@ -2202,7 +2202,58 @@
 <a href="#2201" id="2201">2201</a>
 <a href="#2202" id="2202">2202</a>
 <a href="#2203" id="2203">2203</a>
-<a href="#2204" id="2204">2204</a></pre></div><pre class="rust"><code><span class="kw">use </span>alloc::borrow::Cow;
+<a href="#2204" id="2204">2204</a>
+<a href="#2205" id="2205">2205</a>
+<a href="#2206" id="2206">2206</a>
+<a href="#2207" id="2207">2207</a>
+<a href="#2208" id="2208">2208</a>
+<a href="#2209" id="2209">2209</a>
+<a href="#2210" id="2210">2210</a>
+<a href="#2211" id="2211">2211</a>
+<a href="#2212" id="2212">2212</a>
+<a href="#2213" id="2213">2213</a>
+<a href="#2214" id="2214">2214</a>
+<a href="#2215" id="2215">2215</a>
+<a href="#2216" id="2216">2216</a>
+<a href="#2217" id="2217">2217</a>
+<a href="#2218" id="2218">2218</a>
+<a href="#2219" id="2219">2219</a>
+<a href="#2220" id="2220">2220</a>
+<a href="#2221" id="2221">2221</a>
+<a href="#2222" id="2222">2222</a>
+<a href="#2223" id="2223">2223</a>
+<a href="#2224" id="2224">2224</a>
+<a href="#2225" id="2225">2225</a>
+<a href="#2226" id="2226">2226</a>
+<a href="#2227" id="2227">2227</a>
+<a href="#2228" id="2228">2228</a>
+<a href="#2229" id="2229">2229</a>
+<a href="#2230" id="2230">2230</a>
+<a href="#2231" id="2231">2231</a>
+<a href="#2232" id="2232">2232</a>
+<a href="#2233" id="2233">2233</a>
+<a href="#2234" id="2234">2234</a>
+<a href="#2235" id="2235">2235</a>
+<a href="#2236" id="2236">2236</a>
+<a href="#2237" id="2237">2237</a>
+<a href="#2238" id="2238">2238</a>
+<a href="#2239" id="2239">2239</a>
+<a href="#2240" id="2240">2240</a>
+<a href="#2241" id="2241">2241</a>
+<a href="#2242" id="2242">2242</a>
+<a href="#2243" id="2243">2243</a>
+<a href="#2244" id="2244">2244</a>
+<a href="#2245" id="2245">2245</a>
+<a href="#2246" id="2246">2246</a>
+<a href="#2247" id="2247">2247</a>
+<a href="#2248" id="2248">2248</a>
+<a href="#2249" id="2249">2249</a>
+<a href="#2250" id="2250">2250</a>
+<a href="#2251" id="2251">2251</a>
+<a href="#2252" id="2252">2252</a>
+<a href="#2253" id="2253">2253</a>
+<a href="#2254" id="2254">2254</a>
+<a href="#2255" id="2255">2255</a></pre></div><pre class="rust"><code><span class="kw">use </span>alloc::borrow::Cow;
 <span class="kw">use </span>alloc::string::String;
 <span class="kw">use </span>core::fmt::Display;
 <span class="kw">use </span>core::mem;
@@ -2214,35 +2265,53 @@
 
 <span class="kw">mod </span>char_iterator;
 
-<span class="attr">#[derive(Clone, Eq, PartialEq, Debug)]
+<span class="doccomment">/// A token in an Rsn document.
+</span><span class="attr">#[derive(Clone, Eq, PartialEq, Debug)]
 </span><span class="kw">pub struct </span>Token&lt;<span class="lifetime">'a</span>&gt; {
-    <span class="kw">pub </span>location: Range&lt;usize&gt;,
-    <span class="kw">pub </span>kind: TokenKind&lt;<span class="lifetime">'a</span>&gt;,
+    <span class="doccomment">/// The byte range of this token.
+    </span><span class="kw">pub </span>location: Range&lt;usize&gt;,
+    <span class="doccomment">/// The kind of this token.
+    </span><span class="kw">pub </span>kind: TokenKind&lt;<span class="lifetime">'a</span>&gt;,
 }
 
 <span class="kw">impl</span>&lt;<span class="lifetime">'a</span>&gt; Token&lt;<span class="lifetime">'a</span>&gt; {
     <span class="attr">#[must_use]
-    </span><span class="kw">pub const fn </span>new(location: Range&lt;usize&gt;, kind: TokenKind&lt;<span class="lifetime">'a</span>&gt;) -&gt; <span class="self">Self </span>{
+    </span><span class="kw">const fn </span>new(location: Range&lt;usize&gt;, kind: TokenKind&lt;<span class="lifetime">'a</span>&gt;) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{ location, kind }
     }
 }
 
-<span class="attr">#[derive(Clone, Debug)]
+<span class="doccomment">/// A kind of a token in an Rsn document.
+</span><span class="attr">#[derive(Clone, Debug)]
 </span><span class="kw">pub enum </span>TokenKind&lt;<span class="lifetime">'a</span>&gt; {
-    Integer(Integer),
-    Float(f64),
-    Bool(bool),
-    Character(char),
-    Colon,
-    Comma,
-    Byte(u8),
-    String(Cow&lt;<span class="lifetime">'a</span>, str&gt;),
-    Bytes(Cow&lt;<span class="lifetime">'a</span>, [u8]&gt;),
-    Identifier(<span class="kw-2">&amp;</span><span class="lifetime">'a </span>str),
-    Open(Balanced),
-    Close(Balanced),
-    Comment(<span class="kw-2">&amp;</span><span class="lifetime">'a </span>str),
-    Whitespace(<span class="kw-2">&amp;</span><span class="lifetime">'a </span>str),
+    <span class="doccomment">/// An integer literal.
+    </span>Integer(Integer),
+    <span class="doccomment">/// A floating point literal.
+    </span>Float(f64),
+    <span class="doccomment">/// A boolean literal.
+    </span>Bool(bool),
+    <span class="doccomment">/// A character literal.
+    </span>Character(char),
+    <span class="doccomment">/// The `:` character.
+    </span>Colon,
+    <span class="doccomment">/// The `,` character.
+    </span>Comma,
+    <span class="doccomment">/// A byte literal.
+    </span>Byte(u8),
+    <span class="doccomment">/// A string literal.
+    </span>String(Cow&lt;<span class="lifetime">'a</span>, str&gt;),
+    <span class="doccomment">/// A byte string literal.
+    </span>Bytes(Cow&lt;<span class="lifetime">'a</span>, [u8]&gt;),
+    <span class="doccomment">/// An identifier (name).
+    </span>Identifier(<span class="kw-2">&amp;</span><span class="lifetime">'a </span>str),
+    <span class="doccomment">/// The opening variant of a [`Balanced`] token.
+    </span>Open(Balanced),
+    <span class="doccomment">/// The closing variant of a [`Balanced`] token.
+    </span>Close(Balanced),
+    <span class="doccomment">/// A comment
+    </span>Comment(<span class="kw-2">&amp;</span><span class="lifetime">'a </span>str),
+    <span class="doccomment">/// Whitespace between other tokens.
+    </span>Whitespace(<span class="kw-2">&amp;</span><span class="lifetime">'a </span>str),
 }
 
 <span class="kw">impl</span>&lt;<span class="lifetime">'a</span>&gt; Eq <span class="kw">for </span>TokenKind&lt;<span class="lifetime">'a</span>&gt; {}
@@ -2265,17 +2334,26 @@
     }
 }
 
-<span class="attr">#[derive(Clone, Copy, Eq, PartialEq, Debug)]
+<span class="doccomment">/// An integer literal.
+</span><span class="attr">#[derive(Clone, Copy, Eq, PartialEq, Debug)]
 </span><span class="kw">pub enum </span>Integer {
-    Usize(usize),
-    Isize(isize),
-    UnsignedLarge(UnsignedLarge),
-    SignedLarge(SignedLarge),
+    <span class="doccomment">/// An unsigned integer that fits within an `usize`.
+    </span>Usize(usize),
+    <span class="doccomment">/// A signed integer that fits within an `isize`.
+    </span>Isize(isize),
+    <span class="doccomment">/// An unsigned integer that is too large to fit within an `usize`.
+    </span>UnsignedLarge(UnsignedLarge),
+    <span class="doccomment">/// A signed integer that is too large to fit within an `isize`.
+    </span>SignedLarge(SignedLarge),
 }
 
 <span class="macro">macro_rules!</span> fn_integer_into {
     (<span class="macro-nonterminal">$name</span>:ident, <span class="macro-nonterminal">$</span><span class="kw">type</span>:<span class="macro-nonterminal">ty</span>) =&gt; {
-        <span class="attr">#[inline]
+        <span class="doccomment">/// Returns this integer as a
+        </span><span class="attr">#[doc = <span class="macro">stringify!</span>(<span class="macro-nonterminal">$</span><span class="kw">type</span>)]
+        </span><span class="doccomment">/// if the value can fit in a
+        </span><span class="attr">#[<span class="macro-nonterminal">doc </span>= <span class="macro">stringify!</span>(<span class="macro-nonterminal">$</span><span class="kw">type</span>)]
+        #[<span class="macro-nonterminal">inline</span>]
         #[must_use]
         </span><span class="kw">pub fn </span><span class="macro-nonterminal">$name</span>(<span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="macro-nonterminal">$</span><span class="kw">type</span>&gt; {
             <span class="kw">match </span><span class="macro-nonterminal">self </span>{
@@ -2313,7 +2391,8 @@
 
     <span class="macro">fn_integer_into!</span>(as_isize, isize);
 
-    <span class="attr">#[inline]
+    <span class="doccomment">/// Returns true if this number is equal to 0.
+    </span><span class="attr">#[inline]
     #[must_use]
     </span><span class="kw">pub const fn </span>is_zero(<span class="self">self</span>) -&gt; bool {
         <span class="kw">match </span><span class="self">self </span>{
@@ -2324,7 +2403,8 @@
         }
     }
 
-    <span class="attr">#[must_use]
+    <span class="doccomment">/// Returns this number cast to an `f64`.
+    </span><span class="attr">#[must_use]
     #[allow(clippy::cast_precision_loss)]
     </span><span class="kw">pub fn </span>as_f64(<span class="self">self</span>) -&gt; f64 {
         <span class="kw">match </span><span class="self">self </span>{
@@ -2409,28 +2489,36 @@
 <span class="macro">impl_try_from_primitive!</span>(Usize, usize, UnsignedLarge, u128);
 <span class="macro">impl_try_from_primitive!</span>(Isize, isize, SignedLarge, i128);
 
-<span class="attr">#[derive(Clone, Copy, Eq, PartialEq, Debug)]
+<span class="doccomment">/// A token kind that is expected to have a balanced number of open and closing
+/// variants.
+</span><span class="attr">#[derive(Clone, Copy, Eq, PartialEq, Debug)]
 </span><span class="kw">pub enum </span>Balanced {
-    Paren,
-    Brace,
-    Bracket,
+    <span class="doccomment">/// Parentheses
+    </span>Paren,
+    <span class="doccomment">/// Curly Braces
+    </span>Brace,
+    <span class="doccomment">/// Square Brackets
+    </span>Bracket,
 }
 
-<span class="attr">#[derive(Debug, Clone)]
+<span class="doccomment">/// Parses Rsn into a sequence of [`Token`]s.
+</span><span class="attr">#[derive(Debug, Clone)]
 </span><span class="kw">pub struct </span>Tokenizer&lt;<span class="lifetime">'a</span>, <span class="kw">const </span>INCLUDE_ALL: bool&gt; {
     chars: CharIterator&lt;<span class="lifetime">'a</span>&gt;,
     scratch: String,
 }
 
 <span class="kw">impl</span>&lt;<span class="lifetime">'a</span>&gt; Tokenizer&lt;<span class="lifetime">'a</span>, <span class="bool-val">false</span>&gt; {
-    <span class="attr">#[must_use]
+    <span class="doccomment">/// Returns a tokenizer that ignores whitespace and comments.
+    </span><span class="attr">#[must_use]
     </span><span class="kw">pub fn </span>minified(source: <span class="kw-2">&amp;</span><span class="lifetime">'a </span>str) -&gt; <span class="self">Self </span>{
         <span class="self">Self</span>::new(source)
     }
 }
 
 <span class="kw">impl</span>&lt;<span class="lifetime">'a</span>&gt; Tokenizer&lt;<span class="lifetime">'a</span>, <span class="bool-val">true</span>&gt; {
-    <span class="attr">#[must_use]
+    <span class="doccomment">/// Returns a tokenizer that includes whitespace and comments.
+    </span><span class="attr">#[must_use]
     </span><span class="kw">pub fn </span>full(source: <span class="kw-2">&amp;</span><span class="lifetime">'a </span>str) -&gt; <span class="self">Self </span>{
         <span class="self">Self</span>::new(source)
     }
@@ -2444,7 +2532,8 @@
         }
     }
 
-    <span class="attr">#[must_use]
+    <span class="doccomment">/// Returns the current byte offset of the tokenizer.
+    </span><span class="attr">#[must_use]
     </span><span class="kw">pub const fn </span>current_offset(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
         <span class="self">self</span>.chars.current_offset()
     }
@@ -3446,15 +3535,18 @@
     </span>)
 }
 
-<span class="attr">#[derive(Debug, Clone, Eq, PartialEq)]
+<span class="doccomment">/// An error returned from a tokenizer.
+</span><span class="attr">#[derive(Debug, Clone, Eq, PartialEq)]
 </span><span class="kw">pub struct </span>Error {
-    <span class="kw">pub </span>location: Range&lt;usize&gt;,
-    <span class="kw">pub </span>kind: ErrorKind,
+    <span class="doccomment">/// The byte range of the error.
+    </span><span class="kw">pub </span>location: Range&lt;usize&gt;,
+    <span class="doccomment">/// The kind of error that occurred.
+    </span><span class="kw">pub </span>kind: ErrorKind,
 }
 
 <span class="kw">impl </span>Error {
     <span class="attr">#[must_use]
-    </span><span class="kw">pub const fn </span>new(location: Range&lt;usize&gt;, kind: ErrorKind) -&gt; <span class="self">Self </span>{
+    </span><span class="kw">const fn </span>new(location: Range&lt;usize&gt;, kind: ErrorKind) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{ location, kind }
     }
 }
@@ -3468,16 +3560,26 @@
 <span class="attr">#[cfg(feature = <span class="string">"std"</span>)]
 </span><span class="kw">impl </span>std::error::Error <span class="kw">for </span>Error {}
 
-<span class="attr">#[derive(Debug, Clone, Eq, PartialEq)]
+<span class="doccomment">/// The kind of an error returned from a tokenizer.
+</span><span class="attr">#[derive(Debug, Clone, Eq, PartialEq)]
+#[non_exhaustive]
 </span><span class="kw">pub enum </span>ErrorKind {
-    UnexpectedEof,
-    Unexpected(char),
-    ExpectedDigit,
-    IntegerTooLarge,
-    InvalidUnicode,
-    InvalidAscii,
-    InvalidFloat,
-    IsolatedCarriageReturn,
+    <span class="doccomment">/// The end of input was encountered when additional data was still expected.
+    </span>UnexpectedEof,
+    <span class="doccomment">/// An unexpected character was found.
+    </span>Unexpected(char),
+    <span class="doccomment">/// A digit (0-9) was expected.
+    </span>ExpectedDigit,
+    <span class="doccomment">/// The integer literal is too large to represent.
+    </span>IntegerTooLarge,
+    <span class="doccomment">/// An invalid unicode code point was encountered.
+    </span>InvalidUnicode,
+    <span class="doccomment">/// An invalid ASCII character was encountered.
+    </span>InvalidAscii,
+    <span class="doccomment">/// An invalid floating point number was found.
+    </span>InvalidFloat,
+    <span class="doccomment">/// A carriage return without a corresponding `\n` was encountered.
+    </span>IsolatedCarriageReturn,
 }
 
 <span class="kw">impl </span>Display <span class="kw">for </span>ErrorKind {
@@ -3495,7 +3597,7 @@
     }
 }
 
-<span class="kw">pub trait </span>Integral: From&lt;u8&gt; + Copy {
+<span class="kw">trait </span>Integral: From&lt;u8&gt; + Copy {
     <span class="kw">type </span>Larger: Integral;
     <span class="kw">fn </span>into_larger(<span class="self">self</span>) -&gt; <span class="self">Self</span>::Larger;
     <span class="kw">fn </span>checked_mul(<span class="self">self</span>, other: <span class="self">Self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="self">Self</span>&gt;;

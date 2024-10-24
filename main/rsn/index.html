@@ -1,1 +1,153 @@
-<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="API documentation for the Rust `rsn` crate."><title>rsn - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../static.files/rustdoc-a5dc3bae.css"><meta name="rustdoc-vars" data-root-path="../" data-static-root-path="../static.files/" data-current-crate="rsn" data-themes="" data-resource-suffix="" data-rustdoc-version="1.84.0-nightly (4f2f477fd 2024-10-23)" data-channel="nightly" data-search-js="search-c5a66128.js" data-settings-js="settings-0f613d39.js" ><script src="../static.files/storage-59e33391.js"></script><script defer src="../crates.js"></script><script defer src="../static.files/main-5f194d8c.js"></script><noscript><link rel="stylesheet" href="../static.files/noscript-893ab5e7.css"></noscript><link rel="alternate icon" type="image/png" href="../static.files/favicon-32x32-6580c154.png"><link rel="icon" type="image/svg+xml" href="../static.files/favicon-044be391.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle" title="show sidebar"></button></nav><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../rsn/index.html">rsn</a><span class="version">0.1.0</span></h2></div><div class="sidebar-elems"><ul class="block"><li><a id="all-types" href="all.html">All Items</a></li></ul><section id="rustdoc-toc"><h3><a href="#modules">Crate Items</a></h3><ul class="block"><li><a href="#modules" title="Modules">Modules</a></li><li><a href="#functions" title="Functions">Functions</a></li></ul></section><div id="rustdoc-modnav"></div></div></nav><div class="sidebar-resizer"></div><main><div class="width-limiter"><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1>Crate <span>rsn</span><button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../src/rsn/lib.rs.html#1-62">source</a> </span></div><h2 id="modules" class="section-header">Modules<a href="#modules" class="anchor">§</a></h2><ul class="item-table"><li><div class="item-name"><a class="mod" href="de/index.html" title="mod rsn::de">de</a></div></li><li><div class="item-name"><a class="mod" href="parser/index.html" title="mod rsn::parser">parser</a></div></li><li><div class="item-name"><a class="mod" href="ser/index.html" title="mod rsn::ser">ser</a></div></li><li><div class="item-name"><a class="mod" href="tokenizer/index.html" title="mod rsn::tokenizer">tokenizer</a></div></li><li><div class="item-name"><a class="mod" href="value/index.html" title="mod rsn::value">value</a></div></li><li><div class="item-name"><a class="mod" href="writer/index.html" title="mod rsn::writer">writer</a></div></li></ul><h2 id="functions" class="section-header">Functions<a href="#functions" class="anchor">§</a></h2><ul class="item-table"><li><div class="item-name"><a class="fn" href="fn.from_reader.html" title="fn rsn::from_reader">from_<wbr>reader</a></div></li><li><div class="item-name"><a class="fn" href="fn.from_slice.html" title="fn rsn::from_slice">from_<wbr>slice</a></div></li><li><div class="item-name"><a class="fn" href="fn.from_str.html" title="fn rsn::from_str">from_<wbr>str</a></div></li><li><div class="item-name"><a class="fn" href="fn.to_string.html" title="fn rsn::to_string">to_<wbr>string</a></div></li><li><div class="item-name"><a class="fn" href="fn.to_string_pretty.html" title="fn rsn::to_string_pretty">to_<wbr>string_<wbr>pretty</a></div></li><li><div class="item-name"><a class="fn" href="fn.to_vec.html" title="fn rsn::to_vec">to_vec</a></div></li><li><div class="item-name"><a class="fn" href="fn.to_writer.html" title="fn rsn::to_writer">to_<wbr>writer</a></div></li></ul></section></div></main></body></html>
+<!DOCTYPE html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="generator" content="rustdoc"><meta name="description" content="Rsn - Rusty Notation"><title>rsn - Rust</title><script>if(window.location.protocol!=="file:")document.head.insertAdjacentHTML("beforeend","SourceSerif4-Regular-6b053e98.ttf.woff2,FiraSans-Regular-0fe48ade.woff2,FiraSans-Medium-e1aa3f0a.woff2,SourceCodePro-Regular-8badfe75.ttf.woff2,SourceCodePro-Semibold-aa29a496.ttf.woff2".split(",").map(f=>`<link rel="preload" as="font" type="font/woff2" crossorigin href="../static.files/${f}">`).join(""))</script><link rel="stylesheet" href="../static.files/normalize-9960930a.css"><link rel="stylesheet" href="../static.files/rustdoc-a5dc3bae.css"><meta name="rustdoc-vars" data-root-path="../" data-static-root-path="../static.files/" data-current-crate="rsn" data-themes="" data-resource-suffix="" data-rustdoc-version="1.84.0-nightly (4f2f477fd 2024-10-23)" data-channel="nightly" data-search-js="search-c5a66128.js" data-settings-js="settings-0f613d39.js" ><script src="../static.files/storage-59e33391.js"></script><script defer src="../crates.js"></script><script defer src="../static.files/main-5f194d8c.js"></script><noscript><link rel="stylesheet" href="../static.files/noscript-893ab5e7.css"></noscript><link rel="alternate icon" type="image/png" href="../static.files/favicon-32x32-6580c154.png"><link rel="icon" type="image/svg+xml" href="../static.files/favicon-044be391.svg"></head><body class="rustdoc mod crate"><!--[if lte IE 11]><div class="warning">This old browser is unsupported and will most likely display funky things.</div><![endif]--><nav class="mobile-topbar"><button class="sidebar-menu-toggle" title="show sidebar"></button></nav><nav class="sidebar"><div class="sidebar-crate"><h2><a href="../rsn/index.html">rsn</a><span class="version">0.1.0</span></h2></div><div class="sidebar-elems"><ul class="block"><li><a id="all-types" href="all.html">All Items</a></li></ul><section id="rustdoc-toc"><h3><a href="#">Sections</a></h3><ul class="block top-toc"><li><a href="#rsn---rusty-notation" title="Rsn - Rusty Notation">Rsn - Rusty Notation</a><ul><li><a href="#no_std-support" title="`no_std` support"><code>no_std</code> support</a></li><li><a href="#data-types" title="Data Types">Data Types</a></li><li><a href="#other-related-projects" title="Other related projects">Other related projects</a></li><li><a href="#why-not-ron" title="Why not Ron?">Why not Ron?</a></li><li><a href="#differences-between-rust-syntax-and-rsn" title="Differences between Rust syntax and Rsn">Differences between Rust syntax and Rsn</a></li></ul></li></ul><h3><a href="#modules">Crate Items</a></h3><ul class="block"><li><a href="#modules" title="Modules">Modules</a></li><li><a href="#functions" title="Functions">Functions</a></li></ul></section><div id="rustdoc-modnav"></div></div></nav><div class="sidebar-resizer"></div><main><div class="width-limiter"><rustdoc-search></rustdoc-search><section id="main-content" class="content"><div class="main-heading"><h1>Crate <span>rsn</span><button id="copy-path" title="Copy item path to clipboard">Copy item path</button></h1><rustdoc-toolbar></rustdoc-toolbar><span class="sub-heading"><a class="src" href="../src/rsn/lib.rs.html#1-124">source</a> </span></div><details class="toggle top-doc" open><summary class="hideme"><span>Expand description</span></summary><div class="docblock"><h2 id="rsn---rusty-notation"><a class="doc-anchor" href="#rsn---rusty-notation">§</a>Rsn - Rusty Notation</h2>
+<p><strong>This crate is very early in development. Please report any issues <a href="https://github.com/khonsulabs/rsn">on our
+GitHub</a>.</strong></p>
+<p><img src="https://img.shields.io/badge/unsafe-forbid-success" alt="rsn forbids unsafe code" />
+<img src="https://img.shields.io/badge/status-alpha-orange" alt="rsn is considered alpha" />
+<a href="https://crates.io/crates/rsn"><img src="https://img.shields.io/crates/v/rsn.svg" alt="crate version" /></a>
+<a href="https://github.com/khonsulabs/rsn/actions?query=workflow:Tests"><img src="https://img.shields.io/github/actions/workflow/status/khonsulabs/rsn/rust.yml?branch=main" alt="Live Build Status" /></a>
+<a href="https://khonsulabs.github.io/rsn/coverage/"><img src="https://khonsulabs.github.io/rsn/coverage/badge.svg" alt="HTML Coverage Report for main" /></a>
+<a href="https://khonsulabs.github.io/rsn/main/rsn/"><img src="https://img.shields.io/badge/docs-main-informational" alt="Documentation for main" /></a></p>
+<p>A UTF-8 based text format that looks very similar to valid Rust code. This format adheres closely to <a href="https://doc.rust-lang.org/reference/lexical-structure.html">Rust’s lexical rules</a></p>
+<h3 id="no_std-support"><a class="doc-anchor" href="#no_std-support">§</a><code>no_std</code> support</h3>
+<p>This crate supports <code>no_std</code> targets that support the <code>alloc</code> crate.</p>
+<h3 id="data-types"><a class="doc-anchor" href="#data-types">§</a>Data Types</h3><div class="example-wrap"><pre class="language-rsn"><code>ExampleStruct {
+  integers: [42, 0xFF, 0o77, 0b101],
+  floats: [42., 3.14, 1e10],
+  bools: [true, false],
+  chars: [&#39;a&#39;, &#39;\&#39;&#39;],
+  string: &quot;Hello, World!&quot;,
+  raw_string: r#&quot;I said, &quot;Hello, World!&quot;&quot;#,
+  bytes: [b&#39;a&#39;, b&#39;\&#39;&#39;],
+  byte_string: b&quot;Hello, World!&quot;,
+  raw_byte_string: br#&quot;I said, &quot;Hello, World!&quot;&quot;#,
+  named_map: StructLike {
+    field: 42,
+  },
+  named_tuple: TupleLike(42),
+  r#raw_identifiers: true,
+  array: [1, 2, 3],
+  tuple: (1, 2, 3),
+  map: {
+    &quot;a&quot;: 1,
+    &quot;b&quot;: 2,
+  },
+}</code></pre></div>
+<ul>
+<li>
+<p>Integers (<code>42</code>, <code>0xFF</code>, <code>0o77</code>, <code>0b101</code>)</p>
+</li>
+<li>
+<p>Floats (<code>42.</code>, <code>3.14</code>)</p>
+</li>
+<li>
+<p>Bool (<code>true</code>, <code>false</code>)</p>
+</li>
+<li>
+<p>Character (<code>'a'</code>, <code>'\''</code>)</p>
+</li>
+<li>
+<p>Byte (<code>b'a'</code>, <code>b'\''</code>)</p>
+</li>
+<li>
+<p>String (<code>"hello, world"</code>)</p>
+</li>
+<li>
+<p>Raw Strings (<code>r#"They said, "Hello World!""#</code>)</p>
+</li>
+<li>
+<p>Byte Strings (<code>b"hello, world"</code>)</p>
+</li>
+<li>
+<p>Named</p>
+<ul>
+<li>Ident or Raw Ident (<code>r#foo</code>)</li>
+<li>Map or Tuple</li>
+</ul>
+</li>
+<li>
+<p>Map</p>
+<ul>
+<li>List of <code>&lt;Value&gt;: &lt;Value&gt;</code> pairs, delimited by comma</li>
+<li>Trailing comma is optional</li>
+</ul>
+</li>
+<li>
+<p>Tuple (empty tuple = Unit)</p>
+<ul>
+<li>List of <code>&lt;Value&gt;</code>s, delimited by comma</li>
+<li>Trailing comma is optional</li>
+</ul>
+</li>
+<li>
+<p>Array</p>
+<ul>
+<li>List of <code>&lt;Value&gt;</code>s, delimited by comma</li>
+<li>Trailing comma is optional</li>
+</ul>
+</li>
+<li>
+<p>Comments <code>//</code> and <code>/* */</code></p>
+</li>
+<li>
+<p>Potential Extensions via #[] syntax</p>
+<ul>
+<li>Semi-strict comma-delimited list</li>
+<li><code>#[foo(...), bar = ...,]</code></li>
+<li>All braces/brackets/parens must be paired correctly?</li>
+</ul>
+</li>
+</ul>
+<h3 id="other-related-projects"><a class="doc-anchor" href="#other-related-projects">§</a>Other related projects</h3>
+<ul>
+<li><a href="https://github.com/ModProg/rsn-fmt"><code>rsn-fmt</code></a>: A formatter project for <code>rsn</code>.</li>
+<li><a href="https://github.com/ModProg/rsn.vim"><code>rsn.vim</code></a>: A plugin for Vim/NeoVim.</li>
+</ul>
+<h3 id="why-not-ron"><a class="doc-anchor" href="#why-not-ron">§</a>Why not Ron?</h3>
+<p><a href="https://crates.io/crates/ron">Ron</a> is a great format. There were a few design
+decisions that led to this very-similar-yet-not-the-same format being invented:</p>
+<ul>
+<li><code>ron</code> differentiates between Tuples and Lists, while <code>rsn</code> treats all
+sequences the same.</li>
+<li><code>ron</code> uses a different syntax for structures and maps. <code>rsn</code> uses the same
+syntax for both concepts.</li>
+<li><code>ron</code> has special support for <code>Option&lt;T&gt;</code>. <code>rsn</code> treats <code>Option&lt;T&gt;</code> like any
+other enum.</li>
+<li><code>ron</code>’s parsing rules are close but not the same as Rust, while <code>rsn</code> attempts
+to match implementations:
+<ul>
+<li>Unicode white space and idents (added in
+<a href="https://github.com/ron-rs/ron/pull/444">ron-rs/ron#444</a>)</li>
+<li>Rust allows <code>_</code> in float literals</li>
+<li>Rust allows for raw line endings to be escaped in string literals.</li>
+<li>Rust supports byte strings and byte literals, while Ron elected to use
+<code>base64</code> encoded strings for byte values.</li>
+</ul>
+</li>
+</ul>
+<h3 id="differences-between-rust-syntax-and-rsn"><a class="doc-anchor" href="#differences-between-rust-syntax-and-rsn">§</a>Differences between Rust syntax and Rsn</h3>
+<p>The syntax differs from valid Rust code for:</p>
+<ul>
+<li>Map literals. Rust has no syntax for map literals.</li>
+<li>Enum Variants being used without the type name – <code>Red</code> vs <code>Color::Red</code>
+<ul>
+<li>This is technically valid Rust syntax if <code>use Color::*</code> is present.</li>
+</ul>
+</li>
+<li>Infinity and Not-A-Number floats are represented as
+<code>+inf</code>/<code>-inf</code>/<code>+NaN</code>/<code>-NaN</code>.
+<ul>
+<li>For compatibility with Rust syntax, support for
+<a href="https://github.com/khonsulabs/rsn/issues/3"><code>f64::INFINITY</code></a> is being
+considered.</li>
+</ul>
+</li>
+</ul>
+<p>The rules for parsing literals should match Rust’s rules as closely as possible.</p>
+</div></details><h2 id="modules" class="section-header">Modules<a href="#modules" class="anchor">§</a></h2><ul class="item-table"><li><div class="item-name"><a class="mod" href="de/index.html" title="mod rsn::de">de</a></div><div class="desc docblock-short">Serde deserialization support.</div></li><li><div class="item-name"><a class="mod" href="parser/index.html" title="mod rsn::parser">parser</a></div><div class="desc docblock-short">Parse data or a reader into a sequence of Rsn events.</div></li><li><div class="item-name"><a class="mod" href="ser/index.html" title="mod rsn::ser">ser</a></div><div class="desc docblock-short">Serde serialization support.</div></li><li><div class="item-name"><a class="mod" href="tokenizer/index.html" title="mod rsn::tokenizer">tokenizer</a></div><div class="desc docblock-short">Parse data or a reader into a sequence of tokens.</div></li><li><div class="item-name"><a class="mod" href="value/index.html" title="mod rsn::value">value</a></div><div class="desc docblock-short">Types for generically representing the parsed value from an Rsn document.</div></li><li><div class="item-name"><a class="mod" href="writer/index.html" title="mod rsn::writer">writer</a></div><div class="desc docblock-short">Types for writing Rsn.</div></li></ul><h2 id="functions" class="section-header">Functions<a href="#functions" class="anchor">§</a></h2><ul class="item-table"><li><div class="item-name"><a class="fn" href="fn.from_reader.html" title="fn rsn::from_reader">from_<wbr>reader</a></div><div class="desc docblock-short">Deserializes <code>D</code> from <code>reader</code> using the default Rsn
+<a href="parser/struct.Config.html" title="struct rsn::parser::Config"><code>Config</code></a>.</div></li><li><div class="item-name"><a class="fn" href="fn.from_slice.html" title="fn rsn::from_slice">from_<wbr>slice</a></div><div class="desc docblock-short">Deserializes <code>D</code> from <code>slice</code> using the default Rsn
+<a href="parser/struct.Config.html" title="struct rsn::parser::Config"><code>Config</code></a>.</div></li><li><div class="item-name"><a class="fn" href="fn.from_str.html" title="fn rsn::from_str">from_<wbr>str</a></div><div class="desc docblock-short">Deserializes <code>D</code> from <code>source</code> using the default Rsn
+<a href="parser/struct.Config.html" title="struct rsn::parser::Config"><code>Config</code></a>.</div></li><li><div class="item-name"><a class="fn" href="fn.to_string.html" title="fn rsn::to_string">to_<wbr>string</a></div><div class="desc docblock-short">Serializes <code>value</code> into a <code>String</code> using the default Rsn
+<a href="ser/struct.Config.html" title="struct rsn::ser::Config"><code>Config</code></a>.</div></li><li><div class="item-name"><a class="fn" href="fn.to_string_pretty.html" title="fn rsn::to_string_pretty">to_<wbr>string_<wbr>pretty</a></div><div class="desc docblock-short">Serializes <code>value</code> into a <code>String</code> using
+<a href="ser/struct.Config.html#method.pretty" title="associated function rsn::ser::Config::pretty"><code>Config::pretty()</code></a>.</div></li><li><div class="item-name"><a class="fn" href="fn.to_vec.html" title="fn rsn::to_vec">to_vec</a></div><div class="desc docblock-short">Serializes <code>value</code> into a <code>Vec&lt;u8&gt;</code> using the default Rsn
+<a href="ser/struct.Config.html" title="struct rsn::ser::Config"><code>Config</code></a>.</div></li><li><div class="item-name"><a class="fn" href="fn.to_writer.html" title="fn rsn::to_writer">to_<wbr>writer</a></div><div class="desc docblock-short">Serializes <code>value</code> into a writer using the default Rsn
+<a href="ser/struct.Config.html" title="struct rsn::ser::Config"><code>Config</code></a>.</div></li></ul></section></div></main></body></html>
