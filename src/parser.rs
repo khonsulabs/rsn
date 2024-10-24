@@ -16,6 +16,7 @@ pub struct Parser<'s> {
 }
 
 impl<'s> Parser<'s> {
+    #[must_use]
     pub fn new(source: &'s str, config: Config) -> Self {
         Self {
             tokens: Tokenizer::minified(source),
@@ -26,14 +27,17 @@ impl<'s> Parser<'s> {
         }
     }
 
+    #[must_use]
     pub fn validate(source: &'s str, config: Config) -> bool {
         Self::new(source, config).all(|result| result.is_ok())
     }
 
+    #[must_use]
     pub const fn current_offset(&self) -> usize {
         self.tokens.current_offset()
     }
 
+    #[must_use]
     pub fn current_range(&self) -> Range<usize> {
         let start = self.nested.last().map_or(0, |(offset, _)| *offset);
         start..self.tokens.current_offset()
@@ -108,68 +112,7 @@ impl<'s> Parser<'s> {
                 token.location,
                 EventKind::Primitive(Primitive::Bytes(value)),
             )),
-            TokenKind::Identifier(value) => {
-                if matches!(
-                    self.peek(),
-                    Some(Token {
-                        kind: TokenKind::Open(Balanced::Brace | Balanced::Paren),
-                        ..
-                    })
-                ) {
-                    let Some(Ok(Token {
-                        kind: TokenKind::Open(balanced),
-                        location: open_location,
-                    })) = self.next_token()
-                    else {
-                        unreachable!("matched above")
-                    };
-
-                    let kind = match balanced {
-                        Balanced::Paren => {
-                            self.nested.push((
-                                open_location.start,
-                                NestedState::Tuple(ListState::ExpectingValue),
-                            ));
-                            Nested::Tuple
-                        }
-                        Balanced::Brace => {
-                            self.nested.push((
-                                open_location.start,
-                                NestedState::Map(MapState::ExpectingKey),
-                            ));
-                            Nested::Map
-                        }
-                        Balanced::Bracket => {
-                            unreachable!("specifically excluded above")
-                        }
-                    };
-
-                    Ok(Event::new(
-                        open_location,
-                        EventKind::BeginNested {
-                            name: Some(Name {
-                                location: token.location,
-                                name: value,
-                            }),
-                            kind,
-                        },
-                    ))
-                } else if matches!(
-                    self.peek(),
-                    Some(Token {
-                        kind: TokenKind::Open(Balanced::Bracket),
-                        ..
-                    })
-                ) {
-                    let location = self.peek().expect("just matched").location.clone();
-                    return Err(Error::new(location, ErrorKind::ExpectedMapOrTuple));
-                } else {
-                    Ok(Event::new(
-                        token.location,
-                        EventKind::Primitive(Primitive::Identifier(value)),
-                    ))
-                }
-            }
+            TokenKind::Identifier(value) => self.parse_identifier(token, value),
             TokenKind::Open(Balanced::Paren) => {
                 self.nested.push((
                     token.location.start,
@@ -220,6 +163,69 @@ impl<'s> Parser<'s> {
                 Ok(Event::new(token.location, EventKind::Comment(comment)))
             }
             TokenKind::Whitespace(_) => unreachable!("disabled"),
+        }
+    }
+
+    fn parse_identifier(&mut self, token: Token<'s>, value: &'s str) -> Result<Event<'s>, Error> {
+        if matches!(
+            self.peek(),
+            Some(Token {
+                kind: TokenKind::Open(Balanced::Brace | Balanced::Paren),
+                ..
+            })
+        ) {
+            let Some(Ok(Token {
+                kind: TokenKind::Open(balanced),
+                location: open_location,
+            })) = self.next_token()
+            else {
+                unreachable!("matched above")
+            };
+
+            let kind = match balanced {
+                Balanced::Paren => {
+                    self.nested.push((
+                        open_location.start,
+                        NestedState::Tuple(ListState::ExpectingValue),
+                    ));
+                    Nested::Tuple
+                }
+                Balanced::Brace => {
+                    self.nested.push((
+                        open_location.start,
+                        NestedState::Map(MapState::ExpectingKey),
+                    ));
+                    Nested::Map
+                }
+                Balanced::Bracket => {
+                    unreachable!("specifically excluded above")
+                }
+            };
+
+            Ok(Event::new(
+                open_location,
+                EventKind::BeginNested {
+                    name: Some(Name {
+                        location: token.location,
+                        name: value,
+                    }),
+                    kind,
+                },
+            ))
+        } else if matches!(
+            self.peek(),
+            Some(Token {
+                kind: TokenKind::Open(Balanced::Bracket),
+                ..
+            })
+        ) {
+            let location = self.peek().expect("just matched").location.clone();
+            return Err(Error::new(location, ErrorKind::ExpectedMapOrTuple));
+        } else {
+            Ok(Event::new(
+                token.location,
+                EventKind::Primitive(Primitive::Identifier(value)),
+            ))
         }
     }
 
@@ -492,10 +498,9 @@ impl<'s> Iterator for Parser<'s> {
                 )
             {
                 break Some(event);
-            } else {
-                // Eat the comment
-                continue;
             }
+
+            // Eat the comment
         }
     }
 }
@@ -508,11 +513,13 @@ pub struct Config {
 }
 
 impl Config {
+    #[must_use]
     pub const fn allow_implicit_map_at_root(mut self, allow: bool) -> Self {
         self.allow_implicit_map_at_root = allow;
         self
     }
 
+    #[must_use]
     pub const fn include_comments(mut self, include: bool) -> Self {
         self.include_comments = include;
         self
@@ -534,6 +541,7 @@ pub struct Error {
 }
 
 impl Error {
+    #[must_use]
     pub fn new(location: Range<usize>, kind: ErrorKind) -> Self {
         Self { location, kind }
     }
@@ -603,6 +611,7 @@ pub struct Event<'s> {
 }
 
 impl<'s> Event<'s> {
+    #[must_use]
     pub fn new(location: Range<usize>, kind: EventKind<'s>) -> Self {
         Self { location, kind }
     }
@@ -653,7 +662,7 @@ pub enum Nested {
 }
 
 impl Nested {
-    fn err_display(&self) -> &'static str {
+    fn err_display(self) -> &'static str {
         match self {
             Nested::Tuple => "`)`",
             Nested::Map => "`}`",

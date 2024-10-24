@@ -1,4 +1,8 @@
 #![no_std]
+#![warn(clippy::pedantic)]
+#![allow(missing_docs)]
+#![allow(clippy::missing_errors_doc, clippy::missing_panics_doc)]
+#![allow(clippy::module_name_repetitions)]
 
 extern crate alloc;
 

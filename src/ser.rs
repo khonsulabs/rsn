@@ -464,6 +464,7 @@ pub struct Config {
 }
 
 impl Config {
+    #[must_use]
     pub const fn new() -> Self {
         Self {
             writer: writer::Config::Compact,
@@ -472,6 +473,7 @@ impl Config {
         }
     }
 
+    #[must_use]
     pub fn pretty() -> Self {
         Self {
             writer: writer::Config::Pretty {
@@ -482,16 +484,19 @@ impl Config {
         }
     }
 
+    #[must_use]
     pub const fn implicit_map_at_root(mut self, implicit_map_at_root: bool) -> Self {
         self.implicit_map_at_root = implicit_map_at_root;
         self
     }
 
+    #[must_use]
     pub const fn anonymous_structs(mut self, anonymous_structs: bool) -> Self {
         self.anonymous_structs = anonymous_structs;
         self
     }
 
+    #[must_use]
     pub fn serialize<S: Serialize>(&self, value: &S) -> String {
         let mut serializer = Serializer::new(String::new(), self);
         value.serialize(&mut serializer).expect("core::fmt::Error");
@@ -505,15 +510,16 @@ impl Config {
 
 #[cfg(feature = "std")]
 mod serialize_writer {
-    use super::*;
+    use super::{Config, Serialize, Serializer, Write};
+
     struct Writer<T> {
-        writer: T,
+        inner: T,
         written: usize,
         error: Option<std::io::Error>,
     }
     impl<T: std::io::Write> Write for Writer<T> {
         fn write_str(&mut self, s: &str) -> core::fmt::Result {
-            match self.writer.write(s.as_bytes()) {
+            match self.inner.write(s.as_bytes()) {
                 Ok(written) => {
                     self.written += written;
                     Ok(())
@@ -536,7 +542,7 @@ mod serialize_writer {
             writer: W,
         ) -> std::io::Result<usize> {
             let mut writer = Writer {
-                writer,
+                inner: writer,
                 written: 0,
                 error: None,
             };
@@ -558,5 +564,5 @@ fn serialization_test() {
     }
 
     let rendered = crate::to_string(&BasicNamed { a: 1, b: -1 });
-    assert_eq!(rendered, r#"BasicNamed{a:1,b:-1}"#);
+    assert_eq!(rendered, "BasicNamed{a:1,b:-1}");
 }

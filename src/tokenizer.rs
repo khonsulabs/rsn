@@ -17,6 +17,7 @@ pub struct Token<'a> {
 }
 
 impl<'a> Token<'a> {
+    #[must_use]
     pub const fn new(location: Range<usize>, kind: TokenKind<'a>) -> Self {
         Self { location, kind }
     }
@@ -52,10 +53,9 @@ impl<'a> PartialEq for TokenKind<'a> {
             (Self::Byte(l0), Self::Byte(r0)) => l0 == r0,
             (Self::String(l0), Self::String(r0)) => l0 == r0,
             (Self::Bytes(l0), Self::Bytes(r0)) => l0 == r0,
-            (Self::Identifier(l0), Self::Identifier(r0)) => l0 == r0,
-            (Self::Open(l0), Self::Open(r0)) => l0 == r0,
-            (Self::Close(l0), Self::Close(r0)) => l0 == r0,
-            (Self::Comment(l0), Self::Comment(r0)) => l0 == r0,
+            (Self::Comment(l0), Self::Comment(r0))
+            | (Self::Identifier(l0), Self::Identifier(r0)) => l0 == r0,
+            (Self::Open(l0), Self::Open(r0)) | (Self::Close(l0), Self::Close(r0)) => l0 == r0,
             _ => core::mem::discriminant(self) == core::mem::discriminant(other),
         }
     }
@@ -72,6 +72,7 @@ pub enum Integer {
 macro_rules! fn_integer_into {
     ($name:ident, $type:ty) => {
         #[inline]
+        #[must_use]
         pub fn $name(self) -> Option<$type> {
             match self {
                 Integer::Usize(value) => value.try_into().ok(),
@@ -109,6 +110,7 @@ impl Integer {
     fn_integer_into!(as_isize, isize);
 
     #[inline]
+    #[must_use]
     pub const fn is_zero(self) -> bool {
         match self {
             Integer::Usize(value) => value == 0,
@@ -118,6 +120,8 @@ impl Integer {
         }
     }
 
+    #[must_use]
+    #[allow(clippy::cast_precision_loss)]
     pub fn as_f64(self) -> f64 {
         match self {
             Integer::Usize(value) => value as f64,
@@ -215,12 +219,14 @@ pub struct Tokenizer<'a, const INCLUDE_ALL: bool> {
 }
 
 impl<'a> Tokenizer<'a, false> {
+    #[must_use]
     pub fn minified(source: &'a str) -> Self {
         Self::new(source)
     }
 }
 
 impl<'a> Tokenizer<'a, true> {
+    #[must_use]
     pub fn full(source: &'a str) -> Self {
         Self::new(source)
     }
@@ -234,6 +240,7 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
         }
     }
 
+    #[must_use]
     pub const fn current_offset(&self) -> usize {
         self.chars.current_offset()
     }
@@ -263,6 +270,7 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
         Error::new(range, kind)
     }
 
+    #[allow(clippy::cast_possible_truncation)]
     fn tokenize_positive_integer<I>(&mut self, mut value: I) -> Result<Token<'a>, Error>
     where
         I: Integral,
@@ -352,6 +360,7 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
         }
     }
 
+    #[allow(clippy::cast_possible_truncation)]
     fn tokenize_negative_integer<I>(&mut self, mut value: I) -> Result<Token<'a>, Error>
     where
         I: Integral,
@@ -534,7 +543,7 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
                         .checked_mul(max as UnsignedLarge)
                         .and_then(|value| value.checked_add(radix_value as UnsignedLarge))
                     {
-                        value = next_value
+                        value = next_value;
                     } else {
                         return Err(self.error(ErrorKind::IntegerTooLarge));
                     }
@@ -556,6 +565,7 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
         ))
     }
 
+    #[allow(clippy::cast_possible_wrap)]
     fn tokenize_radix_number<const RADIX: u32>(
         &mut self,
         signed: bool,
@@ -575,7 +585,7 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
                         .checked_mul(max as usize)
                         .and_then(|value| value.checked_add(radix_value as usize))
                     {
-                        value = next_value
+                        value = next_value;
                     } else {
                         // Overflowed
                         return self.tokenize_radix_large_number::<RADIX>(
@@ -613,15 +623,15 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
         negative: bool,
     ) -> Result<Token<'a>, Error> {
         match self.chars.peek() {
-            Some('x') | Some('X') => {
+            Some('x' | 'X') => {
                 self.chars.next();
                 return self.tokenize_radix_number::<4>(signed, negative);
             }
-            Some('b') | Some('B') => {
+            Some('b' | 'B') => {
                 self.chars.next();
                 return self.tokenize_radix_number::<1>(signed, negative);
             }
-            Some('o') | Some('O') => {
+            Some('o' | 'O') => {
                 self.chars.next();
                 return self.tokenize_radix_number::<3>(signed, negative);
             }
@@ -635,6 +645,7 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
         }
     }
 
+    #[allow(clippy::cast_possible_wrap)]
     fn tokenize_number(&mut self, start_char: u8) -> Result<Token<'a>, Error> {
         let negative = start_char == b'-';
         let signed = negative || start_char == b'+';
@@ -831,6 +842,7 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
             .ok_or_else(|| Error::new(start..self.chars.last_offset(), ErrorKind::InvalidUnicode))
     }
 
+    #[allow(clippy::cast_possible_truncation)]
     fn tokenize_ascii_escape(&mut self) -> Result<u8, Error> {
         let first_digit =
             self.next_or_eof()?
@@ -1237,6 +1249,7 @@ pub struct Error {
 }
 
 impl Error {
+    #[must_use]
     pub const fn new(location: Range<usize>, kind: ErrorKind) -> Self {
         Self { location, kind }
     }
@@ -1367,6 +1380,7 @@ impl Integral for SignedLarge {
 }
 
 #[cfg(test)]
+#[allow(clippy::too_many_lines)]
 mod tests {
     use alloc::vec::Vec;
 
@@ -1393,11 +1407,11 @@ mod tests {
     }
 
     #[track_caller]
-    fn test_tokens_err(source: &str, location: Range<usize>, kind: ErrorKind) {
+    fn test_tokens_err(source: &str, location: Range<usize>, kind: &ErrorKind) {
         let err = Tokenizer::minified(source)
             .collect::<Result<Vec<_>, _>>()
             .expect_err("source did not error");
-        assert_eq!(err.kind, kind);
+        assert_eq!(&err.kind, kind);
         assert_eq!(err.location, location);
     }
 
@@ -1416,7 +1430,7 @@ mod tests {
 
         test_tokens("_0", &[Token::new(0..2, TokenKind::Identifier("_0"))]);
 
-        test_tokens_err("=", 0..1, ErrorKind::Unexpected('='));
+        test_tokens_err("=", 0..1, &ErrorKind::Unexpected('='));
     }
 
     #[test]

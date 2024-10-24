@@ -26,6 +26,7 @@ pub enum Value<'a> {
 
 macro_rules! as_integer {
     ($name:ident, $ty:ty) => {
+        #[must_use]
         pub fn $name(&self) -> Option<$ty> {
             let Self::Integer(value) = self else {
                 return None;
@@ -66,6 +67,7 @@ impl<'a> Value<'a> {
         Self::parse(&mut parser)
     }
 
+    #[must_use]
     pub const fn unit() -> Self {
         Self::Tuple(List::new())
     }
@@ -118,12 +120,12 @@ impl<'a> Value<'a> {
                         name: Cow::Borrowed(name.name),
                         contents: StructContents::Tuple(list),
                     }));
-                } else {
-                    match kind {
-                        Nested::List => return Ok(Self::Array(list)),
-                        Nested::Tuple => return Ok(Self::Tuple(list)),
-                        Nested::Map => unreachable!("parse_sequence isn't called on maps"),
-                    }
+                }
+
+                match kind {
+                    Nested::List => return Ok(Self::Array(list)),
+                    Nested::Tuple => return Ok(Self::Tuple(list)),
+                    Nested::Map => unreachable!("parse_sequence isn't called on maps"),
                 }
             } else {
                 list.0.push(Self::from_parser_event(event, parser)?);
@@ -141,18 +143,18 @@ impl<'a> Value<'a> {
                         name: Cow::Borrowed(name.name),
                         contents: StructContents::Map(map),
                     }));
-                } else {
-                    return Ok(Self::Map(map));
                 }
-            } else {
-                let key = Self::from_parser_event(event, parser)?;
-                let value = Self::from_parser_event(
-                    parser.next().expect("will error or have another event")?,
-                    parser,
-                )?;
 
-                map.0.push((key, value));
+                return Ok(Self::Map(map));
             }
+
+            let key = Self::from_parser_event(event, parser)?;
+            let value = Self::from_parser_event(
+                parser.next().expect("will error or have another event")?,
+                parser,
+            )?;
+
+            map.0.push((key, value));
         }
     }
 
@@ -168,6 +170,7 @@ impl<'a> Value<'a> {
         D::deserialize(serde::ValueDeserializer(self))
     }
 
+    #[must_use]
     pub fn into_owned(self) -> Value<'static> {
         match self {
             Value::Integer(value) => Value::Integer(value),
@@ -185,6 +188,7 @@ impl<'a> Value<'a> {
         }
     }
 
+    #[must_use]
     pub fn as_f64(&self) -> Option<f64> {
         match self {
             Value::Integer(integer) => Some(integer.as_f64()),
@@ -193,19 +197,19 @@ impl<'a> Value<'a> {
         }
     }
 
+    #[must_use]
     pub fn as_str(&self) -> Option<&str> {
         match self {
-            Value::Identifier(str) => Some(str),
-            Value::String(str) => Some(str),
+            Value::Identifier(str) | Value::String(str) => Some(str),
             Value::Bytes(bytes) => str::from_utf8(bytes).ok(),
             _ => None,
         }
     }
 
+    #[must_use]
     pub fn as_bytes(&self) -> Option<&[u8]> {
         match self {
-            Value::Identifier(str) => Some(str.as_bytes()),
-            Value::String(str) => Some(str.as_bytes()),
+            Value::Identifier(str) | Value::String(str) => Some(str.as_bytes()),
             Value::Bytes(bytes) => Some(bytes),
             _ => None,
         }
@@ -246,6 +250,7 @@ pub struct Named<'a> {
 }
 
 impl<'a> Named<'a> {
+    #[must_use]
     pub fn into_owned(self) -> Named<'static> {
         Named {
             name: Cow::Owned(self.name.into_owned()),
@@ -261,6 +266,7 @@ pub enum StructContents<'a> {
 }
 
 impl<'a> StructContents<'a> {
+    #[must_use]
     pub fn into_owned(self) -> StructContents<'static> {
         match self {
             StructContents::Map(contents) => StructContents::Map(contents.into_owned()),
@@ -273,6 +279,7 @@ impl<'a> StructContents<'a> {
 pub struct Map<'a>(pub Vec<(Value<'a>, Value<'a>)>);
 
 impl<'a> Map<'a> {
+    #[must_use]
     pub fn into_owned(self) -> Map<'static> {
         Map(self
             .0
@@ -286,10 +293,12 @@ impl<'a> Map<'a> {
 pub struct List<'a>(pub Vec<Value<'a>>);
 
 impl<'a> List<'a> {
+    #[must_use]
     pub const fn new() -> Self {
         Self(Vec::new())
     }
 
+    #[must_use]
     pub fn into_owned(self) -> List<'static> {
         List(self.0.into_iter().map(Value::into_owned).collect())
     }
@@ -548,11 +557,7 @@ mod serde {
 
         fn end(self) -> Result<Self::Ok, Self::Error> {
             match (self.name, self.kind) {
-                (Some(name), Nested::Tuple) => Ok(Value::Named(Named {
-                    name: Cow::Owned(name),
-                    contents: StructContents::Tuple(self.contents),
-                })),
-                (Some(name), Nested::List) => Ok(Value::Named(Named {
+                (Some(name), Nested::List | Nested::Tuple) => Ok(Value::Named(Named {
                     name: Cow::Owned(name),
                     contents: StructContents::Tuple(self.contents),
                 })),
@@ -733,6 +738,7 @@ mod serde {
 
         deserialize_int!(deserialize_f64, as_f64, visit_f64, ExpectedKind::Float);
 
+        #[allow(clippy::cast_possible_truncation)]
         fn deserialize_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: serde::de::Visitor<'de>,
@@ -799,6 +805,7 @@ mod serde {
             }
         }
 
+        #[allow(clippy::cast_possible_truncation)]
         fn deserialize_f32<V>(self, visitor: V) -> Result<V::Value, Self::Error>
         where
             V: serde::de::Visitor<'de>,

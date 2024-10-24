@@ -21,6 +21,7 @@ enum NewtypeState {
 }
 
 impl<'de> Deserializer<'de> {
+    #[must_use]
     pub fn new(source: &'de str, config: Config) -> Self {
         Self {
             parser: BetterPeekable::new(Parser::new(source, config.include_comments(false))),
@@ -106,6 +107,7 @@ impl<'de> Deserializer<'de> {
 }
 
 #[must_use]
+#[derive(Copy, Clone)]
 struct NewtypeStateModification(Option<NewtypeState>);
 
 macro_rules! deserialize_int_impl {
@@ -159,9 +161,8 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
         V: serde::de::Visitor<'de>,
     {
         self.with_error_context(|de| {
-            let event = match de.parser.next().transpose()? {
-                Some(event) => event,
-                None => return visitor.visit_unit(),
+            let Some(event) = de.parser.next().transpose()? else {
+                return visitor.visit_unit();
             };
             match event.kind {
                 EventKind::BeginNested { name, kind } => match kind {
@@ -203,30 +204,34 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
                 },
                 EventKind::Primitive(primitive) => match primitive {
                     Primitive::Bool(v) => visitor.visit_bool(v),
-                    Primitive::Integer(v) => match v {
-                        Integer::Usize(usize) => match usize::BITS {
-                            0..=16 => visitor.visit_u16(usize as u16),
-                            17..=32 => visitor.visit_u32(usize as u32),
-                            33..=64 => visitor.visit_u64(usize as u64),
-                            65..=128 => visitor.visit_u128(usize as u128),
-                            _ => unreachable!("unsupported pointer width"),
-                        },
-                        Integer::Isize(isize) => match usize::BITS {
-                            0..=16 => visitor.visit_i16(isize as i16),
-                            17..=32 => visitor.visit_i32(isize as i32),
-                            33..=64 => visitor.visit_i64(isize as i64),
-                            65..=128 => visitor.visit_i128(isize as i128),
-                            _ => unreachable!("unsupported pointer width"),
-                        },
-                        #[cfg(feature = "integer128")]
-                        Integer::UnsignedLarge(large) => visitor.visit_u128(large),
-                        #[cfg(not(feature = "integer128"))]
-                        Integer::UnsignedLarge(large) => visitor.visit_u64(large),
-                        #[cfg(feature = "integer128")]
-                        Integer::SignedLarge(large) => visitor.visit_i128(large),
-                        #[cfg(not(feature = "integer128"))]
-                        Integer::SignedLarge(large) => visitor.visit_i64(large),
-                    },
+                    Primitive::Integer(v) =>
+                    {
+                        #[allow(clippy::cast_possible_truncation)]
+                        match v {
+                            Integer::Usize(usize) => match usize::BITS {
+                                0..=16 => visitor.visit_u16(usize as u16),
+                                17..=32 => visitor.visit_u32(usize as u32),
+                                33..=64 => visitor.visit_u64(usize as u64),
+                                65..=128 => visitor.visit_u128(usize as u128),
+                                _ => unreachable!("unsupported pointer width"),
+                            },
+                            Integer::Isize(isize) => match usize::BITS {
+                                0..=16 => visitor.visit_i16(isize as i16),
+                                17..=32 => visitor.visit_i32(isize as i32),
+                                33..=64 => visitor.visit_i64(isize as i64),
+                                65..=128 => visitor.visit_i128(isize as i128),
+                                _ => unreachable!("unsupported pointer width"),
+                            },
+                            #[cfg(feature = "integer128")]
+                            Integer::UnsignedLarge(large) => visitor.visit_u128(large),
+                            #[cfg(not(feature = "integer128"))]
+                            Integer::UnsignedLarge(large) => visitor.visit_u64(large),
+                            #[cfg(feature = "integer128")]
+                            Integer::SignedLarge(large) => visitor.visit_i128(large),
+                            #[cfg(not(feature = "integer128"))]
+                            Integer::SignedLarge(large) => visitor.visit_i64(large),
+                        }
+                    }
                     Primitive::Float(v) => visitor.visit_f64(v),
                     Primitive::Char(v) => visitor.visit_char(v),
                     Primitive::String(v) => match v {
@@ -1360,8 +1365,7 @@ impl Config {
             Err(error) => {
                 let end = error
                     .error_len()
-                    .map(|l| l + error.valid_up_to())
-                    .unwrap_or(source.len());
+                    .map_or(source.len(), |l| l + error.valid_up_to());
                 return Err(Error::new(
                     (error.valid_up_to() + 1)..end,
                     ErrorKind::InvalidUtf8,
@@ -1445,7 +1449,7 @@ mod tests {
             b: i32,
         }
 
-        let parsed = crate::from_str::<BasicNamed>(r#"BasicNamed{ a: 1, b: -1 }"#).unwrap();
+        let parsed = crate::from_str::<BasicNamed>(r"BasicNamed{ a: 1, b: -1 }").unwrap();
         assert_eq!(parsed, BasicNamed { a: 1, b: -1 });
     }
 
@@ -1457,16 +1461,14 @@ mod tests {
             b: i32,
         }
         let config = Config::default().allow_implicit_map_at_root(true);
-        let parsed = config.deserialize::<BasicNamed>(r#"a: 1 b: -1"#).unwrap();
+        let parsed = config.deserialize::<BasicNamed>("a: 1 b: -1").unwrap();
         assert_eq!(parsed, BasicNamed { a: 1, b: -1 });
-        let parsed = config.deserialize::<BasicNamed>(r#"a: 1, b: -1,"#).unwrap();
+        let parsed = config.deserialize::<BasicNamed>("a: 1, b: -1,").unwrap();
         assert_eq!(parsed, BasicNamed { a: 1, b: -1 });
-        let parsed = config
-            .deserialize::<BasicNamed>(r#"{a: 1, b: -1}"#)
-            .unwrap();
+        let parsed = config.deserialize::<BasicNamed>("{a: 1, b: -1}").unwrap();
         assert_eq!(parsed, BasicNamed { a: 1, b: -1 });
         let parsed = config
-            .deserialize::<BasicNamed>(r#"BasicNamed{a: 1, b: -1}"#)
+            .deserialize::<BasicNamed>("BasicNamed{a: 1, b: -1}")
             .unwrap();
         assert_eq!(parsed, BasicNamed { a: 1, b: -1 });
     }
@@ -1479,16 +1481,13 @@ mod tests {
             b: i32,
         }
 
-        assert_eq!(
-            crate::from_str::<Option<BasicNamed>>(r#"None"#).unwrap(),
-            None
-        );
+        assert_eq!(crate::from_str::<Option<BasicNamed>>("None").unwrap(), None);
 
         let parsed =
-            crate::from_str::<Option<BasicNamed>>(r#"Some(BasicNamed{ a: 1, b: -1 })"#).unwrap();
+            crate::from_str::<Option<BasicNamed>>("Some(BasicNamed{ a: 1, b: -1 })").unwrap();
         assert_eq!(parsed, Some(BasicNamed { a: 1, b: -1 }));
 
-        let parsed = crate::from_str::<Option<BasicNamed>>(r#"BasicNamed{ a: 1, b: -1 }"#).unwrap();
+        let parsed = crate::from_str::<Option<BasicNamed>>("BasicNamed{ a: 1, b: -1 }").unwrap();
         assert_eq!(parsed, Some(BasicNamed { a: 1, b: -1 }));
     }
 
@@ -1516,23 +1515,23 @@ mod tests {
         }
 
         assert_eq!(
-            crate::from_str::<BasicEnums>(r#"Unit"#).unwrap(),
+            crate::from_str::<BasicEnums>("Unit").unwrap(),
             BasicEnums::Unit
         );
         assert_eq!(
-            crate::from_str::<BasicEnums>(r#"NewType(1)"#).unwrap(),
+            crate::from_str::<BasicEnums>("NewType(1)").unwrap(),
             BasicEnums::NewType(1)
         );
         assert_eq!(
-            crate::from_str::<BasicEnums>(r#"Struct{ a: 1}"#).unwrap(),
+            crate::from_str::<BasicEnums>("Struct{ a: 1}").unwrap(),
             BasicEnums::Struct { a: 1 }
         );
         assert_eq!(
-            crate::from_str::<BasicEnums>(r#"Tuple(1,2)"#).unwrap(),
+            crate::from_str::<BasicEnums>("Tuple(1,2)").unwrap(),
             BasicEnums::Tuple(1, 2)
         );
         assert_eq!(
-            crate::from_str::<BasicEnums>(r#"Tuple(1,2,3)"#).unwrap(),
+            crate::from_str::<BasicEnums>("Tuple(1,2,3)").unwrap(),
             BasicEnums::Tuple(1, 2)
         );
     }

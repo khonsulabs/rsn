@@ -173,8 +173,7 @@ where
             Value::Bool(value) => self.write_primitive(value),
             Value::Char(value) => self.write_primitive(value),
             Value::Byte(value) => self.write_primitive(value),
-            Value::Identifier(value) => self.write_primitive(value.as_ref()),
-            Value::String(value) => self.write_primitive(value.as_ref()),
+            Value::Identifier(value) | Value::String(value) => self.write_primitive(value.as_ref()),
             Value::Bytes(value) => self.write_primitive(value.as_ref()),
             Value::Named(value) => {
                 match &value.contents {
