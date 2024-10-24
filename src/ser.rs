@@ -242,7 +242,6 @@ where
         Ok(self)
     }
 
-    // TODO implicit_map_at_root
     fn serialize_map(self, _len: Option<usize>) -> Result<Self::SerializeMap, Self::Error> {
         let is_implicit_map = self.implicit_map_at_root;
         self.mark_value_seen();
@@ -465,8 +464,12 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn new() -> Self {
-        Self::default()
+    pub const fn new() -> Self {
+        Self {
+            writer: writer::Config::Compact,
+            implicit_map_at_root: false,
+            anonymous_structs: false,
+        }
     }
 
     pub fn pretty() -> Self {
