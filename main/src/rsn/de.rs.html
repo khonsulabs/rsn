@@ -1536,8 +1536,7 @@
 <a href="#1535" id="1535">1535</a>
 <a href="#1536" id="1536">1536</a>
 <a href="#1537" id="1537">1537</a>
-<a href="#1538" id="1538">1538</a>
-<a href="#1539" id="1539">1539</a></pre></div><pre class="rust"><code><span class="kw">use </span>alloc::borrow::Cow;
+<a href="#1538" id="1538">1538</a></pre></div><pre class="rust"><code><span class="kw">use </span>alloc::borrow::Cow;
 <span class="kw">use </span>alloc::string::{String, ToString};
 <span class="kw">use </span>core::fmt::Display;
 <span class="kw">use </span>core::ops::Range;
@@ -1560,7 +1559,8 @@
 }
 
 <span class="kw">impl</span>&lt;<span class="lifetime">'de</span>&gt; Deserializer&lt;<span class="lifetime">'de</span>&gt; {
-    <span class="kw">pub fn </span>new(source: <span class="kw-2">&amp;</span><span class="lifetime">'de </span>str, config: Config) -&gt; <span class="self">Self </span>{
+    <span class="attr">#[must_use]
+    </span><span class="kw">pub fn </span>new(source: <span class="kw-2">&amp;</span><span class="lifetime">'de </span>str, config: Config) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{
             parser: BetterPeekable::new(Parser::new(source, config.include_comments(<span class="bool-val">false</span>))),
             newtype_state: <span class="prelude-val">None</span>,
@@ -1645,6 +1645,7 @@
 }
 
 <span class="attr">#[must_use]
+#[derive(Copy, Clone)]
 </span><span class="kw">struct </span>NewtypeStateModification(<span class="prelude-ty">Option</span>&lt;NewtypeState&gt;);
 
 <span class="macro">macro_rules!</span> deserialize_int_impl {
@@ -1698,9 +1699,8 @@
         </span>V: serde::de::Visitor&lt;<span class="lifetime">'de</span>&gt;,
     {
         <span class="self">self</span>.with_error_context(|de| {
-            <span class="kw">let </span>event = <span class="kw">match </span>de.parser.next().transpose()<span class="question-mark">? </span>{
-                <span class="prelude-val">Some</span>(event) =&gt; event,
-                <span class="prelude-val">None </span>=&gt; <span class="kw">return </span>visitor.visit_unit(),
+            <span class="kw">let </span><span class="prelude-val">Some</span>(event) = de.parser.next().transpose()<span class="question-mark">? </span><span class="kw">else </span>{
+                <span class="kw">return </span>visitor.visit_unit();
             };
             <span class="kw">match </span>event.kind {
                 EventKind::BeginNested { name, kind } =&gt; <span class="kw">match </span>kind {
@@ -1742,30 +1742,34 @@
                 },
                 EventKind::Primitive(primitive) =&gt; <span class="kw">match </span>primitive {
                     Primitive::Bool(v) =&gt; visitor.visit_bool(v),
-                    Primitive::Integer(v) =&gt; <span class="kw">match </span>v {
-                        Integer::Usize(usize) =&gt; <span class="kw">match </span>usize::BITS {
-                            <span class="number">0</span>..=<span class="number">16 </span>=&gt; visitor.visit_u16(usize <span class="kw">as </span>u16),
-                            <span class="number">17</span>..=<span class="number">32 </span>=&gt; visitor.visit_u32(usize <span class="kw">as </span>u32),
-                            <span class="number">33</span>..=<span class="number">64 </span>=&gt; visitor.visit_u64(usize <span class="kw">as </span>u64),
-                            <span class="number">65</span>..=<span class="number">128 </span>=&gt; visitor.visit_u128(usize <span class="kw">as </span>u128),
-                            <span class="kw">_ </span>=&gt; <span class="macro">unreachable!</span>(<span class="string">"unsupported pointer width"</span>),
-                        },
-                        Integer::Isize(isize) =&gt; <span class="kw">match </span>usize::BITS {
-                            <span class="number">0</span>..=<span class="number">16 </span>=&gt; visitor.visit_i16(isize <span class="kw">as </span>i16),
-                            <span class="number">17</span>..=<span class="number">32 </span>=&gt; visitor.visit_i32(isize <span class="kw">as </span>i32),
-                            <span class="number">33</span>..=<span class="number">64 </span>=&gt; visitor.visit_i64(isize <span class="kw">as </span>i64),
-                            <span class="number">65</span>..=<span class="number">128 </span>=&gt; visitor.visit_i128(isize <span class="kw">as </span>i128),
-                            <span class="kw">_ </span>=&gt; <span class="macro">unreachable!</span>(<span class="string">"unsupported pointer width"</span>),
-                        },
-                        <span class="attr">#[cfg(feature = <span class="string">"integer128"</span>)]
-                        </span>Integer::UnsignedLarge(large) =&gt; visitor.visit_u128(large),
-                        <span class="attr">#[cfg(not(feature = <span class="string">"integer128"</span>))]
-                        </span>Integer::UnsignedLarge(large) =&gt; visitor.visit_u64(large),
-                        <span class="attr">#[cfg(feature = <span class="string">"integer128"</span>)]
-                        </span>Integer::SignedLarge(large) =&gt; visitor.visit_i128(large),
-                        <span class="attr">#[cfg(not(feature = <span class="string">"integer128"</span>))]
-                        </span>Integer::SignedLarge(large) =&gt; visitor.visit_i64(large),
-                    },
+                    Primitive::Integer(v) =&gt;
+                    {
+                        <span class="attr">#[allow(clippy::cast_possible_truncation)]
+                        </span><span class="kw">match </span>v {
+                            Integer::Usize(usize) =&gt; <span class="kw">match </span>usize::BITS {
+                                <span class="number">0</span>..=<span class="number">16 </span>=&gt; visitor.visit_u16(usize <span class="kw">as </span>u16),
+                                <span class="number">17</span>..=<span class="number">32 </span>=&gt; visitor.visit_u32(usize <span class="kw">as </span>u32),
+                                <span class="number">33</span>..=<span class="number">64 </span>=&gt; visitor.visit_u64(usize <span class="kw">as </span>u64),
+                                <span class="number">65</span>..=<span class="number">128 </span>=&gt; visitor.visit_u128(usize <span class="kw">as </span>u128),
+                                <span class="kw">_ </span>=&gt; <span class="macro">unreachable!</span>(<span class="string">"unsupported pointer width"</span>),
+                            },
+                            Integer::Isize(isize) =&gt; <span class="kw">match </span>usize::BITS {
+                                <span class="number">0</span>..=<span class="number">16 </span>=&gt; visitor.visit_i16(isize <span class="kw">as </span>i16),
+                                <span class="number">17</span>..=<span class="number">32 </span>=&gt; visitor.visit_i32(isize <span class="kw">as </span>i32),
+                                <span class="number">33</span>..=<span class="number">64 </span>=&gt; visitor.visit_i64(isize <span class="kw">as </span>i64),
+                                <span class="number">65</span>..=<span class="number">128 </span>=&gt; visitor.visit_i128(isize <span class="kw">as </span>i128),
+                                <span class="kw">_ </span>=&gt; <span class="macro">unreachable!</span>(<span class="string">"unsupported pointer width"</span>),
+                            },
+                            <span class="attr">#[cfg(feature = <span class="string">"integer128"</span>)]
+                            </span>Integer::UnsignedLarge(large) =&gt; visitor.visit_u128(large),
+                            <span class="attr">#[cfg(not(feature = <span class="string">"integer128"</span>))]
+                            </span>Integer::UnsignedLarge(large) =&gt; visitor.visit_u64(large),
+                            <span class="attr">#[cfg(feature = <span class="string">"integer128"</span>)]
+                            </span>Integer::SignedLarge(large) =&gt; visitor.visit_i128(large),
+                            <span class="attr">#[cfg(not(feature = <span class="string">"integer128"</span>))]
+                            </span>Integer::SignedLarge(large) =&gt; visitor.visit_i64(large),
+                        }
+                    }
                     Primitive::Float(v) =&gt; visitor.visit_f64(v),
                     Primitive::Char(v) =&gt; visitor.visit_char(v),
                     Primitive::String(v) =&gt; <span class="kw">match </span>v {
@@ -2899,8 +2903,7 @@
             <span class="prelude-val">Err</span>(error) =&gt; {
                 <span class="kw">let </span>end = error
                     .error_len()
-                    .map(|l| l + error.valid_up_to())
-                    .unwrap_or(source.len());
+                    .map_or(source.len(), |l| l + error.valid_up_to());
                 <span class="kw">return </span><span class="prelude-val">Err</span>(Error::new(
                     (error.valid_up_to() + <span class="number">1</span>)..end,
                     ErrorKind::InvalidUtf8,
@@ -2984,7 +2987,7 @@
             b: i32,
         }
 
-        <span class="kw">let </span>parsed = <span class="kw">crate</span>::from_str::&lt;BasicNamed&gt;(<span class="string">r#"BasicNamed{ a: 1, b: -1 }"#</span>).unwrap();
+        <span class="kw">let </span>parsed = <span class="kw">crate</span>::from_str::&lt;BasicNamed&gt;(<span class="string">r"BasicNamed{ a: 1, b: -1 }"</span>).unwrap();
         <span class="macro">assert_eq!</span>(parsed, BasicNamed { a: <span class="number">1</span>, b: -<span class="number">1 </span>});
     }
 
@@ -2996,16 +2999,14 @@
             b: i32,
         }
         <span class="kw">let </span>config = Config::default().allow_implicit_map_at_root(<span class="bool-val">true</span>);
-        <span class="kw">let </span>parsed = config.deserialize::&lt;BasicNamed&gt;(<span class="string">r#"a: 1 b: -1"#</span>).unwrap();
+        <span class="kw">let </span>parsed = config.deserialize::&lt;BasicNamed&gt;(<span class="string">"a: 1 b: -1"</span>).unwrap();
         <span class="macro">assert_eq!</span>(parsed, BasicNamed { a: <span class="number">1</span>, b: -<span class="number">1 </span>});
-        <span class="kw">let </span>parsed = config.deserialize::&lt;BasicNamed&gt;(<span class="string">r#"a: 1, b: -1,"#</span>).unwrap();
+        <span class="kw">let </span>parsed = config.deserialize::&lt;BasicNamed&gt;(<span class="string">"a: 1, b: -1,"</span>).unwrap();
         <span class="macro">assert_eq!</span>(parsed, BasicNamed { a: <span class="number">1</span>, b: -<span class="number">1 </span>});
-        <span class="kw">let </span>parsed = config
-            .deserialize::&lt;BasicNamed&gt;(<span class="string">r#"{a: 1, b: -1}"#</span>)
-            .unwrap();
+        <span class="kw">let </span>parsed = config.deserialize::&lt;BasicNamed&gt;(<span class="string">"{a: 1, b: -1}"</span>).unwrap();
         <span class="macro">assert_eq!</span>(parsed, BasicNamed { a: <span class="number">1</span>, b: -<span class="number">1 </span>});
         <span class="kw">let </span>parsed = config
-            .deserialize::&lt;BasicNamed&gt;(<span class="string">r#"BasicNamed{a: 1, b: -1}"#</span>)
+            .deserialize::&lt;BasicNamed&gt;(<span class="string">"BasicNamed{a: 1, b: -1}"</span>)
             .unwrap();
         <span class="macro">assert_eq!</span>(parsed, BasicNamed { a: <span class="number">1</span>, b: -<span class="number">1 </span>});
     }
@@ -3018,16 +3019,13 @@
             b: i32,
         }
 
-        <span class="macro">assert_eq!</span>(
-            <span class="kw">crate</span>::from_str::&lt;<span class="prelude-ty">Option</span>&lt;BasicNamed&gt;&gt;(<span class="string">r#"None"#</span>).unwrap(),
-            <span class="prelude-val">None
-        </span>);
+        <span class="macro">assert_eq!</span>(<span class="kw">crate</span>::from_str::&lt;<span class="prelude-ty">Option</span>&lt;BasicNamed&gt;&gt;(<span class="string">"None"</span>).unwrap(), <span class="prelude-val">None</span>);
 
         <span class="kw">let </span>parsed =
-            <span class="kw">crate</span>::from_str::&lt;<span class="prelude-ty">Option</span>&lt;BasicNamed&gt;&gt;(<span class="string">r#"Some(BasicNamed{ a: 1, b: -1 })"#</span>).unwrap();
+            <span class="kw">crate</span>::from_str::&lt;<span class="prelude-ty">Option</span>&lt;BasicNamed&gt;&gt;(<span class="string">"Some(BasicNamed{ a: 1, b: -1 })"</span>).unwrap();
         <span class="macro">assert_eq!</span>(parsed, <span class="prelude-val">Some</span>(BasicNamed { a: <span class="number">1</span>, b: -<span class="number">1 </span>}));
 
-        <span class="kw">let </span>parsed = <span class="kw">crate</span>::from_str::&lt;<span class="prelude-ty">Option</span>&lt;BasicNamed&gt;&gt;(<span class="string">r#"BasicNamed{ a: 1, b: -1 }"#</span>).unwrap();
+        <span class="kw">let </span>parsed = <span class="kw">crate</span>::from_str::&lt;<span class="prelude-ty">Option</span>&lt;BasicNamed&gt;&gt;(<span class="string">"BasicNamed{ a: 1, b: -1 }"</span>).unwrap();
         <span class="macro">assert_eq!</span>(parsed, <span class="prelude-val">Some</span>(BasicNamed { a: <span class="number">1</span>, b: -<span class="number">1 </span>}));
     }
 
@@ -3055,23 +3053,23 @@
         }
 
         <span class="macro">assert_eq!</span>(
-            <span class="kw">crate</span>::from_str::&lt;BasicEnums&gt;(<span class="string">r#"Unit"#</span>).unwrap(),
+            <span class="kw">crate</span>::from_str::&lt;BasicEnums&gt;(<span class="string">"Unit"</span>).unwrap(),
             BasicEnums::Unit
         );
         <span class="macro">assert_eq!</span>(
-            <span class="kw">crate</span>::from_str::&lt;BasicEnums&gt;(<span class="string">r#"NewType(1)"#</span>).unwrap(),
+            <span class="kw">crate</span>::from_str::&lt;BasicEnums&gt;(<span class="string">"NewType(1)"</span>).unwrap(),
             BasicEnums::NewType(<span class="number">1</span>)
         );
         <span class="macro">assert_eq!</span>(
-            <span class="kw">crate</span>::from_str::&lt;BasicEnums&gt;(<span class="string">r#"Struct{ a: 1}"#</span>).unwrap(),
+            <span class="kw">crate</span>::from_str::&lt;BasicEnums&gt;(<span class="string">"Struct{ a: 1}"</span>).unwrap(),
             BasicEnums::Struct { a: <span class="number">1 </span>}
         );
         <span class="macro">assert_eq!</span>(
-            <span class="kw">crate</span>::from_str::&lt;BasicEnums&gt;(<span class="string">r#"Tuple(1,2)"#</span>).unwrap(),
+            <span class="kw">crate</span>::from_str::&lt;BasicEnums&gt;(<span class="string">"Tuple(1,2)"</span>).unwrap(),
             BasicEnums::Tuple(<span class="number">1</span>, <span class="number">2</span>)
         );
         <span class="macro">assert_eq!</span>(
-            <span class="kw">crate</span>::from_str::&lt;BasicEnums&gt;(<span class="string">r#"Tuple(1,2,3)"#</span>).unwrap(),
+            <span class="kw">crate</span>::from_str::&lt;BasicEnums&gt;(<span class="string">"Tuple(1,2,3)"</span>).unwrap(),
             BasicEnums::Tuple(<span class="number">1</span>, <span class="number">2</span>)
         );
     }

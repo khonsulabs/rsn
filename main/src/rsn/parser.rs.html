@@ -961,7 +961,16 @@
 <a href="#960" id="960">960</a>
 <a href="#961" id="961">961</a>
 <a href="#962" id="962">962</a>
-<a href="#963" id="963">963</a></pre></div><pre class="rust"><code><span class="kw">use </span>alloc::borrow::Cow;
+<a href="#963" id="963">963</a>
+<a href="#964" id="964">964</a>
+<a href="#965" id="965">965</a>
+<a href="#966" id="966">966</a>
+<a href="#967" id="967">967</a>
+<a href="#968" id="968">968</a>
+<a href="#969" id="969">969</a>
+<a href="#970" id="970">970</a>
+<a href="#971" id="971">971</a>
+<a href="#972" id="972">972</a></pre></div><pre class="rust"><code><span class="kw">use </span>alloc::borrow::Cow;
 <span class="kw">use </span>alloc::vec::Vec;
 <span class="kw">use </span>core::fmt::{Display, Formatter};
 <span class="kw">use </span>core::mem;
@@ -979,7 +988,8 @@
 }
 
 <span class="kw">impl</span>&lt;<span class="lifetime">'s</span>&gt; Parser&lt;<span class="lifetime">'s</span>&gt; {
-    <span class="kw">pub fn </span>new(source: <span class="kw-2">&amp;</span><span class="lifetime">'s </span>str, config: Config) -&gt; <span class="self">Self </span>{
+    <span class="attr">#[must_use]
+    </span><span class="kw">pub fn </span>new(source: <span class="kw-2">&amp;</span><span class="lifetime">'s </span>str, config: Config) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{
             tokens: Tokenizer::minified(source),
             peeked: <span class="prelude-val">None</span>,
@@ -989,15 +999,18 @@
         }
     }
 
-    <span class="kw">pub fn </span>validate(source: <span class="kw-2">&amp;</span><span class="lifetime">'s </span>str, config: Config) -&gt; bool {
+    <span class="attr">#[must_use]
+    </span><span class="kw">pub fn </span>validate(source: <span class="kw-2">&amp;</span><span class="lifetime">'s </span>str, config: Config) -&gt; bool {
         <span class="self">Self</span>::new(source, config).all(|result| result.is_ok())
     }
 
-    <span class="kw">pub const fn </span>current_offset(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
+    <span class="attr">#[must_use]
+    </span><span class="kw">pub const fn </span>current_offset(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; usize {
         <span class="self">self</span>.tokens.current_offset()
     }
 
-    <span class="kw">pub fn </span>current_range(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Range&lt;usize&gt; {
+    <span class="attr">#[must_use]
+    </span><span class="kw">pub fn </span>current_range(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; Range&lt;usize&gt; {
         <span class="kw">let </span>start = <span class="self">self</span>.nested.last().map_or(<span class="number">0</span>, |(offset, <span class="kw">_</span>)| <span class="kw-2">*</span>offset);
         start..<span class="self">self</span>.tokens.current_offset()
     }
@@ -1071,68 +1084,7 @@
                 token.location,
                 EventKind::Primitive(Primitive::Bytes(value)),
             )),
-            TokenKind::Identifier(value) =&gt; {
-                <span class="kw">if </span><span class="macro">matches!</span>(
-                    <span class="self">self</span>.peek(),
-                    <span class="prelude-val">Some</span>(Token {
-                        kind: TokenKind::Open(Balanced::Brace | Balanced::Paren),
-                        ..
-                    })
-                ) {
-                    <span class="kw">let </span><span class="prelude-val">Some</span>(<span class="prelude-val">Ok</span>(Token {
-                        kind: TokenKind::Open(balanced),
-                        location: open_location,
-                    })) = <span class="self">self</span>.next_token()
-                    <span class="kw">else </span>{
-                        <span class="macro">unreachable!</span>(<span class="string">"matched above"</span>)
-                    };
-
-                    <span class="kw">let </span>kind = <span class="kw">match </span>balanced {
-                        Balanced::Paren =&gt; {
-                            <span class="self">self</span>.nested.push((
-                                open_location.start,
-                                NestedState::Tuple(ListState::ExpectingValue),
-                            ));
-                            Nested::Tuple
-                        }
-                        Balanced::Brace =&gt; {
-                            <span class="self">self</span>.nested.push((
-                                open_location.start,
-                                NestedState::Map(MapState::ExpectingKey),
-                            ));
-                            Nested::Map
-                        }
-                        Balanced::Bracket =&gt; {
-                            <span class="macro">unreachable!</span>(<span class="string">"specifically excluded above"</span>)
-                        }
-                    };
-
-                    <span class="prelude-val">Ok</span>(Event::new(
-                        open_location,
-                        EventKind::BeginNested {
-                            name: <span class="prelude-val">Some</span>(Name {
-                                location: token.location,
-                                name: value,
-                            }),
-                            kind,
-                        },
-                    ))
-                } <span class="kw">else if </span><span class="macro">matches!</span>(
-                    <span class="self">self</span>.peek(),
-                    <span class="prelude-val">Some</span>(Token {
-                        kind: TokenKind::Open(Balanced::Bracket),
-                        ..
-                    })
-                ) {
-                    <span class="kw">let </span>location = <span class="self">self</span>.peek().expect(<span class="string">"just matched"</span>).location.clone();
-                    <span class="kw">return </span><span class="prelude-val">Err</span>(Error::new(location, ErrorKind::ExpectedMapOrTuple));
-                } <span class="kw">else </span>{
-                    <span class="prelude-val">Ok</span>(Event::new(
-                        token.location,
-                        EventKind::Primitive(Primitive::Identifier(value)),
-                    ))
-                }
-            }
+            TokenKind::Identifier(value) =&gt; <span class="self">self</span>.parse_identifier(token, value),
             TokenKind::Open(Balanced::Paren) =&gt; {
                 <span class="self">self</span>.nested.push((
                     token.location.start,
@@ -1183,6 +1135,69 @@
                 <span class="prelude-val">Ok</span>(Event::new(token.location, EventKind::Comment(comment)))
             }
             TokenKind::Whitespace(<span class="kw">_</span>) =&gt; <span class="macro">unreachable!</span>(<span class="string">"disabled"</span>),
+        }
+    }
+
+    <span class="kw">fn </span>parse_identifier(<span class="kw-2">&amp;mut </span><span class="self">self</span>, token: Token&lt;<span class="lifetime">'s</span>&gt;, value: <span class="kw-2">&amp;</span><span class="lifetime">'s </span>str) -&gt; <span class="prelude-ty">Result</span>&lt;Event&lt;<span class="lifetime">'s</span>&gt;, Error&gt; {
+        <span class="kw">if </span><span class="macro">matches!</span>(
+            <span class="self">self</span>.peek(),
+            <span class="prelude-val">Some</span>(Token {
+                kind: TokenKind::Open(Balanced::Brace | Balanced::Paren),
+                ..
+            })
+        ) {
+            <span class="kw">let </span><span class="prelude-val">Some</span>(<span class="prelude-val">Ok</span>(Token {
+                kind: TokenKind::Open(balanced),
+                location: open_location,
+            })) = <span class="self">self</span>.next_token()
+            <span class="kw">else </span>{
+                <span class="macro">unreachable!</span>(<span class="string">"matched above"</span>)
+            };
+
+            <span class="kw">let </span>kind = <span class="kw">match </span>balanced {
+                Balanced::Paren =&gt; {
+                    <span class="self">self</span>.nested.push((
+                        open_location.start,
+                        NestedState::Tuple(ListState::ExpectingValue),
+                    ));
+                    Nested::Tuple
+                }
+                Balanced::Brace =&gt; {
+                    <span class="self">self</span>.nested.push((
+                        open_location.start,
+                        NestedState::Map(MapState::ExpectingKey),
+                    ));
+                    Nested::Map
+                }
+                Balanced::Bracket =&gt; {
+                    <span class="macro">unreachable!</span>(<span class="string">"specifically excluded above"</span>)
+                }
+            };
+
+            <span class="prelude-val">Ok</span>(Event::new(
+                open_location,
+                EventKind::BeginNested {
+                    name: <span class="prelude-val">Some</span>(Name {
+                        location: token.location,
+                        name: value,
+                    }),
+                    kind,
+                },
+            ))
+        } <span class="kw">else if </span><span class="macro">matches!</span>(
+            <span class="self">self</span>.peek(),
+            <span class="prelude-val">Some</span>(Token {
+                kind: TokenKind::Open(Balanced::Bracket),
+                ..
+            })
+        ) {
+            <span class="kw">let </span>location = <span class="self">self</span>.peek().expect(<span class="string">"just matched"</span>).location.clone();
+            <span class="kw">return </span><span class="prelude-val">Err</span>(Error::new(location, ErrorKind::ExpectedMapOrTuple));
+        } <span class="kw">else </span>{
+            <span class="prelude-val">Ok</span>(Event::new(
+                token.location,
+                EventKind::Primitive(Primitive::Identifier(value)),
+            ))
         }
     }
 
@@ -1455,11 +1470,10 @@
                 )
             {
                 <span class="kw">break </span><span class="prelude-val">Some</span>(event);
-            } <span class="kw">else </span>{
-                <span class="comment">// Eat the comment
-                </span><span class="kw">continue</span>;
             }
-        }
+
+            <span class="comment">// Eat the comment
+        </span>}
     }
 }
 
@@ -1471,12 +1485,14 @@
 }
 
 <span class="kw">impl </span>Config {
-    <span class="kw">pub const fn </span>allow_implicit_map_at_root(<span class="kw-2">mut </span><span class="self">self</span>, allow: bool) -&gt; <span class="self">Self </span>{
+    <span class="attr">#[must_use]
+    </span><span class="kw">pub const fn </span>allow_implicit_map_at_root(<span class="kw-2">mut </span><span class="self">self</span>, allow: bool) -&gt; <span class="self">Self </span>{
         <span class="self">self</span>.allow_implicit_map_at_root = allow;
         <span class="self">self
     </span>}
 
-    <span class="kw">pub const fn </span>include_comments(<span class="kw-2">mut </span><span class="self">self</span>, include: bool) -&gt; <span class="self">Self </span>{
+    <span class="attr">#[must_use]
+    </span><span class="kw">pub const fn </span>include_comments(<span class="kw-2">mut </span><span class="self">self</span>, include: bool) -&gt; <span class="self">Self </span>{
         <span class="self">self</span>.include_comments = include;
         <span class="self">self
     </span>}
@@ -1497,7 +1513,8 @@
 }
 
 <span class="kw">impl </span>Error {
-    <span class="kw">pub fn </span>new(location: Range&lt;usize&gt;, kind: ErrorKind) -&gt; <span class="self">Self </span>{
+    <span class="attr">#[must_use]
+    </span><span class="kw">pub fn </span>new(location: Range&lt;usize&gt;, kind: ErrorKind) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{ location, kind }
     }
 }
@@ -1566,7 +1583,8 @@
 }
 
 <span class="kw">impl</span>&lt;<span class="lifetime">'s</span>&gt; Event&lt;<span class="lifetime">'s</span>&gt; {
-    <span class="kw">pub fn </span>new(location: Range&lt;usize&gt;, kind: EventKind&lt;<span class="lifetime">'s</span>&gt;) -&gt; <span class="self">Self </span>{
+    <span class="attr">#[must_use]
+    </span><span class="kw">pub fn </span>new(location: Range&lt;usize&gt;, kind: EventKind&lt;<span class="lifetime">'s</span>&gt;) -&gt; <span class="self">Self </span>{
         <span class="self">Self </span>{ location, kind }
     }
 }
@@ -1616,7 +1634,7 @@
 }
 
 <span class="kw">impl </span>Nested {
-    <span class="kw">fn </span>err_display(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span>str {
+    <span class="kw">fn </span>err_display(<span class="self">self</span>) -&gt; <span class="kw-2">&amp;</span><span class="lifetime">'static </span>str {
         <span class="kw">match </span><span class="self">self </span>{
             Nested::Tuple =&gt; <span class="string">"`)`"</span>,
             Nested::Map =&gt; <span class="string">"`}`"</span>,

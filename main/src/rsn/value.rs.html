@@ -1331,7 +1331,14 @@
 <a href="#1330" id="1330">1330</a>
 <a href="#1331" id="1331">1331</a>
 <a href="#1332" id="1332">1332</a>
-<a href="#1333" id="1333">1333</a></pre></div><pre class="rust"><code><span class="kw">use </span>alloc::borrow::Cow;
+<a href="#1333" id="1333">1333</a>
+<a href="#1334" id="1334">1334</a>
+<a href="#1335" id="1335">1335</a>
+<a href="#1336" id="1336">1336</a>
+<a href="#1337" id="1337">1337</a>
+<a href="#1338" id="1338">1338</a>
+<a href="#1339" id="1339">1339</a>
+<a href="#1340" id="1340">1340</a></pre></div><pre class="rust"><code><span class="kw">use </span>alloc::borrow::Cow;
 <span class="kw">use </span>alloc::vec::Vec;
 <span class="kw">use </span>core::fmt::Display;
 <span class="kw">use </span>core::str::{<span class="self">self</span>, FromStr};
@@ -1359,7 +1366,8 @@
 
 <span class="macro">macro_rules!</span> as_integer {
     (<span class="macro-nonterminal">$name</span>:ident, <span class="macro-nonterminal">$ty</span>:ty) =&gt; {
-        <span class="kw">pub fn </span><span class="macro-nonterminal">$name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="macro-nonterminal">$ty</span>&gt; {
+        <span class="attr">#[must_use]
+        </span><span class="kw">pub fn </span><span class="macro-nonterminal">$name</span>(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="macro-nonterminal">$ty</span>&gt; {
             <span class="kw">let </span><span class="self">Self</span>::Integer(value) = <span class="self">self </span><span class="kw">else </span>{
                 <span class="kw">return </span><span class="prelude-val">None</span>;
             };
@@ -1399,7 +1407,8 @@
         <span class="self">Self</span>::parse(<span class="kw-2">&amp;mut </span>parser)
     }
 
-    <span class="kw">pub const fn </span>unit() -&gt; <span class="self">Self </span>{
+    <span class="attr">#[must_use]
+    </span><span class="kw">pub const fn </span>unit() -&gt; <span class="self">Self </span>{
         <span class="self">Self</span>::Tuple(List::new())
     }
 
@@ -1451,12 +1460,12 @@
                         name: Cow::Borrowed(name.name),
                         contents: StructContents::Tuple(list),
                     }));
-                } <span class="kw">else </span>{
-                    <span class="kw">match </span>kind {
-                        Nested::List =&gt; <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="self">Self</span>::Array(list)),
-                        Nested::Tuple =&gt; <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="self">Self</span>::Tuple(list)),
-                        Nested::Map =&gt; <span class="macro">unreachable!</span>(<span class="string">"parse_sequence isn't called on maps"</span>),
-                    }
+                }
+
+                <span class="kw">match </span>kind {
+                    Nested::List =&gt; <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="self">Self</span>::Array(list)),
+                    Nested::Tuple =&gt; <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="self">Self</span>::Tuple(list)),
+                    Nested::Map =&gt; <span class="macro">unreachable!</span>(<span class="string">"parse_sequence isn't called on maps"</span>),
                 }
             } <span class="kw">else </span>{
                 list.<span class="number">0</span>.push(<span class="self">Self</span>::from_parser_event(event, parser)<span class="question-mark">?</span>);
@@ -1474,18 +1483,18 @@
                         name: Cow::Borrowed(name.name),
                         contents: StructContents::Map(map),
                     }));
-                } <span class="kw">else </span>{
-                    <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="self">Self</span>::Map(map));
                 }
-            } <span class="kw">else </span>{
-                <span class="kw">let </span>key = <span class="self">Self</span>::from_parser_event(event, parser)<span class="question-mark">?</span>;
-                <span class="kw">let </span>value = <span class="self">Self</span>::from_parser_event(
-                    parser.next().expect(<span class="string">"will error or have another event"</span>)<span class="question-mark">?</span>,
-                    parser,
-                )<span class="question-mark">?</span>;
 
-                map.<span class="number">0</span>.push((key, value));
+                <span class="kw">return </span><span class="prelude-val">Ok</span>(<span class="self">Self</span>::Map(map));
             }
+
+            <span class="kw">let </span>key = <span class="self">Self</span>::from_parser_event(event, parser)<span class="question-mark">?</span>;
+            <span class="kw">let </span>value = <span class="self">Self</span>::from_parser_event(
+                parser.next().expect(<span class="string">"will error or have another event"</span>)<span class="question-mark">?</span>,
+                parser,
+            )<span class="question-mark">?</span>;
+
+            map.<span class="number">0</span>.push((key, value));
         }
     }
 
@@ -1501,7 +1510,8 @@
         D::deserialize(serde::ValueDeserializer(<span class="self">self</span>))
     }
 
-    <span class="kw">pub fn </span>into_owned(<span class="self">self</span>) -&gt; Value&lt;<span class="lifetime">'static</span>&gt; {
+    <span class="attr">#[must_use]
+    </span><span class="kw">pub fn </span>into_owned(<span class="self">self</span>) -&gt; Value&lt;<span class="lifetime">'static</span>&gt; {
         <span class="kw">match </span><span class="self">self </span>{
             Value::Integer(value) =&gt; Value::Integer(value),
             Value::Float(value) =&gt; Value::Float(value),
@@ -1518,7 +1528,8 @@
         }
     }
 
-    <span class="kw">pub fn </span>as_f64(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;f64&gt; {
+    <span class="attr">#[must_use]
+    </span><span class="kw">pub fn </span>as_f64(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;f64&gt; {
         <span class="kw">match </span><span class="self">self </span>{
             Value::Integer(integer) =&gt; <span class="prelude-val">Some</span>(integer.as_f64()),
             Value::Float(float) =&gt; <span class="prelude-val">Some</span>(<span class="kw-2">*</span>float),
@@ -1526,19 +1537,19 @@
         }
     }
 
-    <span class="kw">pub fn </span>as_str(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>str&gt; {
+    <span class="attr">#[must_use]
+    </span><span class="kw">pub fn </span>as_str(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>str&gt; {
         <span class="kw">match </span><span class="self">self </span>{
-            Value::Identifier(str) =&gt; <span class="prelude-val">Some</span>(str),
-            Value::String(str) =&gt; <span class="prelude-val">Some</span>(str),
+            Value::Identifier(str) | Value::String(str) =&gt; <span class="prelude-val">Some</span>(str),
             Value::Bytes(bytes) =&gt; str::from_utf8(bytes).ok(),
             <span class="kw">_ </span>=&gt; <span class="prelude-val">None</span>,
         }
     }
 
-    <span class="kw">pub fn </span>as_bytes(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>[u8]&gt; {
+    <span class="attr">#[must_use]
+    </span><span class="kw">pub fn </span>as_bytes(<span class="kw-2">&amp;</span><span class="self">self</span>) -&gt; <span class="prelude-ty">Option</span>&lt;<span class="kw-2">&amp;</span>[u8]&gt; {
         <span class="kw">match </span><span class="self">self </span>{
-            Value::Identifier(str) =&gt; <span class="prelude-val">Some</span>(str.as_bytes()),
-            Value::String(str) =&gt; <span class="prelude-val">Some</span>(str.as_bytes()),
+            Value::Identifier(str) | Value::String(str) =&gt; <span class="prelude-val">Some</span>(str.as_bytes()),
             Value::Bytes(bytes) =&gt; <span class="prelude-val">Some</span>(bytes),
             <span class="kw">_ </span>=&gt; <span class="prelude-val">None</span>,
         }
@@ -1579,7 +1590,8 @@
 }
 
 <span class="kw">impl</span>&lt;<span class="lifetime">'a</span>&gt; Named&lt;<span class="lifetime">'a</span>&gt; {
-    <span class="kw">pub fn </span>into_owned(<span class="self">self</span>) -&gt; Named&lt;<span class="lifetime">'static</span>&gt; {
+    <span class="attr">#[must_use]
+    </span><span class="kw">pub fn </span>into_owned(<span class="self">self</span>) -&gt; Named&lt;<span class="lifetime">'static</span>&gt; {
         Named {
             name: Cow::Owned(<span class="self">self</span>.name.into_owned()),
             contents: <span class="self">self</span>.contents.into_owned(),
@@ -1594,7 +1606,8 @@
 }
 
 <span class="kw">impl</span>&lt;<span class="lifetime">'a</span>&gt; StructContents&lt;<span class="lifetime">'a</span>&gt; {
-    <span class="kw">pub fn </span>into_owned(<span class="self">self</span>) -&gt; StructContents&lt;<span class="lifetime">'static</span>&gt; {
+    <span class="attr">#[must_use]
+    </span><span class="kw">pub fn </span>into_owned(<span class="self">self</span>) -&gt; StructContents&lt;<span class="lifetime">'static</span>&gt; {
         <span class="kw">match </span><span class="self">self </span>{
             StructContents::Map(contents) =&gt; StructContents::Map(contents.into_owned()),
             StructContents::Tuple(contents) =&gt; StructContents::Tuple(contents.into_owned()),
@@ -1606,7 +1619,8 @@
 </span><span class="kw">pub struct </span>Map&lt;<span class="lifetime">'a</span>&gt;(<span class="kw">pub </span>Vec&lt;(Value&lt;<span class="lifetime">'a</span>&gt;, Value&lt;<span class="lifetime">'a</span>&gt;)&gt;);
 
 <span class="kw">impl</span>&lt;<span class="lifetime">'a</span>&gt; Map&lt;<span class="lifetime">'a</span>&gt; {
-    <span class="kw">pub fn </span>into_owned(<span class="self">self</span>) -&gt; Map&lt;<span class="lifetime">'static</span>&gt; {
+    <span class="attr">#[must_use]
+    </span><span class="kw">pub fn </span>into_owned(<span class="self">self</span>) -&gt; Map&lt;<span class="lifetime">'static</span>&gt; {
         Map(<span class="self">self
             </span>.<span class="number">0
             </span>.into_iter()
@@ -1619,11 +1633,13 @@
 </span><span class="kw">pub struct </span>List&lt;<span class="lifetime">'a</span>&gt;(<span class="kw">pub </span>Vec&lt;Value&lt;<span class="lifetime">'a</span>&gt;&gt;);
 
 <span class="kw">impl</span>&lt;<span class="lifetime">'a</span>&gt; List&lt;<span class="lifetime">'a</span>&gt; {
-    <span class="kw">pub const fn </span>new() -&gt; <span class="self">Self </span>{
+    <span class="attr">#[must_use]
+    </span><span class="kw">pub const fn </span>new() -&gt; <span class="self">Self </span>{
         <span class="self">Self</span>(Vec::new())
     }
 
-    <span class="kw">pub fn </span>into_owned(<span class="self">self</span>) -&gt; List&lt;<span class="lifetime">'static</span>&gt; {
+    <span class="attr">#[must_use]
+    </span><span class="kw">pub fn </span>into_owned(<span class="self">self</span>) -&gt; List&lt;<span class="lifetime">'static</span>&gt; {
         List(<span class="self">self</span>.<span class="number">0</span>.into_iter().map(Value::into_owned).collect())
     }
 }
@@ -1881,11 +1897,7 @@
 
         <span class="kw">fn </span>end(<span class="self">self</span>) -&gt; <span class="prelude-ty">Result</span>&lt;<span class="self">Self</span>::Ok, <span class="self">Self</span>::Error&gt; {
             <span class="kw">match </span>(<span class="self">self</span>.name, <span class="self">self</span>.kind) {
-                (<span class="prelude-val">Some</span>(name), Nested::Tuple) =&gt; <span class="prelude-val">Ok</span>(Value::Named(Named {
-                    name: Cow::Owned(name),
-                    contents: StructContents::Tuple(<span class="self">self</span>.contents),
-                })),
-                (<span class="prelude-val">Some</span>(name), Nested::List) =&gt; <span class="prelude-val">Ok</span>(Value::Named(Named {
+                (<span class="prelude-val">Some</span>(name), Nested::List | Nested::Tuple) =&gt; <span class="prelude-val">Ok</span>(Value::Named(Named {
                     name: Cow::Owned(name),
                     contents: StructContents::Tuple(<span class="self">self</span>.contents),
                 })),
@@ -2066,7 +2078,8 @@
 
         <span class="macro">deserialize_int!</span>(deserialize_f64, as_f64, visit_f64, ExpectedKind::Float);
 
-        <span class="kw">fn </span>deserialize_any&lt;V&gt;(<span class="self">self</span>, visitor: V) -&gt; <span class="prelude-ty">Result</span>&lt;V::Value, <span class="self">Self</span>::Error&gt;
+        <span class="attr">#[allow(clippy::cast_possible_truncation)]
+        </span><span class="kw">fn </span>deserialize_any&lt;V&gt;(<span class="self">self</span>, visitor: V) -&gt; <span class="prelude-ty">Result</span>&lt;V::Value, <span class="self">Self</span>::Error&gt;
         <span class="kw">where
             </span>V: serde::de::Visitor&lt;<span class="lifetime">'de</span>&gt;,
         {
@@ -2132,7 +2145,8 @@
             }
         }
 
-        <span class="kw">fn </span>deserialize_f32&lt;V&gt;(<span class="self">self</span>, visitor: V) -&gt; <span class="prelude-ty">Result</span>&lt;V::Value, <span class="self">Self</span>::Error&gt;
+        <span class="attr">#[allow(clippy::cast_possible_truncation)]
+        </span><span class="kw">fn </span>deserialize_f32&lt;V&gt;(<span class="self">self</span>, visitor: V) -&gt; <span class="prelude-ty">Result</span>&lt;V::Value, <span class="self">Self</span>::Error&gt;
         <span class="kw">where
             </span>V: serde::de::Visitor&lt;<span class="lifetime">'de</span>&gt;,
         {
