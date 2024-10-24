@@ -75,7 +75,7 @@ impl<'a> StructOfEverything<'a> {
 
 #[track_caller]
 fn roundtrip<T: Debug + Serialize + for<'de> Deserialize<'de> + PartialEq>(value: &T, check: &str) {
-    let rendered = dbg!(crate::to_string(value));
+    let rendered = dbg!(crate::to_string(value).expect("no errors"));
     assert_eq!(rendered, check);
     let restored: T = crate::from_str(&rendered).expect("deserialization failed");
     assert_eq!(&restored, value);
@@ -86,7 +86,7 @@ fn roundtrip_pretty<T: Debug + Serialize + for<'de> Deserialize<'de> + PartialEq
     value: &T,
     check: &str,
 ) {
-    let rendered = crate::to_string_pretty(value);
+    let rendered = crate::to_string_pretty(value).expect("no errors");
     println!("{rendered}");
     assert_eq!(rendered, check);
     let restored: T = crate::from_str(&rendered).expect("deserialization failed");
@@ -100,7 +100,8 @@ fn roundtrip_implicit_map<T: Debug + Serialize + for<'de> Deserialize<'de> + Par
 ) {
     let rendered = crate::ser::Config::pretty()
         .implicit_map_at_root(true)
-        .serialize(value);
+        .serialize(value)
+        .expect("no errors");
     println!("{rendered}");
     assert_eq!(rendered, check);
     let restored: T = crate::parser::Config::default()
@@ -117,7 +118,8 @@ fn roundtrip_anonymous_structs<T: Debug + Serialize + for<'de> Deserialize<'de> 
 ) {
     let rendered = crate::ser::Config::new()
         .anonymous_structs(true)
-        .serialize(value);
+        .serialize(value)
+        .expect("no errors");
     println!("{rendered}");
     assert_eq!(rendered, check);
     let restored: T = crate::parser::Config::default()
@@ -234,7 +236,7 @@ fn deserialize_tagged() {
 #[test]
 fn value_from_serialize() {
     let original = StructOfEverything::default();
-    let value = dbg!(Value::from_serialize(&original));
+    let value = dbg!(Value::from_serialize(&original).unwrap());
     let from_value: StructOfEverything = value.to_deserialize().unwrap();
     assert_eq!(original, from_value);
 }

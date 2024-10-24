@@ -9,6 +9,7 @@ use serde::Deserialize;
 use crate::parser::{self, Config, Event, EventKind, Name, Nested, Parser, Primitive};
 use crate::tokenizer::{self, Integer};
 
+/// Deserializes Rsn using Serde.
 pub struct Deserializer<'de> {
     parser: BetterPeekable<Parser<'de>>,
     newtype_state: Option<NewtypeState>,
@@ -21,19 +22,29 @@ enum NewtypeState {
 }
 
 impl<'de> Deserializer<'de> {
+    /// Returns a deserializer for `source` with the given `configuration`.
+    ///
+    /// `Config::include_comments` will always be disabled, regardless of the
+    /// value set in `configuration`.
     #[must_use]
-    pub fn new(source: &'de str, config: Config) -> Self {
+    pub fn new(source: &'de str, configuration: Config) -> Self {
         Self {
-            parser: BetterPeekable::new(Parser::new(source, config.include_comments(false))),
+            parser: BetterPeekable::new(Parser::new(source, configuration.include_comments(false))),
             newtype_state: None,
         }
     }
 
+    /// Checks that this deserializer has consumed all of the input.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`parser::ErrorKind::TrailingData`] if there is any data left
+    /// unparsed.
     pub fn ensure_eof(mut self) -> Result<(), Error> {
         match self.parser.next() {
             None => Ok(()),
             Some(Ok(event)) => Err(Error::new(event.location, parser::ErrorKind::TrailingData)),
-            Some(Err(err)) => Err(err.into()),
+            Some(Err(err)) => Err(Error::new(err.location, parser::ErrorKind::TrailingData)),
         }
     }
 
@@ -197,7 +208,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
                             de.parser.next();
                             visitor.visit_unit()
                         } else {
-                            visitor.visit_seq(SequenceDeserializer::new(de))
+                            visitor.visit_seq(sealed::SequenceDeserializer::new(de))
                         }
                     }
                     Nested::Map => visitor.visit_map(de),
@@ -500,7 +511,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
                     ));
                 }
 
-                de.with_error_context(|de| visitor.visit_seq(SequenceDeserializer::new(de)))
+                de.with_error_context(|de| visitor.visit_seq(sealed::SequenceDeserializer::new(de)))
             }
             Some(other) => Err(DeserializerError::new(
                 other.location,
@@ -548,7 +559,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
                     // parsing the `)` easily, we need to "take over" by erasing the
                     // current newtype state.
                     de.parser.next();
-                    return visitor.visit_seq(SequenceDeserializer::new(de));
+                    return visitor.visit_seq(sealed::SequenceDeserializer::new(de));
                 }
             } else {
                 match de.parser.next().transpose()? {
@@ -585,7 +596,7 @@ impl<'de> serde::de::Deserializer<'de> for &mut Deserializer<'de> {
                 }
             }
 
-            visitor.visit_seq(SequenceDeserializer::new(de))
+            visitor.visit_seq(sealed::SequenceDeserializer::new(de))
         })
     }
 
@@ -760,450 +771,462 @@ impl<'de> MapAccess<'de> for Deserializer<'de> {
     }
 }
 
-pub struct SequenceDeserializer<'a, 'de> {
-    de: &'a mut Deserializer<'de>,
-    ended: bool,
-}
-impl<'a, 'de> SequenceDeserializer<'a, 'de> {
-    fn new(de: &'a mut Deserializer<'de>) -> Self {
-        Self { de, ended: false }
+mod sealed {
+    use super::{
+        parser, Deserializer, DeserializerError, EnumAccess, ErrorKind, Event, EventKind, Nested,
+        NewtypeState, Primitive, SeqAccess, VariantAccess,
+    };
+
+    pub struct SequenceDeserializer<'a, 'de> {
+        de: &'a mut Deserializer<'de>,
+        ended: bool,
     }
-}
-
-impl<'a, 'de> SeqAccess<'de> for SequenceDeserializer<'a, 'de> {
-    type Error = DeserializerError;
-
-    fn next_element_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>, Self::Error>
-    where
-        T: serde::de::DeserializeSeed<'de>,
-    {
-        self.de.with_error_context(|de| match de.parser.peek() {
-            Some(Ok(Event {
-                kind: EventKind::EndNested,
-                ..
-            })) => {
-                de.parser.next();
-                self.ended = true;
-                Ok(None)
-            }
-            Some(Ok(evt)) => {
-                let error_start = evt.location.start;
-                de.with_error_start(error_start, |de| seed.deserialize(de).map(Some))
-            }
-            Some(_) => seed.deserialize(de).map(Some),
-            None => Err(DeserializerError::new(
-                None,
-                parser::ErrorKind::UnexpectedEof,
-            )),
-        })
+    impl<'a, 'de> SequenceDeserializer<'a, 'de> {
+        pub(crate) fn new(de: &'a mut Deserializer<'de>) -> Self {
+            Self { de, ended: false }
+        }
     }
-}
 
-impl<'a, 'de> Drop for SequenceDeserializer<'a, 'de> {
-    fn drop(&mut self) {
-        if !self.ended {
-            let mut levels = 1;
-            loop {
-                if matches!(self.de.parser.peek(), None | Some(Err(_))) {
-                    break;
+    impl<'a, 'de> SeqAccess<'de> for SequenceDeserializer<'a, 'de> {
+        type Error = DeserializerError;
+
+        fn next_element_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>, Self::Error>
+        where
+            T: serde::de::DeserializeSeed<'de>,
+        {
+            self.de.with_error_context(|de| match de.parser.peek() {
+                Some(Ok(Event {
+                    kind: EventKind::EndNested,
+                    ..
+                })) => {
+                    de.parser.next();
+                    self.ended = true;
+                    Ok(None)
                 }
+                Some(Ok(evt)) => {
+                    let error_start = evt.location.start;
+                    de.with_error_start(error_start, |de| seed.deserialize(de).map(Some))
+                }
+                Some(_) => seed.deserialize(de).map(Some),
+                None => Err(DeserializerError::new(
+                    None,
+                    parser::ErrorKind::UnexpectedEof,
+                )),
+            })
+        }
+    }
 
-                match self.de.parser.next().expect("just peeked") {
-                    Ok(Event {
-                        kind: EventKind::EndNested,
-                        ..
-                    }) => {
-                        levels -= 1;
-                        if levels == 0 {
-                            break;
+    impl<'a, 'de> Drop for SequenceDeserializer<'a, 'de> {
+        fn drop(&mut self) {
+            if !self.ended {
+                let mut levels = 1;
+                loop {
+                    if matches!(self.de.parser.peek(), None | Some(Err(_))) {
+                        break;
+                    }
+
+                    match self.de.parser.next().expect("just peeked") {
+                        Ok(Event {
+                            kind: EventKind::EndNested,
+                            ..
+                        }) => {
+                            levels -= 1;
+                            if levels == 0 {
+                                break;
+                            }
                         }
+                        Ok(Event {
+                            kind: EventKind::BeginNested { .. },
+                            ..
+                        }) => {
+                            levels += 1;
+                        }
+                        _ => {}
                     }
-                    Ok(Event {
-                        kind: EventKind::BeginNested { .. },
-                        ..
-                    }) => {
-                        levels += 1;
-                    }
-                    _ => {}
                 }
             }
         }
     }
-}
 
-impl<'a, 'de> EnumAccess<'de> for &'a mut Deserializer<'de> {
-    type Error = DeserializerError;
-    type Variant = EnumVariantAccessor<'a, 'de>;
+    impl<'a, 'de> EnumAccess<'de> for &'a mut Deserializer<'de> {
+        type Error = DeserializerError;
+        type Variant = EnumVariantAccessor<'a, 'de>;
 
-    fn variant_seed<V>(self, seed: V) -> Result<(V::Value, Self::Variant), Self::Error>
-    where
-        V: serde::de::DeserializeSeed<'de>,
-    {
-        match self.parser.peek() {
-            Some(Ok(Event {
-                kind: EventKind::Primitive(Primitive::Identifier(_) | Primitive::String(_)),
-                ..
-            })) => Ok((seed.deserialize(&mut *self)?, EnumVariantAccessor::Unit)),
-            Some(Ok(Event {
-                kind:
-                    EventKind::BeginNested {
-                        name: Some(name), ..
-                    },
-                ..
-            })) => {
-                let variant = seed.deserialize(&mut VariantDeserializer(name))?;
-                Ok((variant, EnumVariantAccessor::Nested(self)))
-            }
-            _ => Err(DeserializerError::new(None, ErrorKind::ExpectedEnum)),
-        }
-        // match &self.0 {
-        //     Value::Identifier(_) | Value::String(_) => {}
-        //     Value::Named(named) => {
-        //         let variant =
-        //             seed.deserialize(ValueDeserializer(&Value::String(named.name.clone())))?;
-
-        //         let accessor = match &named.contents {
-        //             StructContents::Map(map) => EnumVariantAccessor::Map(map),
-        //             StructContents::Tuple(list) => EnumVariantAccessor::Tuple(list),
-        //         };
-
-        //         Ok((variant, accessor))
-        //     }
-        //     _ => Err(FromValueError::Expected(ExpectedKind::Enum)),
-        // }
-    }
-}
-
-struct VariantDeserializer<'a>(&'a str);
-
-impl<'a, 'de> serde::Deserializer<'de> for &'a mut VariantDeserializer<'a> {
-    type Error = DeserializerError;
-
-    fn deserialize_any<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: serde::de::Visitor<'de>,
-    {
-        Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
-    }
-
-    fn deserialize_bool<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: serde::de::Visitor<'de>,
-    {
-        Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
-    }
-
-    fn deserialize_i8<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: serde::de::Visitor<'de>,
-    {
-        Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
-    }
-
-    fn deserialize_i16<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: serde::de::Visitor<'de>,
-    {
-        Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
-    }
-
-    fn deserialize_i32<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: serde::de::Visitor<'de>,
-    {
-        Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
-    }
-
-    fn deserialize_i64<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: serde::de::Visitor<'de>,
-    {
-        Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
-    }
-
-    fn deserialize_u8<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: serde::de::Visitor<'de>,
-    {
-        Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
-    }
-
-    fn deserialize_u16<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: serde::de::Visitor<'de>,
-    {
-        Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
-    }
-
-    fn deserialize_u32<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: serde::de::Visitor<'de>,
-    {
-        Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
-    }
-
-    fn deserialize_u64<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: serde::de::Visitor<'de>,
-    {
-        Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
-    }
-
-    fn deserialize_f32<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: serde::de::Visitor<'de>,
-    {
-        Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
-    }
-
-    fn deserialize_f64<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: serde::de::Visitor<'de>,
-    {
-        Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
-    }
-
-    fn deserialize_char<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: serde::de::Visitor<'de>,
-    {
-        Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
-    }
-
-    fn deserialize_str<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: serde::de::Visitor<'de>,
-    {
-        visitor.visit_str(self.0)
-    }
-
-    fn deserialize_string<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: serde::de::Visitor<'de>,
-    {
-        visitor.visit_str(self.0)
-    }
-
-    fn deserialize_bytes<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: serde::de::Visitor<'de>,
-    {
-        Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
-    }
-
-    fn deserialize_byte_buf<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: serde::de::Visitor<'de>,
-    {
-        Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
-    }
-
-    fn deserialize_option<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: serde::de::Visitor<'de>,
-    {
-        Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
-    }
-
-    fn deserialize_unit<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: serde::de::Visitor<'de>,
-    {
-        Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
-    }
-
-    fn deserialize_unit_struct<V>(
-        self,
-        _name: &'static str,
-        _visitor: V,
-    ) -> Result<V::Value, Self::Error>
-    where
-        V: serde::de::Visitor<'de>,
-    {
-        Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
-    }
-
-    fn deserialize_newtype_struct<V>(
-        self,
-        _name: &'static str,
-        _visitor: V,
-    ) -> Result<V::Value, Self::Error>
-    where
-        V: serde::de::Visitor<'de>,
-    {
-        Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
-    }
-
-    fn deserialize_seq<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: serde::de::Visitor<'de>,
-    {
-        Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
-    }
-
-    fn deserialize_tuple<V>(self, _len: usize, _visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: serde::de::Visitor<'de>,
-    {
-        Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
-    }
-
-    fn deserialize_tuple_struct<V>(
-        self,
-        _name: &'static str,
-        _len: usize,
-        _visitor: V,
-    ) -> Result<V::Value, Self::Error>
-    where
-        V: serde::de::Visitor<'de>,
-    {
-        Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
-    }
-
-    fn deserialize_map<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: serde::de::Visitor<'de>,
-    {
-        Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
-    }
-
-    fn deserialize_struct<V>(
-        self,
-        _name: &'static str,
-        _fields: &'static [&'static str],
-        _visitor: V,
-    ) -> Result<V::Value, Self::Error>
-    where
-        V: serde::de::Visitor<'de>,
-    {
-        Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
-    }
-
-    fn deserialize_enum<V>(
-        self,
-        _name: &'static str,
-        _variants: &'static [&'static str],
-        _visitor: V,
-    ) -> Result<V::Value, Self::Error>
-    where
-        V: serde::de::Visitor<'de>,
-    {
-        Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
-    }
-
-    fn deserialize_identifier<V>(self, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: serde::de::Visitor<'de>,
-    {
-        visitor.visit_str(self.0)
-    }
-
-    fn deserialize_ignored_any<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: serde::de::Visitor<'de>,
-    {
-        Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
-    }
-}
-
-pub enum EnumVariantAccessor<'a, 'de> {
-    Unit,
-    Nested(&'a mut Deserializer<'de>),
-}
-
-impl<'a, 'de> VariantAccess<'de> for EnumVariantAccessor<'a, 'de> {
-    type Error = DeserializerError;
-
-    fn unit_variant(self) -> Result<(), Self::Error> {
-        Ok(())
-    }
-
-    fn newtype_variant_seed<T>(self, seed: T) -> Result<T::Value, Self::Error>
-    where
-        T: serde::de::DeserializeSeed<'de>,
-    {
-        if let EnumVariantAccessor::Nested(deserializer) = self {
-            let modification = match deserializer.parser.peek() {
+        fn variant_seed<V>(self, seed: V) -> Result<(V::Value, Self::Variant), Self::Error>
+        where
+            V: serde::de::DeserializeSeed<'de>,
+        {
+            match self.parser.peek() {
+                Some(Ok(Event {
+                    kind: EventKind::Primitive(Primitive::Identifier(_) | Primitive::String(_)),
+                    ..
+                })) => Ok((seed.deserialize(&mut *self)?, EnumVariantAccessor::Unit)),
                 Some(Ok(Event {
                     kind:
                         EventKind::BeginNested {
-                            kind: Nested::Tuple,
-                            ..
+                            name: Some(name), ..
                         },
                     ..
                 })) => {
-                    let _begin = deserializer.parser.next();
-                    Some(deserializer.set_newtype_state(NewtypeState::TupleVariant))
+                    let variant = seed.deserialize(&mut VariantDeserializer(name))?;
+                    Ok((variant, EnumVariantAccessor::Nested(self)))
                 }
-                Some(Ok(Event {
-                    kind:
-                        EventKind::BeginNested {
-                            kind: Nested::Map, ..
-                        },
-                    ..
-                })) => Some(deserializer.set_newtype_state(NewtypeState::StructVariant)),
-                _ => None,
-            };
-            let result = deserializer.with_error_context(|de| seed.deserialize(&mut *de))?;
-            if let Some(modification) = modification {
-                if deserializer.finish_newtype(modification) == Some(NewtypeState::TupleVariant) {
-                    // SequenceDeserializer has a loop in its drop to eat the
-                    // remaining events until the end
-                    drop(SequenceDeserializer::new(&mut *deserializer));
-                }
+                _ => Err(DeserializerError::new(None, ErrorKind::ExpectedEnum)),
             }
+            // match &self.0 {
+            //     Value::Identifier(_) | Value::String(_) => {}
+            //     Value::Named(named) => {
+            //         let variant =
+            //             seed.deserialize(ValueDeserializer(&Value::String(named.name.clone())))?;
 
-            Ok(result)
-        } else {
-            Err(DeserializerError::new(None, ErrorKind::ExpectedTupleStruct))
+            //         let accessor = match &named.contents {
+            //             StructContents::Map(map) => EnumVariantAccessor::Map(map),
+            //             StructContents::Tuple(list) => EnumVariantAccessor::Tuple(list),
+            //         };
+
+            //         Ok((variant, accessor))
+            //     }
+            //     _ => Err(FromValueError::Expected(ExpectedKind::Enum)),
+            // }
         }
     }
 
-    fn tuple_variant<V>(self, _len: usize, visitor: V) -> Result<V::Value, Self::Error>
-    where
-        V: serde::de::Visitor<'de>,
-    {
-        if let EnumVariantAccessor::Nested(deserializer) = self {
-            let nested_event = deserializer
-                .parser
-                .next()
-                .expect("variant access matched Nested")?;
-            deserializer.with_error_start(nested_event.location.start, |de| {
-                visitor.visit_seq(SequenceDeserializer::new(de))
-            })
-        } else {
-            Err(DeserializerError::new(None, ErrorKind::ExpectedTupleStruct))
+    struct VariantDeserializer<'a>(&'a str);
+
+    impl<'a, 'de> serde::Deserializer<'de> for &'a mut VariantDeserializer<'a> {
+        type Error = DeserializerError;
+
+        fn deserialize_any<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
+        where
+            V: serde::de::Visitor<'de>,
+        {
+            Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
+        }
+
+        fn deserialize_bool<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
+        where
+            V: serde::de::Visitor<'de>,
+        {
+            Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
+        }
+
+        fn deserialize_i8<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
+        where
+            V: serde::de::Visitor<'de>,
+        {
+            Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
+        }
+
+        fn deserialize_i16<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
+        where
+            V: serde::de::Visitor<'de>,
+        {
+            Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
+        }
+
+        fn deserialize_i32<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
+        where
+            V: serde::de::Visitor<'de>,
+        {
+            Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
+        }
+
+        fn deserialize_i64<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
+        where
+            V: serde::de::Visitor<'de>,
+        {
+            Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
+        }
+
+        fn deserialize_u8<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
+        where
+            V: serde::de::Visitor<'de>,
+        {
+            Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
+        }
+
+        fn deserialize_u16<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
+        where
+            V: serde::de::Visitor<'de>,
+        {
+            Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
+        }
+
+        fn deserialize_u32<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
+        where
+            V: serde::de::Visitor<'de>,
+        {
+            Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
+        }
+
+        fn deserialize_u64<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
+        where
+            V: serde::de::Visitor<'de>,
+        {
+            Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
+        }
+
+        fn deserialize_f32<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
+        where
+            V: serde::de::Visitor<'de>,
+        {
+            Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
+        }
+
+        fn deserialize_f64<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
+        where
+            V: serde::de::Visitor<'de>,
+        {
+            Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
+        }
+
+        fn deserialize_char<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
+        where
+            V: serde::de::Visitor<'de>,
+        {
+            Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
+        }
+
+        fn deserialize_str<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+        where
+            V: serde::de::Visitor<'de>,
+        {
+            visitor.visit_str(self.0)
+        }
+
+        fn deserialize_string<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+        where
+            V: serde::de::Visitor<'de>,
+        {
+            visitor.visit_str(self.0)
+        }
+
+        fn deserialize_bytes<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
+        where
+            V: serde::de::Visitor<'de>,
+        {
+            Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
+        }
+
+        fn deserialize_byte_buf<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
+        where
+            V: serde::de::Visitor<'de>,
+        {
+            Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
+        }
+
+        fn deserialize_option<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
+        where
+            V: serde::de::Visitor<'de>,
+        {
+            Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
+        }
+
+        fn deserialize_unit<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
+        where
+            V: serde::de::Visitor<'de>,
+        {
+            Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
+        }
+
+        fn deserialize_unit_struct<V>(
+            self,
+            _name: &'static str,
+            _visitor: V,
+        ) -> Result<V::Value, Self::Error>
+        where
+            V: serde::de::Visitor<'de>,
+        {
+            Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
+        }
+
+        fn deserialize_newtype_struct<V>(
+            self,
+            _name: &'static str,
+            _visitor: V,
+        ) -> Result<V::Value, Self::Error>
+        where
+            V: serde::de::Visitor<'de>,
+        {
+            Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
+        }
+
+        fn deserialize_seq<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
+        where
+            V: serde::de::Visitor<'de>,
+        {
+            Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
+        }
+
+        fn deserialize_tuple<V>(self, _len: usize, _visitor: V) -> Result<V::Value, Self::Error>
+        where
+            V: serde::de::Visitor<'de>,
+        {
+            Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
+        }
+
+        fn deserialize_tuple_struct<V>(
+            self,
+            _name: &'static str,
+            _len: usize,
+            _visitor: V,
+        ) -> Result<V::Value, Self::Error>
+        where
+            V: serde::de::Visitor<'de>,
+        {
+            Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
+        }
+
+        fn deserialize_map<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
+        where
+            V: serde::de::Visitor<'de>,
+        {
+            Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
+        }
+
+        fn deserialize_struct<V>(
+            self,
+            _name: &'static str,
+            _fields: &'static [&'static str],
+            _visitor: V,
+        ) -> Result<V::Value, Self::Error>
+        where
+            V: serde::de::Visitor<'de>,
+        {
+            Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
+        }
+
+        fn deserialize_enum<V>(
+            self,
+            _name: &'static str,
+            _variants: &'static [&'static str],
+            _visitor: V,
+        ) -> Result<V::Value, Self::Error>
+        where
+            V: serde::de::Visitor<'de>,
+        {
+            Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
+        }
+
+        fn deserialize_identifier<V>(self, visitor: V) -> Result<V::Value, Self::Error>
+        where
+            V: serde::de::Visitor<'de>,
+        {
+            visitor.visit_str(self.0)
+        }
+
+        fn deserialize_ignored_any<V>(self, _visitor: V) -> Result<V::Value, Self::Error>
+        where
+            V: serde::de::Visitor<'de>,
+        {
+            Err(DeserializerError::new(None, ErrorKind::ExpectedEnum))
         }
     }
 
-    fn struct_variant<V>(
-        self,
-        _fields: &'static [&'static str],
-        visitor: V,
-    ) -> Result<V::Value, Self::Error>
-    where
-        V: serde::de::Visitor<'de>,
-    {
-        if let EnumVariantAccessor::Nested(deserializer) = self {
-            let nested_event = deserializer
-                .parser
-                .next()
-                .expect("variant access matched Nested")?;
-            deserializer.with_error_start(nested_event.location.start, |de| visitor.visit_map(de))
-        } else {
-            Err(DeserializerError::new(None, ErrorKind::ExpectedTupleStruct))
+    pub enum EnumVariantAccessor<'a, 'de> {
+        Unit,
+        Nested(&'a mut Deserializer<'de>),
+    }
+
+    impl<'a, 'de> VariantAccess<'de> for EnumVariantAccessor<'a, 'de> {
+        type Error = DeserializerError;
+
+        fn unit_variant(self) -> Result<(), Self::Error> {
+            Ok(())
+        }
+
+        fn newtype_variant_seed<T>(self, seed: T) -> Result<T::Value, Self::Error>
+        where
+            T: serde::de::DeserializeSeed<'de>,
+        {
+            if let EnumVariantAccessor::Nested(deserializer) = self {
+                let modification = match deserializer.parser.peek() {
+                    Some(Ok(Event {
+                        kind:
+                            EventKind::BeginNested {
+                                kind: Nested::Tuple,
+                                ..
+                            },
+                        ..
+                    })) => {
+                        let _begin = deserializer.parser.next();
+                        Some(deserializer.set_newtype_state(NewtypeState::TupleVariant))
+                    }
+                    Some(Ok(Event {
+                        kind:
+                            EventKind::BeginNested {
+                                kind: Nested::Map, ..
+                            },
+                        ..
+                    })) => Some(deserializer.set_newtype_state(NewtypeState::StructVariant)),
+                    _ => None,
+                };
+                let result = deserializer.with_error_context(|de| seed.deserialize(&mut *de))?;
+                if let Some(modification) = modification {
+                    if deserializer.finish_newtype(modification) == Some(NewtypeState::TupleVariant)
+                    {
+                        // SequenceDeserializer has a loop in its drop to eat the
+                        // remaining events until the end
+                        drop(SequenceDeserializer::new(&mut *deserializer));
+                    }
+                }
+
+                Ok(result)
+            } else {
+                Err(DeserializerError::new(None, ErrorKind::ExpectedTupleStruct))
+            }
+        }
+
+        fn tuple_variant<V>(self, _len: usize, visitor: V) -> Result<V::Value, Self::Error>
+        where
+            V: serde::de::Visitor<'de>,
+        {
+            if let EnumVariantAccessor::Nested(deserializer) = self {
+                let nested_event = deserializer
+                    .parser
+                    .next()
+                    .expect("variant access matched Nested")?;
+                deserializer.with_error_start(nested_event.location.start, |de| {
+                    visitor.visit_seq(SequenceDeserializer::new(de))
+                })
+            } else {
+                Err(DeserializerError::new(None, ErrorKind::ExpectedTupleStruct))
+            }
+        }
+
+        fn struct_variant<V>(
+            self,
+            _fields: &'static [&'static str],
+            visitor: V,
+        ) -> Result<V::Value, Self::Error>
+        where
+            V: serde::de::Visitor<'de>,
+        {
+            if let EnumVariantAccessor::Nested(deserializer) = self {
+                let nested_event = deserializer
+                    .parser
+                    .next()
+                    .expect("variant access matched Nested")?;
+                deserializer
+                    .with_error_start(nested_event.location.start, |de| visitor.visit_map(de))
+            } else {
+                Err(DeserializerError::new(None, ErrorKind::ExpectedTupleStruct))
+            }
         }
     }
 }
 
+/// A deserialization error.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Error {
+    /// The offset of bytes in the source when the error occurred.
     pub location: Range<usize>,
+    /// The kind of error that occurred.
     pub kind: ErrorKind,
 }
 
 impl Error {
-    pub fn new(location: Range<usize>, kind: impl Into<ErrorKind>) -> Self {
+    fn new(location: Range<usize>, kind: impl Into<ErrorKind>) -> Self {
         Self {
             location,
             kind: kind.into(),
@@ -1231,14 +1254,17 @@ impl Display for Error {
     }
 }
 
+/// An error that arose while deserializing Rsn.
 #[derive(Debug, Clone, PartialEq)]
 pub struct DeserializerError {
+    /// The location of the error, if available.
     pub location: Option<Range<usize>>,
+    /// The kind of error that occurred.
     pub kind: ErrorKind,
 }
 
 impl DeserializerError {
-    pub fn new(location: impl Into<Option<Range<usize>>>, kind: impl Into<ErrorKind>) -> Self {
+    fn new(location: impl Into<Option<Range<usize>>>, kind: impl Into<ErrorKind>) -> Self {
         Self {
             location: location.into(),
             kind: kind.into(),
@@ -1279,25 +1305,49 @@ impl From<parser::Error> for DeserializerError {
     }
 }
 
+/// The kind of a deserialization error.
 #[derive(Debug, Clone, PartialEq)]
+#[non_exhaustive]
 pub enum ErrorKind {
+    /// An integer was expected.
     ExpectedInteger,
+    /// A floating point number was expected.
     ExpectedFloat,
+    /// A unit type was expected.
     ExpectedUnit,
+    /// A boolean literal was expected.
     ExpectedBool,
+    /// An option was expected.
     ExpectedOption,
+    /// A character literal was expected.
     ExpectedChar,
+    /// A string literal was expected.
     ExpectedString,
+    /// A byte string literal was expected.
     ExpectedBytes,
+    /// A sequence (list) was expected.
     ExpectedSequence,
+    /// A map was expected.
     ExpectedMap,
+    /// A structure containing a tuple was expected.
     ExpectedTupleStruct,
+    /// A structure containing named fields was expected.
     ExpectedMapStruct,
+    /// An enumerated value was expected.
     ExpectedEnum,
+    /// Invalid UTF-8 was encountered in the input or while decoding escaped
+    /// characters.
     InvalidUtf8,
+    /// The name of a type did not match what was expected.
+    ///
+    /// The `&str` parameter is the name that was expected.
     NameMismatch(&'static str),
+    /// `Some(_)` can only contain one value but more than one value was
+    /// encountered.
     SomeCanOnlyContainOneValue,
+    /// An Rsn parsing error.
     Parser(parser::ErrorKind),
+    /// An error from deserializing Serde.
     Message(String),
 }
 
@@ -1341,6 +1391,11 @@ impl Display for ErrorKind {
 }
 
 impl Config {
+    /// Deserializes `T` from `source` using this configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `source` cannot be deserialized as `T`.
     pub fn deserialize<'de, T: Deserialize<'de>>(self, source: &'de str) -> Result<T, Error> {
         let mut deserializer = Deserializer::new(source, self);
         let result = match T::deserialize(&mut deserializer) {
@@ -1356,6 +1411,11 @@ impl Config {
         Ok(result)
     }
 
+    /// Deserializes `T` from `source` using this configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `source` cannot be deserialized as `T`.
     pub fn deserialize_from_slice<'de, T: Deserialize<'de>>(
         self,
         source: &'de [u8],
@@ -1375,6 +1435,12 @@ impl Config {
         self.deserialize(source)
     }
 
+    /// Deserializes `T` from `reader` using this configuration.
+    ///
+    /// # Errors
+    ///
+    /// Returns any errors encountered while reading from `reader` or if
+    /// `reader` cannot be deserialized as `T`.
     #[cfg(feature = "std")]
     pub fn deserialize_from_reader<T: DeserializeOwned, R: std::io::Read>(
         self,

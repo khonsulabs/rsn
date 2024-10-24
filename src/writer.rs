@@ -7,6 +7,7 @@ use core::fmt::Write;
 use crate::tokenizer::Integer;
 use crate::value::{StructContents, Value};
 
+/// A low-level writer for the Rsn format.
 #[derive(Debug)]
 pub struct Writer<'config, Output> {
     output: Output,
@@ -24,6 +25,7 @@ impl<'config, Output> Writer<'config, Output>
 where
     Output: Write,
 {
+    /// Returns a writer that outputs to `output` using `config`.
     pub fn new(output: Output, config: &'config Config) -> Self {
         Self {
             output,
@@ -32,11 +34,23 @@ where
         }
     }
 
+    /// Finishes writing and returns the output.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if a nested type was begun and a corresponding
+    /// `finish_nested` was not called.
     pub fn finish(self) -> Output {
         assert!(self.nested.is_empty());
         self.output
     }
 
+    /// Begins a named map. A corresponding call to `finish_nested` must be made
+    /// when the map contents are completed.
+    ///
+    /// # Errors
+    ///
+    /// Returns any errors that arise while writing to `Output`.
     pub fn begin_named_map(&mut self, name: &str) -> fmt::Result {
         self.prepare_to_write_value()?;
         self.output.write_str(name)?;
@@ -48,6 +62,12 @@ where
         Ok(())
     }
 
+    /// Begins a named tuple. A corresponding call to `finish_nested` must be
+    /// made when the tuple contents are completed.
+    ///
+    /// # Errors
+    ///
+    /// Returns any errors that arise while writing to `Output`.
     pub fn begin_named_tuple(&mut self, name: &str) -> fmt::Result {
         self.prepare_to_write_value()?;
         self.nested.push(NestedState::Tuple(SequenceState::Empty));
@@ -55,24 +75,47 @@ where
         self.output.write_char('(')
     }
 
+    /// Begins a map. A corresponding call to `finish_nested` must be made when
+    /// the map contents are completed.
+    ///
+    /// # Errors
+    ///
+    /// Returns any errors that arise while writing to `Output`.
     pub fn begin_map(&mut self) -> fmt::Result {
         self.prepare_to_write_value()?;
         self.nested.push(NestedState::Map(MapState::Empty));
         self.output.write_char('{')
     }
 
+    /// Begins a tuple. A corresponding call to `finish_nested` must be made when
+    /// the tuple contents are completed.
+    ///
+    /// # Errors
+    ///
+    /// Returns any errors that arise while writing to `Output`.
     pub fn begin_tuple(&mut self) -> fmt::Result {
         self.prepare_to_write_value()?;
         self.nested.push(NestedState::Tuple(SequenceState::Empty));
         self.output.write_char('(')
     }
 
+    /// Begins a list/array. A corresponding call to `finish_nested` must be
+    /// made when the list contents are completed.
+    ///
+    /// # Errors
+    ///
+    /// Returns any errors that arise while writing to `Output`.
     pub fn begin_list(&mut self) -> fmt::Result {
         self.prepare_to_write_value()?;
         self.nested.push(NestedState::List(SequenceState::Empty));
         self.output.write_char('[')
     }
 
+    /// Writes a primitive value, formatting it as valid Rsn.
+    ///
+    /// # Errors
+    ///
+    /// Returns any errors that arise while writing to `Output`.
     pub fn write_primitive<P>(&mut self, p: &P) -> fmt::Result
     where
         P: Primitive + ?Sized,
@@ -81,6 +124,11 @@ where
         p.render_to(&mut self.output)
     }
 
+    /// Writes `ident` without any extra formatting.
+    ///
+    /// # Errors
+    ///
+    /// Returns any errors that arise while writing to `Output`.
     pub fn write_raw_value(&mut self, ident: &str) -> fmt::Result {
         self.prepare_to_write_value()?;
         self.output.write_str(ident)
@@ -122,6 +170,11 @@ where
         Ok(())
     }
 
+    /// Inserts the configured newline character, if needed.
+    ///
+    /// # Errors
+    ///
+    /// Returns any errors that arise while writing to `Output`.
     pub fn insert_newline(&mut self) -> fmt::Result {
         if let Config::Pretty {
             indentation,
@@ -137,6 +190,15 @@ where
         Ok(())
     }
 
+    /// Finishes the current nested value.
+    ///
+    /// # Errors
+    ///
+    /// Returns any errors that arise while writing to `Output`.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if are no open nested types.
     pub fn finish_nested(&mut self) -> fmt::Result {
         match self.nested.pop().expect("not in a nested state") {
             NestedState::Tuple(state) => {
@@ -161,6 +223,11 @@ where
         }
     }
 
+    /// Writes a value.
+    ///
+    /// # Errors
+    ///
+    /// Returns any errors that arise while writing to `Output`.
     pub fn write_value(&mut self, value: &Value<'_>) -> fmt::Result {
         match value {
             Value::Integer(value) => match value {
@@ -219,7 +286,13 @@ where
     }
 }
 
+/// A type that can be written as a primitive.q
 pub trait Primitive {
+    /// Renders this type to `buffer`.
+    ///
+    /// # Errors
+    ///
+    /// Returns any errors that arise while writing to `buffer`.
     fn render_to<W: Write>(&self, buffer: &mut W) -> fmt::Result;
 }
 
@@ -354,13 +427,18 @@ enum MapState {
     AfterKey,
 }
 
+/// A writer configuration.
 #[derive(Debug, Default, Clone)]
 #[non_exhaustive]
 pub enum Config {
+    /// Renders Rsn in its most compact representation.
     #[default]
     Compact,
+    /// Renders Rsn with indentation and line endings.
     Pretty {
+        /// The indentation to include for each level of nested data type.
         indentation: Cow<'static, str>,
+        /// The newline character(s) to include when wrapping to a new line.
         newline: Cow<'static, str>,
     },
 }

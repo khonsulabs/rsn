@@ -10,6 +10,7 @@ use serde::Serialize;
 
 use crate::writer::{self, Writer};
 
+/// A Serde serializer that generates Rsn.
 #[derive(Debug)]
 pub struct Serializer<'config, Output> {
     writer: Writer<'config, Output>,
@@ -31,14 +32,16 @@ impl<'config, Output> Serializer<'config, Output>
 where
     Output: Write,
 {
-    pub fn new(output: Output, config: &'config Config) -> Self {
+    /// Returns a new serializer that writes to `output` using `configuration`.
+    pub fn new(output: Output, configuration: &'config Config) -> Self {
         Self {
-            writer: Writer::new(output, &config.writer),
-            implicit_map_at_root: config.implicit_map_at_root,
-            anonymous_structs: config.anonymous_structs,
+            writer: Writer::new(output, &configuration.writer),
+            implicit_map_at_root: configuration.implicit_map_at_root,
+            anonymous_structs: configuration.anonymous_structs,
         }
     }
 
+    /// Finishes writing to the output and returns the output.
     pub fn finish(self) -> Output {
         self.writer.finish()
     }
@@ -54,9 +57,9 @@ where
 {
     type Error = core::fmt::Error;
     type Ok = ();
-    type SerializeMap = MapSerializer<'a, 'config, Output>;
+    type SerializeMap = sealed::MapSerializer<'a, 'config, Output>;
     type SerializeSeq = Self;
-    type SerializeStruct = MapSerializer<'a, 'config, Output>;
+    type SerializeStruct = sealed::MapSerializer<'a, 'config, Output>;
     type SerializeStructVariant = Self;
     type SerializeTuple = Self;
     type SerializeTupleStruct = Self;
@@ -248,7 +251,7 @@ where
         if !is_implicit_map {
             self.writer.begin_map()?;
         }
-        Ok(MapSerializer {
+        Ok(sealed::MapSerializer {
             serializer: self,
             is_implicit_map,
         })
@@ -270,7 +273,7 @@ where
             }
         }
 
-        Ok(MapSerializer {
+        Ok(sealed::MapSerializer {
             serializer: self,
             is_implicit_map,
         })
@@ -364,106 +367,122 @@ where
     }
 }
 
-pub struct MapSerializer<'a, 'config, Output> {
-    serializer: &'a mut Serializer<'config, Output>,
-    is_implicit_map: bool,
-}
+mod sealed {
+    use super::{SerializeMap, SerializeStruct, SerializeStructVariant, Serializer, Write};
 
-impl<'a, 'config, Output> SerializeStruct for MapSerializer<'a, 'config, Output>
-where
-    Output: Write,
-{
-    type Error = core::fmt::Error;
-    type Ok = ();
+    pub struct MapSerializer<'a, 'config, Output> {
+        pub serializer: &'a mut Serializer<'config, Output>,
+        pub is_implicit_map: bool,
+    }
 
-    fn serialize_field<T>(&mut self, key: &'static str, value: &T) -> Result<(), Self::Error>
+    impl<'a, 'config, Output> SerializeStruct for MapSerializer<'a, 'config, Output>
     where
-        T: serde::Serialize + ?Sized,
+        Output: Write,
     {
-        if self.is_implicit_map {
-            self.serializer.writer.write_raw_value(key)?;
-            self.serializer.writer.write_raw_value(": ")?;
-            value.serialize(&mut *self.serializer)?;
-            self.serializer.writer.insert_newline()?;
-        } else {
-            self.serializer.writer.write_raw_value(key)?;
-            value.serialize(&mut *self.serializer)?;
+        type Error = core::fmt::Error;
+        type Ok = ();
+
+        fn serialize_field<T>(&mut self, key: &'static str, value: &T) -> Result<(), Self::Error>
+        where
+            T: serde::Serialize + ?Sized,
+        {
+            if self.is_implicit_map {
+                self.serializer.writer.write_raw_value(key)?;
+                self.serializer.writer.write_raw_value(": ")?;
+                value.serialize(&mut *self.serializer)?;
+                self.serializer.writer.insert_newline()?;
+            } else {
+                self.serializer.writer.write_raw_value(key)?;
+                value.serialize(&mut *self.serializer)?;
+            }
+            Ok(())
         }
-        Ok(())
-    }
 
-    fn end(self) -> Result<Self::Ok, Self::Error> {
-        if !self.is_implicit_map {
-            self.serializer.writer.finish_nested()?;
-        }
-        Ok(())
-    }
-}
-
-impl<'a, 'config, Output> SerializeStructVariant for &'a mut Serializer<'config, Output>
-where
-    Output: Write,
-{
-    type Error = core::fmt::Error;
-    type Ok = ();
-
-    fn serialize_field<T>(&mut self, key: &'static str, value: &T) -> Result<(), Self::Error>
-    where
-        T: serde::Serialize + ?Sized,
-    {
-        self.writer.write_raw_value(key)?;
-        value.serialize(&mut **self)
-    }
-
-    fn end(self) -> Result<Self::Ok, Self::Error> {
-        self.writer.finish_nested()
-    }
-}
-
-impl<'a, 'config, Output> SerializeMap for MapSerializer<'a, 'config, Output>
-where
-    Output: Write,
-{
-    type Error = core::fmt::Error;
-    type Ok = ();
-
-    fn serialize_key<T>(&mut self, key: &T) -> Result<(), Self::Error>
-    where
-        T: serde::Serialize + ?Sized,
-    {
-        key.serialize(&mut *self.serializer)
-    }
-
-    fn serialize_value<T>(&mut self, value: &T) -> Result<(), Self::Error>
-    where
-        T: serde::Serialize + ?Sized,
-    {
-        if self.is_implicit_map {
-            self.serializer.writer.write_raw_value(": ")?;
-            value.serialize(&mut *self.serializer)?;
-            self.serializer.writer.insert_newline()
-        } else {
-            value.serialize(&mut *self.serializer)
+        fn end(self) -> Result<Self::Ok, Self::Error> {
+            if !self.is_implicit_map {
+                self.serializer.writer.finish_nested()?;
+            }
+            Ok(())
         }
     }
 
-    fn end(self) -> Result<Self::Ok, Self::Error> {
-        if !self.is_implicit_map {
-            self.serializer.writer.finish_nested()?;
+    impl<'a, 'config, Output> SerializeStructVariant for &'a mut Serializer<'config, Output>
+    where
+        Output: Write,
+    {
+        type Error = core::fmt::Error;
+        type Ok = ();
+
+        fn serialize_field<T>(&mut self, key: &'static str, value: &T) -> Result<(), Self::Error>
+        where
+            T: serde::Serialize + ?Sized,
+        {
+            self.writer.write_raw_value(key)?;
+            value.serialize(&mut **self)
         }
-        Ok(())
+
+        fn end(self) -> Result<Self::Ok, Self::Error> {
+            self.writer.finish_nested()
+        }
+    }
+
+    impl<'a, 'config, Output> SerializeMap for MapSerializer<'a, 'config, Output>
+    where
+        Output: Write,
+    {
+        type Error = core::fmt::Error;
+        type Ok = ();
+
+        fn serialize_key<T>(&mut self, key: &T) -> Result<(), Self::Error>
+        where
+            T: serde::Serialize + ?Sized,
+        {
+            key.serialize(&mut *self.serializer)
+        }
+
+        fn serialize_value<T>(&mut self, value: &T) -> Result<(), Self::Error>
+        where
+            T: serde::Serialize + ?Sized,
+        {
+            if self.is_implicit_map {
+                self.serializer.writer.write_raw_value(": ")?;
+                value.serialize(&mut *self.serializer)?;
+                self.serializer.writer.insert_newline()
+            } else {
+                value.serialize(&mut *self.serializer)
+            }
+        }
+
+        fn end(self) -> Result<Self::Ok, Self::Error> {
+            if !self.is_implicit_map {
+                self.serializer.writer.finish_nested()?;
+            }
+            Ok(())
+        }
     }
 }
 
+/// The configuration for a [`Serializer`].
 #[derive(Default, Debug, Clone)]
 #[non_exhaustive]
 pub struct Config {
+    /// The writer configuration.
     pub writer: writer::Config,
+    /// Whether a map-like type at the root of the document should use the
+    /// implicit map syntax.
     pub implicit_map_at_root: bool,
+    /// Whether to include the names of structures in.
     pub anonymous_structs: bool,
 }
 
 impl Config {
+    /// Returns the default configuration.
+    ///
+    /// The default configuration uses:
+    ///
+    /// - `writer`: [`writer::Config::Compact`]
+    /// - `implicit_map_at_root`: `false`
+    /// - `anonymous_structs`: `false`
     #[must_use]
     pub const fn new() -> Self {
         Self {
@@ -473,6 +492,7 @@ impl Config {
         }
     }
 
+    /// Returns the default configuration with nested indentation and newlines.
     #[must_use]
     pub fn pretty() -> Self {
         Self {
@@ -484,27 +504,45 @@ impl Config {
         }
     }
 
+    /// Sets [`Config::implicit_map_at_root`] and returns self.
     #[must_use]
     pub const fn implicit_map_at_root(mut self, implicit_map_at_root: bool) -> Self {
         self.implicit_map_at_root = implicit_map_at_root;
         self
     }
 
+    /// Sets [`Config::anonymous_structs`] and returns self.
     #[must_use]
     pub const fn anonymous_structs(mut self, anonymous_structs: bool) -> Self {
         self.anonymous_structs = anonymous_structs;
         self
     }
 
-    #[must_use]
-    pub fn serialize<S: Serialize>(&self, value: &S) -> String {
+    /// Returns `value` serialized as Rsn with this configuration.
+    ///
+    /// # Errors
+    ///
+    /// Rsn itself does not produce any errors while serializing values. This
+    /// function will return errors that arise within `Serialize` implementations
+    /// encountered while serializing `value`.
+    pub fn serialize<S: Serialize>(&self, value: &S) -> Result<String, core::fmt::Error> {
         let mut serializer = Serializer::new(String::new(), self);
-        value.serialize(&mut serializer).expect("core::fmt::Error");
-        serializer.finish()
+        value.serialize(&mut serializer)?;
+        Ok(serializer.finish())
     }
 
-    pub fn serialize_to_vec<S: Serialize>(&self, value: &S) -> alloc::vec::Vec<u8> {
-        self.serialize(value).into_bytes()
+    /// Returns `value` serialized as Rsn with this configuration.
+    ///
+    /// # Errors
+    ///
+    /// Rsn itself does not produce any errors while serializing values. This
+    /// function will return errors that arise within `Serialize` implementations
+    /// encountered while serializing `value`.
+    pub fn serialize_to_vec<S: Serialize>(
+        &self,
+        value: &S,
+    ) -> Result<alloc::vec::Vec<u8>, core::fmt::Error> {
+        self.serialize(value).map(String::into_bytes)
     }
 }
 
@@ -536,6 +574,13 @@ mod serialize_writer {
         }
     }
     impl Config {
+        /// Serializes `value` into `writer` using this configuration.
+        ///
+        /// # Errors
+        ///
+        /// Returns any errors occurring while serializing `value` or while
+        /// writing to `writer`.
+        #[allow(clippy::missing_panics_doc)]
         pub fn serialize_to_writer<S: Serialize, W: std::io::Write>(
             &self,
             value: &S,
@@ -563,6 +608,6 @@ fn serialization_test() {
         b: i32,
     }
 
-    let rendered = crate::to_string(&BasicNamed { a: 1, b: -1 });
+    let rendered = crate::to_string(&BasicNamed { a: 1, b: -1 }).expect("no errors");
     assert_eq!(rendered, "BasicNamed{a:1,b:-1}");
 }

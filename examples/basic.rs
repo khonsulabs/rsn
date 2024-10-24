@@ -18,13 +18,13 @@ enum Category {
 
 fn main() {
     let posts: Vec<BlogPost> =
-        rsn::from_str(include_str!("./basic.rsn")).expect("error deserializing basic.rsn");
+        rsn::from_str(include_str!("./basic.rsn")).expect("valid rsn in basic.rsn");
 
     println!("Loaded blog posts: {posts:?}");
 
-    let compact = rsn::to_string(&posts);
+    let compact = rsn::to_string(&posts).expect("no errors");
     println!("Compact form:\n{compact}");
-    let pretty = rsn::to_string_pretty(&posts);
+    let pretty = rsn::to_string_pretty(&posts).expect("no errors");
     println!("Pretty form:\n{pretty}");
 }
 

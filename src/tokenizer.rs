@@ -10,34 +10,52 @@ use crate::tokenizer::char_iterator::CharIterator;
 
 mod char_iterator;
 
+/// A token in an Rsn document.
 #[derive(Clone, Eq, PartialEq, Debug)]
 pub struct Token<'a> {
+    /// The byte range of this token.
     pub location: Range<usize>,
+    /// The kind of this token.
     pub kind: TokenKind<'a>,
 }
 
 impl<'a> Token<'a> {
     #[must_use]
-    pub const fn new(location: Range<usize>, kind: TokenKind<'a>) -> Self {
+    const fn new(location: Range<usize>, kind: TokenKind<'a>) -> Self {
         Self { location, kind }
     }
 }
 
+/// A kind of a token in an Rsn document.
 #[derive(Clone, Debug)]
 pub enum TokenKind<'a> {
+    /// An integer literal.
     Integer(Integer),
+    /// A floating point literal.
     Float(f64),
+    /// A boolean literal.
     Bool(bool),
+    /// A character literal.
     Character(char),
+    /// The `:` character.
     Colon,
+    /// The `,` character.
     Comma,
+    /// A byte literal.
     Byte(u8),
+    /// A string literal.
     String(Cow<'a, str>),
+    /// A byte string literal.
     Bytes(Cow<'a, [u8]>),
+    /// An identifier (name).
     Identifier(&'a str),
+    /// The opening variant of a [`Balanced`] token.
     Open(Balanced),
+    /// The closing variant of a [`Balanced`] token.
     Close(Balanced),
+    /// A comment
     Comment(&'a str),
+    /// Whitespace between other tokens.
     Whitespace(&'a str),
 }
 
@@ -61,16 +79,25 @@ impl<'a> PartialEq for TokenKind<'a> {
     }
 }
 
+/// An integer literal.
 #[derive(Clone, Copy, Eq, PartialEq, Debug)]
 pub enum Integer {
+    /// An unsigned integer that fits within an `usize`.
     Usize(usize),
+    /// A signed integer that fits within an `isize`.
     Isize(isize),
+    /// An unsigned integer that is too large to fit within an `usize`.
     UnsignedLarge(UnsignedLarge),
+    /// A signed integer that is too large to fit within an `isize`.
     SignedLarge(SignedLarge),
 }
 
 macro_rules! fn_integer_into {
     ($name:ident, $type:ty) => {
+        /// Returns this integer as a
+        #[doc = stringify!($type)]
+        /// if the value can fit in a
+        #[doc = stringify!($type)]
         #[inline]
         #[must_use]
         pub fn $name(self) -> Option<$type> {
@@ -109,6 +136,7 @@ impl Integer {
 
     fn_integer_into!(as_isize, isize);
 
+    /// Returns true if this number is equal to 0.
     #[inline]
     #[must_use]
     pub const fn is_zero(self) -> bool {
@@ -120,6 +148,7 @@ impl Integer {
         }
     }
 
+    /// Returns this number cast to an `f64`.
     #[must_use]
     #[allow(clippy::cast_precision_loss)]
     pub fn as_f64(self) -> f64 {
@@ -205,13 +234,19 @@ macro_rules! impl_try_from_primitive {
 impl_try_from_primitive!(Usize, usize, UnsignedLarge, u128);
 impl_try_from_primitive!(Isize, isize, SignedLarge, i128);
 
+/// A token kind that is expected to have a balanced number of open and closing
+/// variants.
 #[derive(Clone, Copy, Eq, PartialEq, Debug)]
 pub enum Balanced {
+    /// Parentheses
     Paren,
+    /// Curly Braces
     Brace,
+    /// Square Brackets
     Bracket,
 }
 
+/// Parses Rsn into a sequence of [`Token`]s.
 #[derive(Debug, Clone)]
 pub struct Tokenizer<'a, const INCLUDE_ALL: bool> {
     chars: CharIterator<'a>,
@@ -219,6 +254,7 @@ pub struct Tokenizer<'a, const INCLUDE_ALL: bool> {
 }
 
 impl<'a> Tokenizer<'a, false> {
+    /// Returns a tokenizer that ignores whitespace and comments.
     #[must_use]
     pub fn minified(source: &'a str) -> Self {
         Self::new(source)
@@ -226,6 +262,7 @@ impl<'a> Tokenizer<'a, false> {
 }
 
 impl<'a> Tokenizer<'a, true> {
+    /// Returns a tokenizer that includes whitespace and comments.
     #[must_use]
     pub fn full(source: &'a str) -> Self {
         Self::new(source)
@@ -240,6 +277,7 @@ impl<'a, const INCLUDE_ALL: bool> Tokenizer<'a, INCLUDE_ALL> {
         }
     }
 
+    /// Returns the current byte offset of the tokenizer.
     #[must_use]
     pub const fn current_offset(&self) -> usize {
         self.chars.current_offset()
@@ -1242,15 +1280,18 @@ fn is_rust_whitespace(ch: char) -> bool {
     )
 }
 
+/// An error returned from a tokenizer.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Error {
+    /// The byte range of the error.
     pub location: Range<usize>,
+    /// The kind of error that occurred.
     pub kind: ErrorKind,
 }
 
 impl Error {
     #[must_use]
-    pub const fn new(location: Range<usize>, kind: ErrorKind) -> Self {
+    const fn new(location: Range<usize>, kind: ErrorKind) -> Self {
         Self { location, kind }
     }
 }
@@ -1264,15 +1305,25 @@ impl Display for Error {
 #[cfg(feature = "std")]
 impl std::error::Error for Error {}
 
+/// The kind of an error returned from a tokenizer.
 #[derive(Debug, Clone, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum ErrorKind {
+    /// The end of input was encountered when additional data was still expected.
     UnexpectedEof,
+    /// An unexpected character was found.
     Unexpected(char),
+    /// A digit (0-9) was expected.
     ExpectedDigit,
+    /// The integer literal is too large to represent.
     IntegerTooLarge,
+    /// An invalid unicode code point was encountered.
     InvalidUnicode,
+    /// An invalid ASCII character was encountered.
     InvalidAscii,
+    /// An invalid floating point number was found.
     InvalidFloat,
+    /// A carriage return without a corresponding `\n` was encountered.
     IsolatedCarriageReturn,
 }
 
@@ -1291,7 +1342,7 @@ impl Display for ErrorKind {
     }
 }
 
-pub trait Integral: From<u8> + Copy {
+trait Integral: From<u8> + Copy {
     type Larger: Integral;
     fn into_larger(self) -> Self::Larger;
     fn checked_mul(self, other: Self) -> Option<Self>;

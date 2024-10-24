@@ -6,26 +6,45 @@ use core::str::{self, FromStr};
 use crate::parser::{Config, Error, ErrorKind, Event, EventKind, Name, Nested, Parser, Primitive};
 use crate::tokenizer::Integer;
 use crate::writer::{self, Writer};
+
+/// A value with a static lifetime.
 pub type OwnedValue = Value<'static>;
 
+/// A value representable by Rsn.
 #[derive(Debug, Clone, PartialEq)]
 pub enum Value<'a> {
+    /// An integer.
     Integer(Integer),
+    /// A floating point number.
     Float(f64),
+    /// A boolean.
     Bool(bool),
+    /// A character.
     Char(char),
+    /// A byte.
     Byte(u8),
+    /// An identifier (name).
     Identifier(Cow<'a, str>),
+    /// A string.
     String(Cow<'a, str>),
+    /// A byte string.
     Bytes(Cow<'a, [u8]>),
+    /// A named structure.
     Named(Named<'a>),
+    /// A tuple of values.
     Tuple(List<'a>),
+    /// An array of values.
     Array(List<'a>),
+    /// A collection of key-value pairs.
     Map(Map<'a>),
 }
 
 macro_rules! as_integer {
     ($name:ident, $ty:ty) => {
+        /// Returns this value as a
+        #[doc = stringify!($type)]
+        /// if the value is an integer that can fit in a
+        #[doc = stringify!($type)]
         #[must_use]
         pub fn $name(&self) -> Option<$ty> {
             let Self::Integer(value) = self else {
@@ -62,11 +81,17 @@ impl<'a> Value<'a> {
 
     as_integer!(as_isize, isize);
 
+    /// Parses `source` as a [`Value`].
+    ///
+    /// # Errors
+    ///
+    /// Returns any error encountered while parsing `source`.
     pub fn from_str(source: &'a str, config: Config) -> Result<Self, Error> {
         let mut parser = Parser::new(source, config.include_comments(false));
         Self::parse(&mut parser)
     }
 
+    /// Returns a value representing the unit type.
     #[must_use]
     pub const fn unit() -> Self {
         Self::Tuple(List::new())
@@ -158,18 +183,29 @@ impl<'a> Value<'a> {
         }
     }
 
+    /// Creates a value by serializing `value` using Serde.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the `value` cannot be represented losslessly or if
+    /// any errors occur from `Serializer` implementations.
     #[cfg(feature = "serde")]
-    pub fn from_serialize<S: ::serde::Serialize>(value: &S) -> Self {
-        value
-            .serialize(serde::ValueSerializer)
-            .expect("core::fmt::Error")
+    pub fn from_serialize<S: ::serde::Serialize>(value: &S) -> Result<Self, ToValueError> {
+        value.serialize(serde::ValueSerializer)
     }
 
+    /// Deserializes `self` as `D` using Serde.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if `self` cannot be deserialized as `D`.
     #[cfg(feature = "serde")]
     pub fn to_deserialize<D: ::serde::Deserialize<'a>>(&self) -> Result<D, serde::FromValueError> {
         D::deserialize(serde::ValueDeserializer(self))
     }
 
+    /// Returns the owned version of `self`, copying any borrowed data to the
+    /// heap.
     #[must_use]
     pub fn into_owned(self) -> Value<'static> {
         match self {
@@ -188,6 +224,9 @@ impl<'a> Value<'a> {
         }
     }
 
+    /// Returns this value as a floating point number.
+    ///
+    /// If this is an integer, this will cast the integer to an f64.
     #[must_use]
     pub fn as_f64(&self) -> Option<f64> {
         match self {
@@ -197,6 +236,10 @@ impl<'a> Value<'a> {
         }
     }
 
+    /// Returns this value as a str, if possible.
+    ///
+    /// `Identifier`, `String`, and `Bytes` bytes all can be returned from this
+    /// function.
     #[must_use]
     pub fn as_str(&self) -> Option<&str> {
         match self {
@@ -206,6 +249,11 @@ impl<'a> Value<'a> {
         }
     }
 
+    /// Returns the underlying bytes for this value, if it can be represented as
+    /// a byte slice.
+    ///
+    /// `Identifier`, `String`, and `Bytes` bytes all can be returned from this
+    /// function.
     #[must_use]
     pub fn as_bytes(&self) -> Option<&[u8]> {
         match self {
@@ -243,13 +291,18 @@ impl<'a> Display for Value<'a> {
     }
 }
 
+/// A named structure.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Named<'a> {
+    /// The name of the structure.
     pub name: Cow<'a, str>,
+    /// The contents of the structure.
     pub contents: StructContents<'a>,
 }
 
 impl<'a> Named<'a> {
+    /// Returns an owned representation of this name, copying to the stack if
+    /// needed.
     #[must_use]
     pub fn into_owned(self) -> Named<'static> {
         Named {
@@ -259,13 +312,17 @@ impl<'a> Named<'a> {
     }
 }
 
+/// The contents of a structure.
 #[derive(Debug, Clone, PartialEq)]
 pub enum StructContents<'a> {
+    /// Named fields, represented as a map.
     Map(Map<'a>),
+    /// A tuple of valuees.
     Tuple(List<'a>),
 }
 
 impl<'a> StructContents<'a> {
+    /// Returns an owned representation, copying to the heap if needed.
     #[must_use]
     pub fn into_owned(self) -> StructContents<'static> {
         match self {
@@ -275,10 +332,12 @@ impl<'a> StructContents<'a> {
     }
 }
 
+/// A list of key-value pairs.
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct Map<'a>(pub Vec<(Value<'a>, Value<'a>)>);
 
 impl<'a> Map<'a> {
+    /// Returns an owned representation, copying to the heap if needed.
     #[must_use]
     pub fn into_owned(self) -> Map<'static> {
         Map(self
@@ -289,15 +348,18 @@ impl<'a> Map<'a> {
     }
 }
 
+/// A list of values.
 #[derive(Default, Debug, Clone, PartialEq)]
 pub struct List<'a>(pub Vec<Value<'a>>);
 
 impl<'a> List<'a> {
+    /// Returns an empty list.
     #[must_use]
     pub const fn new() -> Self {
         Self(Vec::new())
     }
 
+    /// Returns an owned representation, copying to the heap if needed.
     #[must_use]
     pub fn into_owned(self) -> List<'static> {
         List(self.0.into_iter().map(Value::into_owned).collect())
@@ -1188,10 +1250,13 @@ mod serde {
         }
     }
 
+    /// An error from serializing to a [`Value`].
     #[derive(Debug, PartialEq)]
 
     pub enum ToValueError {
+        /// A custom serialization error.
         Message(String),
+        /// An integer was too larget to represent.
         IntegerTooLarge(TryFromIntError),
     }
 
@@ -1221,11 +1286,15 @@ mod serde {
         }
     }
 
+    /// An error from deserializing from a [`Value`].
     #[derive(Debug, PartialEq)]
 
     pub enum FromValueError {
+        /// A custom serialization error.
         Message(String),
+        /// Expected a kind of data, but encountered another kind.
         Expected(ExpectedKind),
+        /// Invalid UTF-8 was encountered.
         InvalidUtf8,
     }
 

@@ -6,6 +6,7 @@ use core::ops::{Deref, Range};
 
 use crate::tokenizer::{self, Balanced, Integer, Token, TokenKind, Tokenizer};
 
+/// Parses input as a sequence of [`Event`]s.
 #[derive(Debug)]
 pub struct Parser<'s> {
     tokens: Tokenizer<'s, false>,
@@ -16,27 +17,32 @@ pub struct Parser<'s> {
 }
 
 impl<'s> Parser<'s> {
+    /// Returns a parser that parses `source` using `configuration`.
     #[must_use]
-    pub fn new(source: &'s str, config: Config) -> Self {
+    pub fn new(source: &'s str, configuration: Config) -> Self {
         Self {
             tokens: Tokenizer::minified(source),
             peeked: None,
             nested: Vec::new(),
             root_state: State::AtStart,
-            config,
+            config: configuration,
         }
     }
 
+    /// Validates that `source` would parse successfully using `configuration`.
     #[must_use]
-    pub fn validate(source: &'s str, config: Config) -> bool {
-        Self::new(source, config).all(|result| result.is_ok())
+    pub fn validate(source: &'s str, configuration: Config) -> bool {
+        Self::new(source, configuration).all(|result| result.is_ok())
     }
 
+    /// Returns the current byte offset of the parser.
     #[must_use]
     pub const fn current_offset(&self) -> usize {
         self.tokens.current_offset()
     }
 
+    /// Returns the range between the start of the containing nested event and
+    /// the current byte offset of the parser.
     #[must_use]
     pub fn current_range(&self) -> Range<usize> {
         let start = self.nested.last().map_or(0, |(offset, _)| *offset);
@@ -116,7 +122,7 @@ impl<'s> Parser<'s> {
             TokenKind::Open(Balanced::Paren) => {
                 self.nested.push((
                     token.location.start,
-                    NestedState::Tuple(ListState::ExpectingValue),
+                    NestedState::Tuple(ListStateExpecting::Value),
                 ));
                 Ok(Event::new(
                     token.location,
@@ -129,7 +135,7 @@ impl<'s> Parser<'s> {
             TokenKind::Open(Balanced::Bracket) => {
                 self.nested.push((
                     token.location.start,
-                    NestedState::List(ListState::ExpectingValue),
+                    NestedState::List(ListStateExpecting::Value),
                 ));
                 Ok(Event::new(
                     token.location,
@@ -142,7 +148,7 @@ impl<'s> Parser<'s> {
             TokenKind::Open(Balanced::Brace) => {
                 self.nested.push((
                     token.location.start,
-                    NestedState::Map(MapState::ExpectingKey),
+                    NestedState::Map(MapStateExpecting::Key),
                 ));
                 Ok(Event::new(
                     token.location,
@@ -186,14 +192,14 @@ impl<'s> Parser<'s> {
                 Balanced::Paren => {
                     self.nested.push((
                         open_location.start,
-                        NestedState::Tuple(ListState::ExpectingValue),
+                        NestedState::Tuple(ListStateExpecting::Value),
                     ));
                     Nested::Tuple
                 }
                 Balanced::Brace => {
                     self.nested.push((
                         open_location.start,
-                        NestedState::Map(MapState::ExpectingKey),
+                        NestedState::Map(MapStateExpecting::Key),
                     ));
                     Nested::Map
                 }
@@ -229,27 +235,31 @@ impl<'s> Parser<'s> {
         }
     }
 
-    fn parse_sequence(&mut self, state: ListState, end: Balanced) -> Result<Event<'s>, Error> {
+    fn parse_sequence(
+        &mut self,
+        state: ListStateExpecting,
+        end: Balanced,
+    ) -> Result<Event<'s>, Error> {
         match state {
-            ListState::ExpectingValue => {
+            ListStateExpecting::Value => {
                 let token = self.next_or_eof()?;
                 if let TokenKind::Comment(comment) = &token.kind {
                     Ok(Event::new(token.location, EventKind::Comment(comment)))
                 } else {
                     self.nested.last_mut().expect("required for this fn").1 =
-                        NestedState::list(end, ListState::ExpectingComma);
+                        NestedState::list(end, ListStateExpecting::Comma);
                     self.parse_token(token, Some(end))
                 }
             }
-            ListState::ExpectingComma => match self.next_token_parts()? {
+            ListStateExpecting::Comma => match self.next_token_parts()? {
                 (location, Some(TokenKind::Close(closed))) if closed == end => {
                     self.nested.pop();
                     Ok(Event::new(location, EventKind::EndNested))
                 }
                 (_, Some(TokenKind::Comma)) => {
                     self.nested.last_mut().expect("required for this fn").1 =
-                        NestedState::list(end, ListState::ExpectingValue);
-                    self.parse_sequence(ListState::ExpectingValue, end)
+                        NestedState::list(end, ListStateExpecting::Value);
+                    self.parse_sequence(ListStateExpecting::Value, end)
                 }
                 (location, Some(TokenKind::Comment(comment))) => {
                     Ok(Event::new(location, EventKind::Comment(comment)))
@@ -262,22 +272,22 @@ impl<'s> Parser<'s> {
         }
     }
 
-    fn map_state_mut(&mut self) -> &mut MapState {
+    fn map_state_mut(&mut self) -> &mut MapStateExpecting {
         let Some((_, NestedState::Map(map_state))) = self.nested.last_mut() else {
             unreachable!("not a map state")
         };
         map_state
     }
 
-    fn parse_map(&mut self, state: MapState) -> Result<Event<'s>, Error> {
+    fn parse_map(&mut self, state: MapStateExpecting) -> Result<Event<'s>, Error> {
         match state {
-            MapState::ExpectingKey => match self.next_token().transpose()? {
+            MapStateExpecting::Key => match self.next_token().transpose()? {
                 Some(Token {
                     kind: TokenKind::Comment(comment),
                     location,
                 }) => Ok(Event::new(location, EventKind::Comment(comment))),
                 Some(token) => {
-                    *self.map_state_mut() = MapState::ExpectingColon;
+                    *self.map_state_mut() = MapStateExpecting::Colon;
                     self.parse_token(token, Some(Balanced::Brace))
                 }
                 None => Err(Error::new(
@@ -285,23 +295,23 @@ impl<'s> Parser<'s> {
                     ErrorKind::ExpectedKey,
                 )),
             },
-            MapState::ExpectingColon => match self.next_token_parts()? {
+            MapStateExpecting::Colon => match self.next_token_parts()? {
                 (_, Some(TokenKind::Colon)) => {
-                    *self.map_state_mut() = MapState::ExpectingValue;
-                    self.parse_map(MapState::ExpectingValue)
+                    *self.map_state_mut() = MapStateExpecting::Value;
+                    self.parse_map(MapStateExpecting::Value)
                 }
                 (location, Some(TokenKind::Comment(comment))) => {
                     Ok(Event::new(location, EventKind::Comment(comment)))
                 }
                 (location, _) => Err(Error::new(location, ErrorKind::ExpectedColon)),
             },
-            MapState::ExpectingValue => match self.next_token().transpose()? {
+            MapStateExpecting::Value => match self.next_token().transpose()? {
                 Some(Token {
                     kind: TokenKind::Comment(comment),
                     location,
                 }) => Ok(Event::new(location, EventKind::Comment(comment))),
                 Some(token) => {
-                    *self.map_state_mut() = MapState::ExpectingComma;
+                    *self.map_state_mut() = MapStateExpecting::Comma;
                     self.parse_token(token, None)
                 }
                 None => Err(Error::new(
@@ -309,14 +319,14 @@ impl<'s> Parser<'s> {
                     ErrorKind::ExpectedValue,
                 )),
             },
-            MapState::ExpectingComma => match self.next_token_parts()? {
+            MapStateExpecting::Comma => match self.next_token_parts()? {
                 (location, Some(TokenKind::Close(Balanced::Brace))) => {
                     self.nested.pop();
                     Ok(Event::new(location, EventKind::EndNested))
                 }
                 (_, Some(TokenKind::Comma)) => {
-                    *self.map_state_mut() = MapState::ExpectingKey;
-                    self.parse_map(MapState::ExpectingKey)
+                    *self.map_state_mut() = MapStateExpecting::Key;
+                    self.parse_map(MapStateExpecting::Key)
                 }
                 (location, Some(TokenKind::Comment(comment))) => {
                     Ok(Event::new(location, EventKind::Comment(comment)))
@@ -329,9 +339,9 @@ impl<'s> Parser<'s> {
         }
     }
 
-    fn parse_implicit_map(&mut self, state: MapState) -> Result<Event<'s>, Error> {
+    fn parse_implicit_map(&mut self, state: MapStateExpecting) -> Result<Event<'s>, Error> {
         match state {
-            MapState::ExpectingKey => match self.next_token().transpose()? {
+            MapStateExpecting::Key => match self.next_token().transpose()? {
                 Some(Token {
                     location,
                     kind: TokenKind::Comment(comment),
@@ -341,7 +351,7 @@ impl<'s> Parser<'s> {
                         kind: EventKind::Primitive(primitive),
                         location,
                     } => {
-                        self.root_state = State::ImplicitMap(MapState::ExpectingColon);
+                        self.root_state = State::ImplicitMap(MapStateExpecting::Colon);
                         Ok(Event::new(location, EventKind::Primitive(primitive)))
                     }
                     Event { location, .. } => Err(Error::new(location, ErrorKind::ExpectedKey)),
@@ -351,23 +361,23 @@ impl<'s> Parser<'s> {
                     Ok(Event::new(self.current_range(), EventKind::EndNested))
                 }
             },
-            MapState::ExpectingColon => match self.next_token_parts()? {
+            MapStateExpecting::Colon => match self.next_token_parts()? {
                 (_, Some(TokenKind::Colon)) => {
-                    self.root_state = State::ImplicitMap(MapState::ExpectingValue);
-                    self.parse_implicit_map(MapState::ExpectingValue)
+                    self.root_state = State::ImplicitMap(MapStateExpecting::Value);
+                    self.parse_implicit_map(MapStateExpecting::Value)
                 }
                 (location, Some(TokenKind::Comment(comment))) => {
                     Ok(Event::new(location, EventKind::Comment(comment)))
                 }
                 (location, _) => Err(Error::new(location, ErrorKind::ExpectedColon)),
             },
-            MapState::ExpectingValue => match self.next_token().transpose()? {
+            MapStateExpecting::Value => match self.next_token().transpose()? {
                 Some(Token {
                     kind: TokenKind::Comment(comment),
                     location,
                 }) => Ok(Event::new(location, EventKind::Comment(comment))),
                 Some(token) => {
-                    self.root_state = State::ImplicitMap(MapState::ExpectingComma);
+                    self.root_state = State::ImplicitMap(MapStateExpecting::Comma);
                     self.parse_token(token, None)
                 }
                 None => Err(Error::new(
@@ -375,7 +385,7 @@ impl<'s> Parser<'s> {
                     ErrorKind::ExpectedValue,
                 )),
             },
-            MapState::ExpectingComma => match self.next_token().transpose()? {
+            MapStateExpecting::Comma => match self.next_token().transpose()? {
                 Some(Token {
                     location,
                     kind: TokenKind::Comment(comment),
@@ -391,11 +401,11 @@ impl<'s> Parser<'s> {
                     kind: TokenKind::Comma,
                     ..
                 }) => {
-                    self.root_state = State::ImplicitMap(MapState::ExpectingKey);
-                    self.parse_implicit_map(MapState::ExpectingKey)
+                    self.root_state = State::ImplicitMap(MapStateExpecting::Key);
+                    self.parse_implicit_map(MapStateExpecting::Key)
                 }
                 Some(token) => {
-                    self.root_state = State::ImplicitMap(MapState::ExpectingColon);
+                    self.root_state = State::ImplicitMap(MapStateExpecting::Colon);
                     match self.parse_token(token, None)? {
                         Event {
                             location,
@@ -456,7 +466,7 @@ impl<'s> Parser<'s> {
                 State::StartingImplicitMap(_) => {
                     let State::StartingImplicitMap(event) = mem::replace(
                         &mut self.root_state,
-                        State::ImplicitMap(MapState::ExpectingColon),
+                        State::ImplicitMap(MapStateExpecting::Colon),
                     ) else {
                         unreachable!("just matched")
                     };
@@ -505,20 +515,46 @@ impl<'s> Iterator for Parser<'s> {
     }
 }
 
+/// The configuration of a [`Parser`].
 #[derive(Default, Debug, Clone, Copy)]
 #[non_exhaustive]
 pub struct Config {
+    /// Allows parsing an implicit map at the root of the Rsn document.
+    ///
+    /// Rsn allows root-level syntax that may be desirable when using it as a
+    /// configuration-like file format.
+    ///
+    /// Implicit map:
+    /// ```rsn
+    /// name: "John Doe"
+    /// age: 40
+    /// ```
+    ///
+    /// Normal map:
+    /// ```rsn
+    /// {
+    ///     name: "John Doe",
+    ///     age: 40,
+    /// }
+    /// ```
+    ///
+    /// When set to true, the parser will allow both implicit and explicit
+    /// syntaxes at the root of the document. When set to false, the parser will
+    /// only allow explicit maps.
     pub allow_implicit_map_at_root: bool,
+    /// When true, the parser will include [`EventKind::Comment`] events.
     pub include_comments: bool,
 }
 
 impl Config {
+    /// Sets [`Config::allow_implicit_map_at_root`] to `allow` and returns self.
     #[must_use]
     pub const fn allow_implicit_map_at_root(mut self, allow: bool) -> Self {
         self.allow_implicit_map_at_root = allow;
         self
     }
 
+    /// Sets [`Config::include_comments`] to `include` and returns self.
     #[must_use]
     pub const fn include_comments(mut self, include: bool) -> Self {
         self.include_comments = include;
@@ -530,19 +566,22 @@ impl Config {
 enum State<'s> {
     AtStart,
     StartingImplicitMap(Event<'s>),
-    ImplicitMap(MapState),
+    ImplicitMap(MapStateExpecting),
     Finished,
 }
 
+/// An error that arose while parsing Rsn events.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct Error {
+    /// The byte range of this error.
     pub location: Range<usize>,
+    /// The kind of error that occurred.
     pub kind: ErrorKind,
 }
 
 impl Error {
     #[must_use]
-    pub fn new(location: Range<usize>, kind: ErrorKind) -> Self {
+    pub(crate) fn new(location: Range<usize>, kind: ErrorKind) -> Self {
         Self { location, kind }
     }
 }
@@ -565,15 +604,28 @@ impl From<tokenizer::Error> for Error {
     }
 }
 
+/// A kind of error that arose while parsing Rsn events.
 #[derive(Debug, Clone, Eq, PartialEq)]
+#[non_exhaustive]
 pub enum ErrorKind {
+    /// An error occurred tokenizing the input.
     Tokenizer(tokenizer::ErrorKind),
+    /// An end-of-file error was encountered when data was still expected.
     UnexpectedEof,
+    /// A key in a map was expected.
     ExpectedKey,
+    /// A `:` was expected.
     ExpectedColon,
+    /// A value was expected.
+    ///
+    /// This may be encountered in both sequence (list/tuple) parsing and map
+    /// parsing.
     ExpectedValue,
+    /// Expected a `,` or the end-variant of the specified [`Nested`].
     ExpectedCommaOrEnd(Nested),
+    /// Expected either a map or a tuple.
     ExpectedMapOrTuple,
+    /// Additional data was found after a complete value was parsed.
     TrailingData,
 }
 
@@ -604,33 +656,53 @@ impl Display for ErrorKind {
     }
 }
 
+/// A Rsn event from parsing Rsn.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Event<'s> {
+    /// The byte offset of the source that produced this event.
     pub location: Range<usize>,
+    /// The kind of this event.
     pub kind: EventKind<'s>,
 }
 
 impl<'s> Event<'s> {
     #[must_use]
-    pub fn new(location: Range<usize>, kind: EventKind<'s>) -> Self {
+    fn new(location: Range<usize>, kind: EventKind<'s>) -> Self {
         Self { location, kind }
     }
 }
 
+/// A kind of an event encountered when parsing Rsn.
 #[derive(Debug, PartialEq, Clone)]
 pub enum EventKind<'s> {
+    /// A nested sequence of events has started.
+    ///
+    /// The next events "belong" to this nesting until a matching
+    /// [`EventKind::EndNested`] is encountered.
     BeginNested {
+        /// The name of this nested context, if encountered.
         name: Option<Name<'s>>,
+        /// The type of nesting.
         kind: Nested,
     },
+    /// A nested sequence of events has concluded.
+    ///
+    /// This event can only be encountered after a [`EventKind::BeginNested`]
+    /// has been encountered. Only valid nesting equences can be encountered. If
+    /// nesting cannot be matched, an error will be returned.
     EndNested,
+    /// A primitive literal.
     Primitive(Primitive<'s>),
+    /// A comment.
     Comment(&'s str),
 }
 
+/// A name/identifier.
 #[derive(Debug, PartialEq, Clone)]
 pub struct Name<'s> {
+    /// The byte range of the name in the source.
     pub location: Range<usize>,
+    /// The name/identifier.
     pub name: &'s str,
 }
 
@@ -654,10 +726,14 @@ impl<'a, 's> PartialEq<&'a str> for Name<'s> {
     }
 }
 
+/// A kind of nestable types.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum Nested {
+    /// A sequence of values enclosed by parentheses.
     Tuple,
+    /// A sequence of key-value pairs enclosed by curly braces.
     Map,
+    /// A sequence of values enclosed by square brackets.
     List,
 }
 
@@ -682,14 +758,14 @@ impl From<Balanced> for Nested {
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub enum NestedState {
-    Tuple(ListState),
-    List(ListState),
-    Map(MapState),
+enum NestedState {
+    Tuple(ListStateExpecting),
+    List(ListStateExpecting),
+    Map(MapStateExpecting),
 }
 
 impl NestedState {
-    fn list(kind: Balanced, state: ListState) -> Self {
+    fn list(kind: Balanced, state: ListStateExpecting) -> Self {
         match kind {
             Balanced::Paren => Self::Tuple(state),
             Balanced::Bracket => Self::List(state),
@@ -699,27 +775,35 @@ impl NestedState {
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub enum ListState {
-    ExpectingValue,
-    ExpectingComma,
+enum ListStateExpecting {
+    Value,
+    Comma,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
-pub enum MapState {
-    ExpectingKey,
-    ExpectingColon,
-    ExpectingValue,
-    ExpectingComma,
+enum MapStateExpecting {
+    Key,
+    Colon,
+    Value,
+    Comma,
 }
 
+/// A primitive literal.
 #[derive(Debug, PartialEq, Clone)]
 pub enum Primitive<'s> {
+    /// A boolean literal.
     Bool(bool),
+    /// An integer literal.
     Integer(Integer),
+    /// A floating point literal.
     Float(f64),
+    /// A character literal.
     Char(char),
+    /// A string literal.
     String(Cow<'s, str>),
+    /// An identifier.
     Identifier(&'s str),
+    /// A byte string literal.
     Bytes(Cow<'s, [u8]>),
 }
 
