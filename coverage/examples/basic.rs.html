@@ -307,7 +307,7 @@
                 1
             </div>
             <div class="column has-background-success-light p-0">
-                <pre class="has-background-success-light py-0 px-2">        rsn::from_str(include_str!(&quot;.&#x2F;basic.rsn&quot;)).expect(&quot;error deserializing basic.rsn&quot;);</pre>
+                <pre class="has-background-success-light py-0 px-2">        rsn::from_str(include_str!(&quot;.&#x2F;basic.rsn&quot;)).expect(&quot;valid rsn in basic.rsn&quot;);</pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -359,7 +359,7 @@
                 1
             </div>
             <div class="column has-background-success-light p-0">
-                <pre class="has-background-success-light py-0 px-2">    let compact = rsn::to_string(&amp;posts);</pre>
+                <pre class="has-background-success-light py-0 px-2">    let compact = rsn::to_string(&amp;posts).expect(&quot;no errors&quot;);</pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -385,7 +385,7 @@
                 1
             </div>
             <div class="column has-background-success-light p-0">
-                <pre class="has-background-success-light py-0 px-2">    let pretty = rsn::to_string_pretty(&amp;posts);</pre>
+                <pre class="has-background-success-light py-0 px-2">    let pretty = rsn::to_string_pretty(&amp;posts).expect(&quot;no errors&quot;);</pre>
             </div>
         </div><div class="columns p-0 m-0">
             <div
@@ -481,7 +481,7 @@
         </div></div>
         <footer class="footer">
             <div class="content has-text-centered">
-                <p class="heading">Date: 2024-10-24 15:49</p>
+                <p class="heading">Date: 2024-10-24 21:26</p>
             </div>
         </footer>
     </body>
