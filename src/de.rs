@@ -1393,6 +1393,13 @@ impl Display for ErrorKind {
 impl Config {
     /// Deserializes `T` from `source` using this configuration.
     ///
+    /// ```rust
+    /// let deserialized: Vec<usize> = rsn::parser::Config::default()
+    ///     .deserialize("[1, 2, 3]")
+    ///     .unwrap();
+    /// assert_eq!(deserialized, vec![1, 2, 3]);
+    /// ```
+    ///
     /// # Errors
     ///
     /// Returns an error if `source` cannot be deserialized as `T`.
@@ -1412,6 +1419,13 @@ impl Config {
     }
 
     /// Deserializes `T` from `source` using this configuration.
+    ///
+    /// ```rust
+    /// let deserialized: Vec<usize> = rsn::parser::Config::default()
+    ///     .deserialize_from_slice(b"[1, 2, 3]")
+    ///     .unwrap();
+    /// assert_eq!(deserialized, vec![1, 2, 3]);
+    /// ```
     ///
     /// # Errors
     ///
@@ -1436,6 +1450,13 @@ impl Config {
     }
 
     /// Deserializes `T` from `reader` using this configuration.
+    ///
+    /// ```rust
+    /// let deserialized: Vec<usize> = rsn::parser::Config::default()
+    ///     .deserialize_from_reader(&b"[1, 2, 3]"[..])
+    ///     .unwrap();
+    /// assert_eq!(deserialized, vec![1, 2, 3]);
+    /// ```
     ///
     /// # Errors
     ///

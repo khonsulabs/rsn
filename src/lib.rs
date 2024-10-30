@@ -27,6 +27,11 @@ pub mod writer;
 /// Deserializes `D` from `source` using the default Rsn
 /// [`Config`](parser::Config).
 ///
+/// ```rust
+/// let deserialized: Vec<usize> = rsn::from_str("[1, 2, 3]").unwrap();
+/// assert_eq!(deserialized, vec![1, 2, 3]);
+/// ```
+///
 /// # Errors
 ///
 /// Returns an error if `source` isn't valid Rsn or cannot be deserialized as
@@ -39,6 +44,11 @@ pub fn from_str<'de, D: serde::Deserialize<'de>>(source: &'de str) -> Result<D, 
 /// Deserializes `D` from `slice` using the default Rsn
 /// [`Config`](parser::Config).
 ///
+/// ```rust
+/// let deserialized: Vec<usize> = rsn::from_slice(b"[1, 2, 3]").unwrap();
+/// assert_eq!(deserialized, vec![1, 2, 3]);
+/// ```
+///
 /// # Errors
 ///
 /// Returns an error if `slice` isn't valid Rsn or cannot be deserialized as
@@ -50,6 +60,11 @@ pub fn from_slice<'de, D: serde::Deserialize<'de>>(source: &'de [u8]) -> Result<
 
 /// Deserializes `D` from `reader` using the default Rsn
 /// [`Config`](parser::Config).
+///
+/// ```rust
+/// let deserialized: Vec<usize> = rsn::from_reader(&b"[1, 2, 3]"[..]).unwrap();
+/// assert_eq!(deserialized, vec![1, 2, 3]);
+/// ```
 ///
 /// # Errors
 ///
@@ -64,6 +79,11 @@ pub fn from_reader<D: serde::de::DeserializeOwned, R: std::io::Read>(
 
 /// Serializes `value` into a `String` using the default Rsn
 /// [`Config`](ser::Config).
+///
+/// ```rust
+/// let serialized = rsn::to_string(&vec![1, 2, 3]).unwrap();
+/// assert_eq!(serialized, "[1,2,3]");
+/// ```
 ///
 /// # Errors
 ///
@@ -80,6 +100,11 @@ pub fn to_string<S: serde::Serialize>(
 /// Serializes `value` into a `Vec<u8>` using the default Rsn
 /// [`Config`](ser::Config).
 ///
+/// ```rust
+/// let serialized = rsn::to_vec(&vec![1, 2, 3]).unwrap();
+/// assert_eq!(serialized, b"[1,2,3]");
+/// ```
+///
 /// # Errors
 ///
 /// Rsn itself does not produce any errors while serializing values. This
@@ -92,6 +117,12 @@ pub fn to_vec<S: serde::Serialize>(value: &S) -> Result<alloc::vec::Vec<u8>, cor
 
 /// Serializes `value` into a writer using the default Rsn
 /// [`Config`](ser::Config).
+///
+/// ```rust
+/// let mut serialized = Vec::new();
+/// rsn::to_writer(&vec![1, 2, 3], &mut serialized).unwrap();
+/// assert_eq!(serialized, b"[1,2,3]");
+/// ```
 ///
 /// # Errors
 ///
@@ -107,6 +138,12 @@ pub fn to_writer<S: serde::Serialize, W: std::io::Write>(
 
 /// Serializes `value` into a `String` using
 /// [`Config::pretty()`](ser::Config::pretty()).
+///
+/// ```rust
+/// let input = vec![1, 2, 3];
+/// let serialized = rsn::to_string_pretty(&input).unwrap();
+/// assert_eq!(serialized, "[\n  1,\n  2,\n  3\n]");
+/// ```
 ///
 /// # Errors
 ///

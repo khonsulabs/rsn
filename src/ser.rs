@@ -483,6 +483,15 @@ impl Config {
     /// - `writer`: [`writer::Config::Compact`]
     /// - `implicit_map_at_root`: `false`
     /// - `anonymous_structs`: `false`
+    ///
+    /// ```rust
+    /// use std::collections::HashMap;
+    ///
+    /// let serialized = rsn::ser::Config::new()
+    ///     .serialize(&HashMap::from([("hello", "world")]))
+    ///     .unwrap();
+    /// assert_eq!(serialized, r#"{"hello":"world"}"#)
+    /// ```
     #[must_use]
     pub const fn new() -> Self {
         Self {
@@ -493,6 +502,20 @@ impl Config {
     }
 
     /// Returns the default configuration with nested indentation and newlines.
+    ///
+    /// ```rust
+    /// use std::collections::HashMap;
+    ///
+    /// let serialized = rsn::ser::Config::pretty()
+    ///     .serialize(&HashMap::from([("hello", "world")]))
+    ///     .unwrap();
+    /// assert_eq!(
+    ///     serialized,
+    ///     r#"{
+    ///   "hello": "world"
+    /// }"#
+    /// );
+    /// ```
     #[must_use]
     pub fn pretty() -> Self {
         Self {
@@ -505,6 +528,16 @@ impl Config {
     }
 
     /// Sets [`Config::implicit_map_at_root`] and returns self.
+    ///
+    /// ```rust
+    /// use std::collections::HashMap;
+    ///
+    /// let serialized = rsn::ser::Config::pretty()
+    ///     .implicit_map_at_root(true)
+    ///     .serialize(&HashMap::from([("hello", "world")]))
+    ///     .unwrap();
+    /// assert_eq!(serialized, "\"hello\": \"world\"\n");
+    /// ```
     #[must_use]
     pub const fn implicit_map_at_root(mut self, implicit_map_at_root: bool) -> Self {
         self.implicit_map_at_root = implicit_map_at_root;
@@ -512,6 +545,28 @@ impl Config {
     }
 
     /// Sets [`Config::anonymous_structs`] and returns self.
+    ///
+    /// ```rust
+    /// use serde::Serialize;
+    ///
+    /// #[derive(Serialize)]
+    /// struct Person {
+    ///     name: &'static str,
+    /// }
+    ///
+    /// // With anonymous structures enabled
+    /// let anonymous_structs = rsn::ser::Config::new()
+    ///     .anonymous_structs(true)
+    ///     .serialize(&Person { name: "Bob" })
+    ///     .unwrap();
+    /// assert_eq!(anonymous_structs, r#"{name:"Bob"}"#);
+    ///
+    /// // The default configuration
+    /// let default_config = rsn::ser::Config::new()
+    ///     .serialize(&Person { name: "Bob" })
+    ///     .unwrap();
+    /// assert_eq!(default_config, r#"Person{name:"Bob"}"#);
+    /// ```
     #[must_use]
     pub const fn anonymous_structs(mut self, anonymous_structs: bool) -> Self {
         self.anonymous_structs = anonymous_structs;
@@ -519,6 +574,11 @@ impl Config {
     }
 
     /// Returns `value` serialized as Rsn with this configuration.
+    ///
+    /// ```rust
+    /// let serialized = rsn::ser::Config::new().serialize(&vec![1, 2, 3]).unwrap();
+    /// assert_eq!(serialized, "[1,2,3]");
+    /// ```
     ///
     /// # Errors
     ///
@@ -532,6 +592,13 @@ impl Config {
     }
 
     /// Returns `value` serialized as Rsn with this configuration.
+    ///
+    /// ```rust
+    /// let serialized = rsn::ser::Config::new()
+    ///     .serialize_to_vec(&vec![1, 2, 3])
+    ///     .unwrap();
+    /// assert_eq!(serialized, b"[1,2,3]");
+    /// ```
     ///
     /// # Errors
     ///
@@ -575,6 +642,14 @@ mod serialize_writer {
     }
     impl Config {
         /// Serializes `value` into `writer` using this configuration.
+        ///
+        /// ```rust
+        /// let mut serialized = Vec::new();
+        /// rsn::ser::Config::new()
+        ///     .serialize_to_writer(&vec![1, 2, 3], &mut serialized)
+        ///     .unwrap();
+        /// assert_eq!(serialized, b"[1,2,3]");
+        /// ```
         ///
         /// # Errors
         ///
